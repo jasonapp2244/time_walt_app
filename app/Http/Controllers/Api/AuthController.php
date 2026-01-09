@@ -200,7 +200,7 @@ class AuthController extends Controller
         }
 
         // Step 3: Check if user is verified (OTP must be verified)
-        if (! $user->is_verified) {
+        if (! $user->is_verified && $user->otp_code !== null) {
             return response()->json([
                 'success' => false,
                 'message' => 'Please verify your account with OTP first.',
@@ -446,6 +446,8 @@ class AuthController extends Controller
             'otp_code' => $otpCode,
             'otp_expires_at' => now()->addMinutes(5),
             'token' => $token,
+            'is_verified' => false,
+            'status' => 'pending',
             'expires_at' => now()->addHours(1),
         ]);
 
@@ -500,6 +502,8 @@ class AuthController extends Controller
             'otp_expires_at' => null,
             'token' => null,
             'expires_at' => null,
+            'status' => 'active',
+            'is_verified' => true,
         ]);
 
         return response()->json([
