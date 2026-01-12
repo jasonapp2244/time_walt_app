@@ -16,14 +16,33 @@ class DeviceController extends Controller
     public function register(RegisterDeviceRequest $request): JsonResponse
     {
         $user = $request->user();
-        $user->update([
-            'device_id' => $request->device_id,
-            'device_type' => $request->device_type,
-            'fcm_token' => $request->fcm_token,
-            'timezone' => $request->timezone ?? $user->timezone,
-            'language' => $request->language ?? $user->language,
+        $updateData = [
             'last_active_at' => now(),
-        ]);
+        ];
+
+        // Update device fields if provided
+        if ($request->filled('device_id')) {
+            $updateData['device_id'] = $request->device_id;
+        }
+
+        if ($request->filled('device_type')) {
+            $updateData['device_type'] = $request->device_type;
+        }
+
+        if ($request->filled('fcm_token')) {
+            $updateData['fcm_token'] = $request->fcm_token;
+        }
+
+        // Update timezone and language (profile fields) if provided
+        if ($request->filled('timezone')) {
+            $updateData['timezone'] = $request->timezone;
+        }
+
+        if ($request->filled('language')) {
+            $updateData['language'] = $request->language;
+        }
+
+        $user->update($updateData);
 
         return response()->json([
             'success' => true,

@@ -256,15 +256,34 @@ class AuthController extends Controller
             ]);
         }
 
-        // Update device info and last active
-        $user->update([
-            'device_id' => $request->device_id ?? $user->device_id,
-            'device_type' => $request->device_type ?? $user->device_type,
-            'fcm_token' => $request->fcm_token ?? $user->fcm_token,
-            'timezone' => $request->timezone ?? $user->timezone,
-            'language' => $request->language ?? $user->language,
+        // Update device info and last active (store device info on every login)
+        $updateData = [
             'last_active_at' => now(),
-        ]);
+        ];
+
+        // Update device fields if provided
+        if ($request->filled('device_id')) {
+            $updateData['device_id'] = $request->device_id;
+        }
+
+        if ($request->filled('device_type')) {
+            $updateData['device_type'] = $request->device_type;
+        }
+
+        if ($request->filled('fcm_token')) {
+            $updateData['fcm_token'] = $request->fcm_token;
+        }
+
+        // Update timezone and language if provided
+        if ($request->filled('timezone')) {
+            $updateData['timezone'] = $request->timezone;
+        }
+
+        if ($request->filled('language')) {
+            $updateData['language'] = $request->language;
+        }
+
+        $user->update($updateData);
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
@@ -482,10 +501,10 @@ class AuthController extends Controller
             ], 404);
         }
 
-        if ($user->otp_code !== $request->otp_code) {
+        if ($user->otp_code !== null) {
             return response()->json([
                 'success' => false,
-                'message' => 'Invalid OTP code.',
+                'message' => 'please first otp verify your account',
             ], 400);
         }
 

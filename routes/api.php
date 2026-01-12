@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProfileController;
 use Illuminate\Http\Request;
@@ -19,7 +18,8 @@ Route::prefix('auth')->name('auth.')->group(function () {
 });
 
 // Protected Routes (Require Authentication)
-Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
+// Rate limit: 60 requests per minute for authenticated users
+Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     // Authentication
     Route::prefix('auth')->name('auth.')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
@@ -28,20 +28,15 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     // Profile Routes
     Route::prefix('profile')->name('profile.')->group(function () {
         Route::get('/', [ProfileController::class, 'show'])->name('show');
-        Route::put('/update', [ProfileController::class, 'update'])->name('update');
-        Route::put('/language', [ProfileController::class, 'updateLanguage'])->name('language');
-        Route::put('/timezone', [ProfileController::class, 'updateTimezone'])->name('timezone');
-    });
-
-    // Device Routes
-    Route::prefix('device')->name('device.')->group(function () {
-        Route::post('/register', [DeviceController::class, 'register'])->name('register');
-        Route::put('/update-token', [DeviceController::class, 'updateToken'])->name('update-token');
+        // Use POST for update to support file uploads properly
+        Route::post('/update', [ProfileController::class, 'update'])->name('update');
+        Route::post('/language', [ProfileController::class, 'updateLanguage'])->name('language');
+        Route::post('/timezone', [ProfileController::class, 'updateTimezone'])->name('timezone');
     });
 
     // Notification Settings Routes
     Route::prefix('notification-settings')->name('notification-settings.')->group(function () {
         Route::get('/', [NotificationController::class, 'show'])->name('show');
-        Route::put('/update', [NotificationController::class, 'update'])->name('update');
+        Route::post('/update', [NotificationController::class, 'update'])->name('update');
     });
 });

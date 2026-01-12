@@ -24,12 +24,14 @@ class UpdateProfileRequest extends FormRequest
         $userId = $this->user()->id;
 
         return [
-            'full_name' => ['sometimes', 'string', 'max:255'],
-            'email' => ['sometimes', 'string', 'email', 'max:255', 'unique:users,email,' . $userId],
-            'phone' => ['sometimes', 'string', 'max:20', 'unique:users,phone,' . $userId],
-            'profile' => ['sometimes', 'string', 'max:255'],
+            'full_name' => ['nullable', 'sometimes', 'string', 'max:255'],
+            'phone' => ['nullable', 'sometimes', 'string', 'max:20', 'unique:users,phone,' . $userId],
+            'profile_image' => ['nullable', 'sometimes', 'file', 'image', 'mimes:jpeg,jpg,png,gif', 'max:2048'],
+            'timezone' => ['nullable', 'sometimes', 'string', 'max:100'],
+            'language' => ['nullable', 'sometimes', 'string', 'max:10'],
         ];
     }
+
 
     /**
      * Get custom messages for validator errors.
@@ -40,9 +42,10 @@ class UpdateProfileRequest extends FormRequest
     {
         return [
             'full_name.string' => 'Full name must be a string.',
-            'email.email' => 'Please provide a valid email address.',
-            'email.unique' => 'This email is already taken.',
             'phone.unique' => 'This phone number is already taken.',
+            'profile_image.image' => 'Profile image must be an image file.',
+            'profile_image.mimes' => 'Profile image must be jpeg, jpg, png, or gif.',
+            'profile_image.max' => 'Profile image must not exceed 2MB.',
         ];
     }
 }
