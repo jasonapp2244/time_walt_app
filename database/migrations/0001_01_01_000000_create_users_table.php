@@ -19,7 +19,7 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->string('phone')->unique();
             $table->string('password');
-            $table->string('profile')->nullable();
+            $table->string('profile')->default('default.png');
             
             $table->string('otp_code', 4)->nullable();
             $table->timestamp('otp_expires_at')->nullable();
