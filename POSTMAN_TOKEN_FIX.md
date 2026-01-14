@@ -219,3 +219,4 @@ token = 1|xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 **Correct**: `Bearer {{token}}`  
 **Wrong**: `Bearer{{token}}` or `{{token}}`
 
+

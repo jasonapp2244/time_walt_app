@@ -156,3 +156,4 @@ curl -X PUT http://localhost:8000/api/profile/update \
 
 **Remember**: Always use `form-data` body type and set `profile_image` field type to **File** in Postman!
 
+

@@ -272,3 +272,4 @@ token = 1|xxxxxxxxxxxx (from login)
 
 **Note**: Both endpoints update `last_active_at` automatically to track user activity.
 
+
