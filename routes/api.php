@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Controllers\Api\Admin\TransferController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\StripeController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -39,4 +41,23 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::get('/', [NotificationController::class, 'show'])->name('show');
         Route::post('/update', [NotificationController::class, 'update'])->name('update');
     });
+
+
+    
+    // Stripe Connect Routes
+    Route::prefix('stripe')->name('stripe.')->group(function () {
+        Route::post('/connect/create', [StripeController::class, 'createConnectAccount'])->name('connect.create');
+        Route::post('/connect/onboarding-link', [StripeController::class, 'getOnboardingLink'])->name('connect.onboarding-link');
+        Route::post('/payment-intent', [StripeController::class, 'createPaymentIntent'])->name('payment-intent');
+    });
+
+    // Admin Routes
+    Route::prefix('admin')->name('admin.')->group(function () {
+        Route::post('/transfer/{hold_id}', [TransferController::class, 'transfer'])->name('transfer');
+    });
 });
+
+// Webhook Route (NO AUTH - Stripe calls this)
+Route::post('/stripe/webhook', [StripeController::class, 'handleWebhook'])
+    ->name('stripe.webhook')
+    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
