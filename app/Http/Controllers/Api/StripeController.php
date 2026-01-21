@@ -13,6 +13,7 @@ use App\Services\StripeService;
 use App\Services\WebhookService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class StripeController extends Controller
@@ -159,6 +160,181 @@ class StripeController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to create payment intent.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Test Payment Intent with Card (For Testing Only).
+     * This route creates payment intent and confirms it with test card automatically.
+     */
+    public function testPaymentWithCard(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+
+            // Validate request
+            $request->validate([
+                'amount' => ['required', 'integer', 'min:100'],
+                'currency' => ['nullable', 'string', 'in:usd,eur,gbp'],
+                'hold_period_type' => ['nullable', 'string', 'in:1_month,2_months,6_months,1_year,custom'],
+            ]);
+
+            $amount = $request->amount;
+            $currency = $request->currency ?? 'usd';
+
+            // Prepare hold period data
+            $holdPeriodData = [];
+            if ($request->hold_period_type) {
+                $holdPeriodData = [
+                    'user_id' => $user->id,
+                    'hold_period_type' => $request->hold_period_type,
+                    'hold_start_at' => $request->hold_start_at ?? now()->toIso8601String(),
+                    'hold_end_at' => $request->hold_end_at ?? null,
+                    'hold_days' => $request->hold_days ?? 30,
+                ];
+
+                // Calculate end date if not provided
+                if (! $request->hold_end_at && $request->hold_period_type !== 'custom') {
+                    $days = match ($request->hold_period_type) {
+                        '1_month' => 30,
+                        '2_months' => 60,
+                        '6_months' => 180,
+                        '1_year' => 365,
+                        default => 30,
+                    };
+                    $holdPeriodData['hold_days'] = $days;
+                    $holdPeriodData['hold_end_at'] = now()->addDays($days)->toIso8601String();
+                }
+            }
+
+            // Prepare metadata for hold period
+            $metadata = [
+                'user_id' => (string) $user->id,
+            ];
+
+            if (isset($holdPeriodData['hold_period_type'])) {
+                $metadata['hold_period_type'] = $holdPeriodData['hold_period_type'];
+                $metadata['hold_start_at'] = $holdPeriodData['hold_start_at'];
+                $metadata['hold_end_at'] = $holdPeriodData['hold_end_at'];
+                $metadata['hold_days'] = (string) $holdPeriodData['hold_days'];
+            }
+
+            // Step 1: Create payment intent with payment method and auto-confirm
+            // Note: This requires "Access to raw card data APIs" enabled in Stripe Dashboard
+            // Go to: Stripe Dashboard → Settings → API → Enable "Process payments unsafely"
+            // OR use Stripe CLI: stripe payment_intents confirm <pi_id> --payment-method=pm_card_visa
+            
+            // For testing, we'll create payment intent and use Stripe's test payment method
+            // First, try to create with payment_method_data (requires raw card APIs enabled)
+            try {
+                $paymentIntentData = [
+                    'amount' => $amount,
+                    'currency' => $currency,
+                    'metadata' => $metadata,
+                    'payment_method_data' => [
+                        'type' => 'card',
+                        'card' => [
+                            'number' => '4242424242424242',
+                            'exp_month' => 12,
+                            'exp_year' => date('Y') + 1,
+                            'cvc' => '123',
+                        ],
+                    ],
+                    'confirm' => true,
+                    'return_url' => config('app.url').'/stripe/return',
+                ];
+
+                $confirmedPaymentIntent = \Stripe\PaymentIntent::create($paymentIntentData);
+                $paymentIntentId = $confirmedPaymentIntent->id;
+            } catch (\Stripe\Exception\InvalidRequestException $e) {
+                // If raw card data APIs not enabled, throw helpful error
+                if (str_contains($e->getMessage(), 'raw card data')) {
+                    throw new \Exception(
+                        'Raw card data APIs not enabled. '.
+                        'Please enable in Stripe Dashboard: Settings → API → "Process payments unsafely" '.
+                        'OR use Stripe CLI: stripe payment_intents confirm <pi_id> --payment-method=pm_card_visa'
+                    );
+                }
+                throw $e;
+            }
+
+            // Store hold period data in cache for webhook
+            if (isset($holdPeriodData['hold_period_type'])) {
+                Cache::put(
+                    "payment_intent_hold_{$paymentIntentId}",
+                    [
+                        'hold_period_type' => $holdPeriodData['hold_period_type'] ?? null,
+                        'hold_start_at' => $holdPeriodData['hold_start_at'] ?? null,
+                        'hold_end_at' => $holdPeriodData['hold_end_at'] ?? null,
+                        'hold_days' => $holdPeriodData['hold_days'] ?? null,
+                    ],
+                    now()->addDays(7)
+                );
+            }
+
+            // Step 5: Create payment record
+            $payment = Payment::create([
+                'user_id' => $user->id,
+                'payment_intent_id' => $paymentIntentId,
+                'amount' => $amount / 100, // Convert cents to dollars
+                'currency' => $currency,
+                'status' => $confirmedPaymentIntent->status === 'succeeded' ? 'succeeded' : 'pending',
+                'paid_at' => $confirmedPaymentIntent->status === 'succeeded' ? now() : null,
+                'stripe_data' => $confirmedPaymentIntent->toArray(),
+            ]);
+
+            // Step 6: If payment succeeded, create payment hold (simulate webhook)
+            if ($confirmedPaymentIntent->status === 'succeeded') {
+                $holdPeriodData = $this->stripeService->getHoldPeriodData($paymentIntentId);
+
+                if ($holdPeriodData) {
+                    $this->webhookService->handlePaymentIntentSucceeded([
+                        'id' => 'evt_test_'.$paymentIntentId,
+                        'type' => 'payment_intent.succeeded',
+                        'data' => [
+                            'object' => $confirmedPaymentIntent->toArray(),
+                        ],
+                    ]);
+                } else {
+                    // Default 30 days if no hold period data
+                    $this->webhookService->handlePaymentIntentSucceeded([
+                        'id' => 'evt_test_'.$paymentIntentId,
+                        'type' => 'payment_intent.succeeded',
+                        'data' => [
+                            'object' => $confirmedPaymentIntent->toArray(),
+                        ],
+                    ]);
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Test payment completed successfully.',
+                'data' => [
+                    'payment_intent_id' => $paymentIntentId,
+                    'payment_status' => $confirmedPaymentIntent->status,
+                    'payment_id' => $payment->id,
+                    'amount' => $amount / 100,
+                    'currency' => $currency,
+                    'hold_created' => $confirmedPaymentIntent->status === 'succeeded',
+                    'hold_period' => $paymentIntent['hold_period'] ?? null,
+                ],
+            ]);
+        } catch (\Stripe\Exception\CardException $e) {
+            Log::error('Test Payment Card Error: '.$e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Payment failed: '.$e->getError()->message,
+                'error' => $e->getError()->toArray(),
+            ], 400);
+        } catch (\Exception $e) {
+            Log::error('Test Payment Failed: '.$e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to process test payment: '.$e->getMessage(),
             ], 500);
         }
     }
