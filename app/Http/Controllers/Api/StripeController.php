@@ -100,6 +100,64 @@ class StripeController extends Controller
     }
 
     /**
+     * Handle Stripe Connect OAuth callback after onboarding completion.
+     */
+    public function handleConnectCallback(Request $request): JsonResponse
+    {
+        try {
+            // Set Stripe API key
+            \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
+
+            $accountId = $request->query('account');
+
+            if (! $accountId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Account ID is required.',
+                ], 400);
+            }
+
+            // Find the connect account
+            $connectAccount = StripeConnectAccount::where('connect_account_id', $accountId)->first();
+
+            if (! $connectAccount) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Stripe Connect account not found.',
+                ], 404);
+            }
+
+            // Retrieve account details from Stripe
+            $account = \Stripe\Account::retrieve($accountId);
+
+            // Update connect account status
+            $connectAccount->update([
+                'status' => $account->details_submitted ? 'active' : 'pending',
+                'payouts_enabled' => $account->payouts_enabled ?? false,
+                'stripe_data' => $account->toArray(),
+                'verified_at' => $account->details_submitted ? now() : null,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Stripe Connect account verified successfully.',
+                'data' => [
+                    'connect_account_id' => $connectAccount->connect_account_id,
+                    'status' => $connectAccount->status,
+                    'payouts_enabled' => $connectAccount->payouts_enabled,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Stripe Connect Callback Failed: '.$e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to process Stripe Connect callback.',
+            ], 500);
+        }
+    }
+
+    /**
      * Create PaymentIntent with hold period data.
      */
     public function createPaymentIntent(CreatePaymentIntentRequest $request): JsonResponse
@@ -224,7 +282,7 @@ class StripeController extends Controller
             // Note: This requires "Access to raw card data APIs" enabled in Stripe Dashboard
             // Go to: Stripe Dashboard → Settings → API → Enable "Process payments unsafely"
             // OR use Stripe CLI: stripe payment_intents confirm <pi_id> --payment-method=pm_card_visa
-            
+
             // For testing, we'll create payment intent and use Stripe's test payment method
             // First, try to create with payment_method_data (requires raw card APIs enabled)
             try {
@@ -381,9 +439,11 @@ class StripeController extends Controller
             match ($event->type) {
                 'payment_intent.succeeded' => $this->webhookService->handlePaymentIntentSucceeded($eventArray),
                 'payment_intent.payment_failed' => $this->webhookService->handlePaymentIntentFailed($eventArray),
+                'payment_intent.canceled' => $this->webhookService->handlePaymentIntentCanceled($eventArray),
                 'account.updated' => $this->webhookService->handleAccountUpdated($eventArray),
                 'transfer.created' => $this->webhookService->handleTransferCreated($eventArray),
                 'transfer.failed' => $this->webhookService->handleTransferFailed($eventArray),
+                'transfer.canceled' => $this->webhookService->handleTransferCanceled($eventArray),
                 default => Log::info("Unhandled webhook event type: {$event->type}"),
             };
 

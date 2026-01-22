@@ -43,7 +43,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     });
 
 
-    
+
     // Stripe Connect Routes
     Route::prefix('stripe')->name('stripe.')->group(function () {
         Route::post('/connect/create', [StripeController::class, 'createConnectAccount'])->name('connect.create');
@@ -64,6 +64,11 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::post('/transfer/{hold_id}', [TransferController::class, 'transfer'])->name('transfer');
     });
 });
+
+// Stripe Connect OAuth Callback (NO AUTH - Stripe redirects here)
+Route::get('/stripe/connect/return', [StripeController::class, 'handleConnectCallback'])
+    ->name('stripe.connect.return')
+    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
 // Webhook Route (NO AUTH - Stripe calls this)
 Route::post('/stripe/webhook', [StripeController::class, 'handleWebhook'])

@@ -169,4 +169,74 @@ class WebhookService
             }
         }
     }
+
+    /**
+     * Handle payment_intent.canceled event (when user cancels payment).
+     */
+    public function handlePaymentIntentCanceled(array $eventData): void
+    {
+        $paymentIntent = $eventData['data']['object'];
+        $paymentIntentId = $paymentIntent['id'];
+        $cancelReason = $paymentIntent['cancellation_reason'] ?? 'Payment canceled by user';
+
+        $payment = Payment::where('payment_intent_id', $paymentIntentId)->first();
+
+        if ($payment) {
+            $payment->update([
+                'status' => 'canceled',
+                'failure_reason' => $cancelReason,
+                'stripe_data' => $paymentIntent,
+            ]);
+
+            // If payment hold exists, update it
+            $hold = PaymentHold::whereHas('payment', function ($query) use ($paymentIntentId) {
+                $query->where('payment_intent_id', $paymentIntentId);
+            })->first();
+
+            if ($hold) {
+                $hold->update([
+                    'status' => 'canceled',
+                ]);
+            }
+
+            // Send email notification
+            $userSettings = UserNotificationSetting::where('user_id', $payment->user_id)->first();
+            if (! $userSettings || $userSettings->email_alert) {
+                SendPaymentFailedNotification::dispatch($payment, $cancelReason);
+            }
+        }
+    }
+
+    /**
+     * Handle transfer.canceled event (when transfer is canceled mid-process).
+     */
+    public function handleTransferCanceled(array $eventData): void
+    {
+        $transfer = $eventData['data']['object'];
+        $transferId = $transfer['id'];
+        $cancelReason = $transfer['failure_message'] ?? 'Transfer canceled';
+
+        $transferRecord = Transfer::where('stripe_transfer_id', $transferId)->first();
+
+        if ($transferRecord) {
+            $transferRecord->update([
+                'status' => 'canceled',
+                'failure_reason' => $cancelReason,
+                'stripe_data' => $transfer,
+            ]);
+
+            // Update payment hold status back to ready_for_transfer
+            if ($transferRecord->hold) {
+                $transferRecord->hold->update([
+                    'status' => 'ready_for_transfer',
+                ]);
+            }
+
+            // Send email notification
+            $userSettings = UserNotificationSetting::where('user_id', $transferRecord->user_id)->first();
+            if (! $userSettings || $userSettings->email_alert) {
+                SendTransferFailedNotification::dispatch($transferRecord, $cancelReason);
+            }
+        }
+    }
 }

@@ -60,8 +60,8 @@ class StripeService
         try {
             $accountLink = \Stripe\AccountLink::create([
                 'account' => $connectAccount->connect_account_id,
-                'refresh_url' => config('app.url').'/stripe/reauth',
-                'return_url' => config('app.url').'/stripe/return',
+                'refresh_url' => config('app.url').'/api/stripe/connect/return',
+                'return_url' => config('app.url').'/api/stripe/connect/return',
                 'type' => 'account_onboarding',
             ]);
 
