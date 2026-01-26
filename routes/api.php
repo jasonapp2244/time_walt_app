@@ -5,7 +5,6 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\StripeController;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // Public Authentication Routes with Rate Limiting
@@ -42,22 +41,13 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::post('/update', [NotificationController::class, 'update'])->name('update');
     });
 
-
-
     // Stripe Connect Routes
     Route::prefix('stripe')->name('stripe.')->group(function () {
         Route::post('/connect/create', [StripeController::class, 'createConnectAccount'])->name('connect.create');
         Route::post('/connect/onboarding-link', [StripeController::class, 'getOnboardingLink'])->name('connect.onboarding-link');
         Route::post('/payment-intent', [StripeController::class, 'createPaymentIntent'])->name('payment-intent');
-
-
-
-        Route::post('/test-payment', [StripeController::class, 'testPaymentWithCard'])->name('test-payment');
     });
 
-
-
-    
     // Payment Holds Routes (User)
     Route::prefix('payment-holds')->name('payment-holds.')->group(function () {
         Route::get('/', [\App\Http\Controllers\Api\PaymentHoldController::class, 'index'])->name('index');

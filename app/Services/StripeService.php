@@ -59,17 +59,34 @@ class StripeService
     {
         try {
             // Use the return URL from config
-            $returnUrl = config('services.stripe.connect_return_url');
+            $baseReturnUrl = config('services.stripe.connect_return_url');
+
+            // Append account ID to return URL to ensure we have it in callback
+            // Stripe will also add its own parameters, but this ensures we have the account ID
+            $separator = parse_url($baseReturnUrl, PHP_URL_QUERY) ? '&' : '?';
+            $returnUrl = $baseReturnUrl.$separator.'account='.urlencode($connectAccount->connect_account_id);
+            $refreshUrl = $baseReturnUrl.$separator.'account='.urlencode($connectAccount->connect_account_id);
+
+            // Store account ID in cache for fallback (valid for 24 hours)
+            // Key: account_link_{account_id} -> account_id
+            Cache::put(
+                "account_link_{$connectAccount->connect_account_id}",
+                $connectAccount->connect_account_id,
+                now()->addHours(24)
+            );
 
             // Log the return URL being used
             Log::info('Creating Stripe AccountLink', [
                 'account_id' => $connectAccount->connect_account_id,
-                'return_url' => $returnUrl,
+                'user_id' => $connectAccount->user_id,
+                'base_return_url' => $baseReturnUrl,
+                'return_url_with_account' => $returnUrl,
+                'refresh_url_with_account' => $refreshUrl,
             ]);
 
             $accountLink = \Stripe\AccountLink::create([
                 'account' => $connectAccount->connect_account_id,
-                'refresh_url' => $returnUrl,
+                'refresh_url' => $refreshUrl,
                 'return_url' => $returnUrl,
                 'type' => 'account_onboarding',
             ]);
@@ -83,6 +100,7 @@ class StripeService
                 'account_id' => $connectAccount->connect_account_id,
                 'account_link_url' => $accountLink->url,
                 'return_url' => $returnUrl,
+                'stripe_account_link_id' => $accountLink->id ?? null,
             ]);
 
             return $accountLink->url;
@@ -124,7 +142,7 @@ class StripeService
 
             $paymentIntent = \Stripe\PaymentIntent::create($paymentIntentParams);
 
-            // Store hold period data in cache for webhook
+            // Store hold period data in cache for payment return handler
             Cache::put(
                 "payment_intent_hold_{$paymentIntent->id}",
                 [
@@ -172,6 +190,12 @@ class StripeService
             ]);
 
             // Create transfer record
+            $adminId = null;
+            if (\Illuminate\Support\Facades\Auth::check()) {
+                $user = \Illuminate\Support\Facades\Auth::user();
+                $adminId = ($user && isset($user->role) && $user->role === 'admin') ? $user->id : null;
+            }
+
             $transferRecord = Transfer::create([
                 'hold_id' => $hold->id,
                 'user_id' => $hold->user_id,
@@ -181,7 +205,7 @@ class StripeService
                 'currency' => 'usd',
                 'status' => 'pending',
                 'transfer_type' => $type,
-                'admin_id' => auth()->check() && auth()->user()->role === 'admin' ? auth()->id() : null,
+                'admin_id' => $adminId,
                 'stripe_data' => $transfer->toArray(),
             ]);
 

@@ -31,7 +31,7 @@ return new class extends Migration
         });
     }
 
-    /**
+    /**STRIPE_CONNECT_RETURN_UR
      * Reverse the migrations.
      */
     public function down(): void

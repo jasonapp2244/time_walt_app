@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\SendPayoutRequestNotification;
 use App\Models\PaymentHold;
+use App\Models\UserNotificationSetting;
 use App\Services\StripeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,8 +15,7 @@ class PaymentHoldController extends Controller
 {
     public function __construct(
         protected StripeService $stripeService
-    ) {
-    }
+    ) {}
 
     /**
      * Get user's payment holds.
@@ -132,6 +133,19 @@ class PaymentHoldController extends Controller
             // Create transfer
             $transfer = $this->stripeService->createTransfer($hold, 'user_requested');
 
+            // Send email notification to user and admin (check user preferences)
+            $userSettings = UserNotificationSetting::where('user_id', $hold->user_id)->first();
+            if (! $userSettings || $userSettings->email_alert) {
+                SendPayoutRequestNotification::dispatch($transfer);
+            }
+
+            Log::info('Payout request created', [
+                'transfer_id' => $transfer->id,
+                'hold_id' => $hold->id,
+                'user_id' => $hold->user_id,
+                'amount' => $transfer->amount,
+            ]);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Payout request submitted successfully. Transfer will be processed shortly.',
@@ -205,7 +219,7 @@ class PaymentHoldController extends Controller
                         'locked' => $lockedCount,
                         'ready_for_transfer' => $readyCount,
                         'transferred' => $transferredCount,
-                        'available_for_payout' => $holds->filter(fn($h) => $this->canRequestPayout($h))->count(),
+                        'available_for_payout' => $holds->filter(fn ($h) => $this->canRequestPayout($h))->count(),
                     ],
                 ],
             ]);
@@ -240,7 +254,7 @@ class PaymentHoldController extends Controller
         }
 
         // If status is ready_for_transfer or holding (and period complete)
-        return $hold->status === 'ready_for_transfer' || 
+        return $hold->status === 'ready_for_transfer' ||
                ($hold->status === 'holding' && $hold->hold_end_at && $hold->hold_end_at->isPast());
     }
 }

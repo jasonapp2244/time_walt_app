@@ -22,9 +22,12 @@ class CreatePaymentIntentRequest extends FormRequest
      */
     public function rules(): array
     {
+        // Get supported currencies from config
+        $supportedCurrencies = array_keys(config('services.stripe.supported_currencies', ['usd', 'eur', 'gbp']));
+    
         return [
-            'amount' => ['required', 'integer', 'min:100'], // minimum $1.00 in cents
-            'currency' => ['required', 'string', 'size:3', 'in:usd,eur,gbp'],
+            'amount' => ['required', 'numeric', 'min:1'], // amount in dollars (minimum $1.00)
+            'currency' => ['required', 'string', 'size:3', Rule::in($supportedCurrencies)],
             'hold_period_type' => ['nullable', 'string', Rule::in(['1_month', '2_months', '6_months', '1_year', 'custom'])],
             'hold_start_at' => ['nullable', 'date', 'after_or_equal:today'],
             'hold_end_at' => ['nullable', 'date', 'after:hold_start_at'],
@@ -66,10 +69,15 @@ class CreatePaymentIntentRequest extends FormRequest
      */
     public function messages(): array
     {
+        $supportedCurrencies = array_keys(config('services.stripe.supported_currencies', ['usd', 'eur', 'gbp']));
+        $currencyList = implode(', ', array_map('strtoupper', $supportedCurrencies));
+    
         return [
             'amount.required' => 'Amount is required.',
             'amount.min' => 'Minimum amount is $1.00.',
+            'amount.numeric' => 'Amount must be a valid number.',
             'currency.required' => 'Currency is required.',
+            'currency.in' => "Currency must be one of: {$currencyList}.",
             'hold_period_type.in' => 'Invalid hold period type.',
             'hold_end_at.after' => 'End date must be after start date.',
             'hold_days.min' => 'Minimum hold period is 30 days.',

@@ -10,6 +10,5 @@ Artisan::command('inspire', function () {
 
 // Schedule Cron Jobs
 Schedule::command('check:payment-holds')
-    ->daily()
-    ->at('00:00')
-    ->description('Check payment holds where hold period has ended');
+    ->everyMinute()
+    ->description('Check payment holds where hold period has ended and mark as ready for transfer');
