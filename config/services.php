@@ -40,6 +40,16 @@ return [
         'secret' => env('STRIPE_SECRET'),
         'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
         'auto_transfer_enabled' => env('STRIPE_AUTO_TRANSFER', false),
+
+        // Stripe Connect OAuth Return URL (set in .env file)
+        'connect_return_url' => env('STRIPE_CONNECT_RETURN_URL', 'https://time-vault.devonlinetestserver.com/api/stripe/connect/return'),
+
+        // Payment Intent Return URL (where Stripe redirects after payment) - set in .env file
+        'payment_return_url' => env('STRIPE_PAYMENT_RETURN_URL', 'https://time-vault.devonlinetestserver.com/api/stripe/payment/return'),
+
+        // Frontend URLs (set in .env file)
+        'payment_success_url' => env('STRIPE_PAYMENT_SUCCESS_URL', 'https://time-vault.devonlinetestserver.com/payment/success'),
+        'payment_failed_url' => env('STRIPE_PAYMENT_FAILED_URL', 'https://time-vault.devonlinetestserver.com/payment/failed'),
     ],
 
 ];

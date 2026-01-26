@@ -58,16 +58,31 @@ class StripeService
     public function getOnboardingLink(StripeConnectAccount $connectAccount): string
     {
         try {
+            // Use the return URL from config
+            $returnUrl = config('services.stripe.connect_return_url');
+
+            // Log the return URL being used
+            Log::info('Creating Stripe AccountLink', [
+                'account_id' => $connectAccount->connect_account_id,
+                'return_url' => $returnUrl,
+            ]);
+
             $accountLink = \Stripe\AccountLink::create([
                 'account' => $connectAccount->connect_account_id,
-                'refresh_url' => config('app.url').'/api/stripe/connect/return',
-                'return_url' => config('app.url').'/api/stripe/connect/return',
+                'refresh_url' => $returnUrl,
+                'return_url' => $returnUrl,
                 'type' => 'account_onboarding',
             ]);
 
             // Update onboarding URL
             $connectAccount->update([
                 'onboarding_url' => $accountLink->url,
+            ]);
+
+            Log::info('Stripe AccountLink created successfully', [
+                'account_id' => $connectAccount->connect_account_id,
+                'account_link_url' => $accountLink->url,
+                'return_url' => $returnUrl,
             ]);
 
             return $accountLink->url;
@@ -95,11 +110,19 @@ class StripeService
                 $metadata['hold_days'] = $data['hold_days'] ?? 30;
             }
 
-            $paymentIntent = \Stripe\PaymentIntent::create([
+            // Prepare PaymentIntent parameters
+            $paymentIntentParams = [
                 'amount' => $data['amount'],
                 'currency' => $data['currency'] ?? 'usd',
                 'metadata' => $metadata,
-            ]);
+            ];
+
+            // Add redirect URLs if provided (for redirect-based payment methods)
+            if (isset($data['return_url'])) {
+                $paymentIntentParams['return_url'] = $data['return_url'];
+            }
+
+            $paymentIntent = \Stripe\PaymentIntent::create($paymentIntentParams);
 
             // Store hold period data in cache for webhook
             Cache::put(

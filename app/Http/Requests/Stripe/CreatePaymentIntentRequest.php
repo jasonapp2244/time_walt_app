@@ -29,6 +29,7 @@ class CreatePaymentIntentRequest extends FormRequest
             'hold_start_at' => ['nullable', 'date', 'after_or_equal:today'],
             'hold_end_at' => ['nullable', 'date', 'after:hold_start_at'],
             'hold_days' => ['nullable', 'integer', 'min:30'],
+            'return_url' => ['nullable', 'url', 'max:500'], // For redirect-based payment methods
         ];
     }
 

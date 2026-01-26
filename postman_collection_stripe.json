@@ -1,0 +1,416 @@
+{
+	"info": {
+		"_postman_id": "stripe-api-collection",
+		"name": "Stripe Payment API - Time Walt App",
+		"description": "Complete Stripe payment and payout API collection",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.success && jsonData.data && jsonData.data.token) {",
+									"        pm.environment.set(\"token\", jsonData.data.token);",
+									"        console.log(\"✅ Token saved:\", jsonData.data.token);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"test@example.com\",\n    \"password\": \"Secure@123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/login",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "login"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Stripe Connect",
+			"item": [
+				{
+					"name": "Create Connect Account",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{}"
+						},
+						"url": {
+							"raw": "{{base_url}}/stripe/connect/create",
+							"host": ["{{base_url}}"],
+							"path": ["stripe", "connect", "create"]
+						},
+						"description": "Create Stripe Connect Express account for user"
+					}
+				},
+				{
+					"name": "Get Onboarding Link",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{}"
+						},
+						"url": {
+							"raw": "{{base_url}}/stripe/connect/onboarding-link",
+							"host": ["{{base_url}}"],
+							"path": ["stripe", "connect", "onboarding-link"]
+						},
+						"description": "Get onboarding link for Stripe Connect account"
+					}
+				}
+			]
+		},
+		{
+			"name": "Payments",
+			"item": [
+				{
+					"name": "Create Payment Intent",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"amount\": 5000,\n    \"currency\": \"usd\",\n    \"hold_period_type\": \"1_month\",\n    \"return_url\": \"https://yourapp.com/payment/return\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/stripe/payment-intent",
+							"host": ["{{base_url}}"],
+							"path": ["stripe", "payment-intent"]
+						},
+						"description": "Create payment intent with hold period. Amount in cents (5000 = $50.00)"
+					}
+				},
+				{
+					"name": "Test Payment (Auto Confirm)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"amount\": 5000,\n    \"currency\": \"usd\",\n    \"hold_period_type\": \"1_month\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/stripe/test-payment",
+							"host": ["{{base_url}}"],
+							"path": ["stripe", "test-payment"]
+						},
+						"description": "Test payment with card (auto-confirms). Creates payment hold directly without webhook. Amount in cents."
+					}
+				},
+				{
+					"name": "Payment Return Handler",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/stripe/payment/return?payment_intent=pi_xxxxx&payment_intent_client_secret=pi_xxxxx_secret_xxxxx",
+							"host": ["{{base_url}}"],
+							"path": ["stripe", "payment", "return"],
+							"query": [
+								{
+									"key": "payment_intent",
+									"value": "pi_xxxxx",
+									"description": "Payment Intent ID from Stripe"
+								},
+								{
+									"key": "payment_intent_client_secret",
+									"value": "pi_xxxxx_secret_xxxxx",
+									"description": "Client secret from Stripe"
+								}
+							]
+						},
+						"description": "Handle payment return after redirect (3D Secure, etc.). Called by Stripe after payment."
+					}
+				}
+			]
+		},
+		{
+			"name": "Payment Holds",
+			"item": [
+				{
+					"name": "Get Payment Holds",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/payment-holds",
+							"host": ["{{base_url}}"],
+							"path": ["payment-holds"]
+						},
+						"description": "Get all payment holds for authenticated user"
+					}
+				},
+				{
+					"name": "Get Payment Holds Summary",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/payment-holds/summary",
+							"host": ["{{base_url}}"],
+							"path": ["payment-holds", "summary"]
+						},
+						"description": "Get payment holds summary (totals, available for payout, etc.)"
+					}
+				},
+				{
+					"name": "Request Payout",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{}"
+						},
+						"url": {
+							"raw": "{{base_url}}/payment-holds/:hold_id/request-payout",
+							"host": ["{{base_url}}"],
+							"path": ["payment-holds", ":hold_id", "request-payout"],
+							"variable": [
+								{
+									"key": "hold_id",
+									"value": "1",
+									"description": "Payment Hold ID"
+								}
+							]
+						},
+						"description": "Request payout for a payment hold (user initiated)"
+					}
+				}
+			]
+		},
+		{
+			"name": "Admin - Transfers",
+			"item": [
+				{
+					"name": "Create Transfer (Admin)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{}"
+						},
+						"url": {
+							"raw": "{{base_url}}/admin/transfer/:hold_id",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "transfer", ":hold_id"],
+							"variable": [
+								{
+									"key": "hold_id",
+									"value": "1",
+									"description": "Payment Hold ID"
+								}
+							]
+						},
+						"description": "Admin: Create transfer for payment hold (triggers Stripe transfer)"
+					}
+				}
+			]
+		},
+		{
+			"name": "Webhooks",
+			"item": [
+				{
+					"name": "Stripe Webhook",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Stripe-Signature",
+								"value": "t=1234567890,v1=signature_here",
+								"description": "Stripe webhook signature"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"id\": \"evt_xxxxx\",\n    \"type\": \"transfer.created\",\n    \"data\": {\n        \"object\": {\n            \"id\": \"tr_xxxxx\",\n            \"amount\": 5000,\n            \"status\": \"paid\"\n        }\n    }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/stripe/webhook",
+							"host": ["{{base_url}}"],
+							"path": ["stripe", "webhook"]
+						},
+						"description": "Stripe webhook endpoint (only handles transfer events, not payment events)"
+					}
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000/api",
+			"type": "string"
+		},
+		{
+			"key": "token",
+			"value": "",
+			"type": "string"
+		}
+	]
+}
+
+

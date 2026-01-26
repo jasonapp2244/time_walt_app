@@ -14,16 +14,16 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // Security middleware disabled for now - enable later when app is complete
         // Uncomment below when ready for production:
-        
+
         // $middleware->api(prepend: [
         //     \App\Http\Middleware\SecurityHeaders::class,
         //     \App\Http\Middleware\SanitizeInput::class,
         //     \App\Http\Middleware\LogApiRequests::class,
         // ]);
-        
+
         // Rate Limiting (basic - can enable later)
         // $middleware->throttleApi();
-        
+
         // Trust Proxies (for production)
         // $middleware->trustProxies(at: '*');
     })
