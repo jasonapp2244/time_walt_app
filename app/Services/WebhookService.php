@@ -9,7 +9,6 @@ use App\Jobs\SendTransferFailedNotification;
 use App\Models\Payment;
 use App\Models\PaymentHold;
 use App\Models\StripeConnectAccount;
-use App\Models\StripeWebhookEvent;
 use App\Models\Transfer;
 use App\Models\UserNotificationSetting;
 use Illuminate\Support\Facades\Log;
@@ -19,7 +18,98 @@ class WebhookService
     public function __construct(
         protected PaymentHoldService $paymentHoldService,
         protected StripeService $stripeService
-    ) {
+    ) {}
+
+    /**
+     * Handle checkout.session.completed event (when payment succeeds via Checkout Session).
+     */
+    public function handleCheckoutSessionCompleted(array $eventData): void
+    {
+        \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
+
+        $session = $eventData['data']['object'];
+        $sessionId = $session['id'] ?? null;
+        $paymentIntentId = $session['payment_intent'] ?? null;
+
+        if (! $paymentIntentId) {
+            Log::warning('PaymentIntent ID missing from checkout session', [
+                'session_id' => $sessionId,
+            ]);
+
+            return;
+        }
+
+        // Get user_id and hold period data from PaymentIntent metadata
+        $paymentIntent = \Stripe\PaymentIntent::retrieve($paymentIntentId);
+        $userId = $paymentIntent->metadata->user_id ?? null;
+
+        if (! $userId) {
+            Log::warning('User ID missing from payment intent metadata', [
+                'payment_intent_id' => $paymentIntentId,
+            ]);
+
+            return;
+        }
+
+        // Get amount from session
+        $amount = ($session['amount_total'] ?? 0) / 100;
+        $currency = $session['currency'] ?? 'usd';
+
+        // Check if payment already exists
+        $payment = Payment::where('payment_intent_id', $paymentIntentId)->first();
+
+        if (! $payment) {
+            // Create payment record
+            $payment = Payment::create([
+                'user_id' => $userId,
+                'payment_intent_id' => $paymentIntentId,
+                'amount' => $amount,
+                'currency' => $currency,
+                'status' => 'succeeded',
+                'paid_at' => now(),
+                'stripe_data' => $paymentIntent->toArray(),
+            ]);
+        } else {
+            // Update existing payment
+            $payment->update([
+                'status' => 'succeeded',
+                'paid_at' => now(),
+                'stripe_data' => $paymentIntent->toArray(),
+            ]);
+        }
+
+        // Get hold period data from PaymentIntent metadata or cache
+        $holdPeriodData = null;
+        if (isset($paymentIntent->metadata->hold_period_type)) {
+            $holdPeriodData = [
+                'hold_period_type' => $paymentIntent->metadata->hold_period_type,
+                'hold_start_at' => $paymentIntent->metadata->hold_start_at ?? null,
+                'hold_end_at' => $paymentIntent->metadata->hold_end_at ?? null,
+                'hold_days' => $paymentIntent->metadata->hold_days ?? null,
+            ];
+        } else {
+            // Try to get from cache (fallback if metadata not set)
+            $cachedHoldData = Cache::get("payment_intent_hold_{$paymentIntentId}");
+            if ($cachedHoldData) {
+                $holdPeriodData = [
+                    'hold_period_type' => $cachedHoldData['hold_period_type'] ?? null,
+                    'hold_start_at' => $cachedHoldData['hold_start_at'] ?? null,
+                    'hold_end_at' => $cachedHoldData['hold_end_at'] ?? null,
+                    'hold_days' => $cachedHoldData['hold_days'] ?? null,
+                ];
+            }
+        }
+
+        // Create payment hold if hold period data exists and hold doesn't exist
+        if ($holdPeriodData && ! $payment->hold) {
+            $this->paymentHoldService->createFromPayment($payment, $holdPeriodData);
+        }
+
+        // Send email notification
+        $userSettings = UserNotificationSetting::where('user_id', $userId)->first();
+        if (! $userSettings || $userSettings->email_alert) {
+            SendPaymentSuccessNotification::dispatch($payment);
+        }
     }
 
     /**
@@ -30,33 +120,34 @@ class WebhookService
         $paymentIntent = $eventData['data']['object'];
         $paymentIntentId = $paymentIntent['id'];
 
-        // Find or create payment record
+        // Find payment record
         $payment = Payment::where('payment_intent_id', $paymentIntentId)->first();
 
-        if ($payment) {
-            // Update payment status
-            $payment->update([
-                'status' => 'succeeded',
-                'paid_at' => now(),
-                'stripe_data' => $paymentIntent,
-            ]);
+        if (! $payment) {
+            Log::warning('Payment not found for payment intent: '.$paymentIntentId);
 
-            // Get hold period data
-            $holdPeriodData = $this->stripeService->getHoldPeriodData($paymentIntentId);
+            return;
+        }
 
-            // Create payment hold
-            if ($holdPeriodData) {
-                $hold = $this->paymentHoldService->createFromPayment($payment, $holdPeriodData);
-            } else {
-                // Default 30 days if no hold period data
-                $hold = $this->paymentHoldService->createFromPayment($payment);
-            }
+        // Update payment status
+        $payment->update([
+            'status' => 'succeeded',
+            'paid_at' => now(),
+            'stripe_data' => $paymentIntent,
+        ]);
 
-            // Send email notification (check user preferences)
-            $userSettings = UserNotificationSetting::where('user_id', $payment->user_id)->first();
-            if (! $userSettings || $userSettings->email_alert) {
-                SendPaymentSuccessNotification::dispatch($payment);
-            }
+        // Get hold period data from cache or metadata
+        $holdPeriodData = $this->stripeService->getHoldPeriodData($paymentIntentId);
+
+        // Create payment hold if not exists and hold period data available
+        if ($holdPeriodData && ! $payment->hold) {
+            $this->paymentHoldService->createFromPayment($payment, $holdPeriodData);
+        }
+
+        // Send email notification (check user preferences)
+        $userSettings = UserNotificationSetting::where('user_id', $payment->user_id)->first();
+        if (! $userSettings || $userSettings->email_alert) {
+            SendPaymentSuccessNotification::dispatch($payment);
         }
     }
 
@@ -181,29 +272,31 @@ class WebhookService
 
         $payment = Payment::where('payment_intent_id', $paymentIntentId)->first();
 
-        if ($payment) {
-            $payment->update([
+        if (! $payment) {
+            Log::warning('Payment not found for payment intent: '.$paymentIntentId);
+
+            return;
+        }
+
+        $payment->update([
+            'status' => 'canceled',
+            'failure_reason' => $cancelReason,
+            'stripe_data' => $paymentIntent,
+        ]);
+
+        // If payment hold exists, update it
+        $hold = PaymentHold::where('payment_id', $payment->id)->first();
+
+        if ($hold) {
+            $hold->update([
                 'status' => 'canceled',
-                'failure_reason' => $cancelReason,
-                'stripe_data' => $paymentIntent,
             ]);
+        }
 
-            // If payment hold exists, update it
-            $hold = PaymentHold::whereHas('payment', function ($query) use ($paymentIntentId) {
-                $query->where('payment_intent_id', $paymentIntentId);
-            })->first();
-
-            if ($hold) {
-                $hold->update([
-                    'status' => 'canceled',
-                ]);
-            }
-
-            // Send email notification
-            $userSettings = UserNotificationSetting::where('user_id', $payment->user_id)->first();
-            if (! $userSettings || $userSettings->email_alert) {
-                SendPaymentFailedNotification::dispatch($payment, $cancelReason);
-            }
+        // Send email notification
+        $userSettings = UserNotificationSetting::where('user_id', $payment->user_id)->first();
+        if (! $userSettings || $userSettings->email_alert) {
+            SendPaymentFailedNotification::dispatch($payment, $cancelReason);
         }
     }
 

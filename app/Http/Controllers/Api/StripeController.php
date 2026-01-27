@@ -6,21 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Stripe\CreateConnectAccountRequest;
 use App\Http\Requests\Stripe\CreatePaymentIntentRequest;
 use App\Http\Requests\Stripe\GetOnboardingLinkRequest;
-use App\Http\Requests\Stripe\TestPaymentRequest;
-use App\Jobs\SendPaymentFailedNotification;
-use App\Jobs\SendPaymentSuccessNotification;
 use App\Models\Payment;
-use App\Models\PaymentHold;
 use App\Models\StripeConnectAccount;
-use App\Models\StripeWebhookEvent;
-use App\Models\UserNotificationSetting;
 use App\Services\PaymentHoldService;
 use App\Services\StripeService;
 use App\Services\WebhookService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class StripeController extends Controller
@@ -161,72 +154,42 @@ class StripeController extends Controller
         try {
             $amountInCents = (int) round($request->amount * 100);
 
-            $paymentIntent = $this->stripeService->createPaymentIntent([
+            // Prepare hold period data if provided
+            $holdPeriodData = [];
+            if ($request->hold_period_type) {
+                $holdPeriodData = [
+                    'hold_period_type' => $request->hold_period_type,
+                    'hold_start_at' => $request->hold_start_at,
+                    'hold_end_at' => $request->hold_end_at,
+                    'hold_days' => $request->hold_days,
+                ];
+            }
+
+            // Create Checkout Session (Payment and PaymentHold will be created via webhook when payment succeeds)
+            $checkoutSession = $this->stripeService->createPaymentIntent([
                 'user_id' => $request->user()->id,
                 'amount' => $amountInCents,
                 'currency' => $request->currency,
                 'return_url' => $request->return_url,
-            ]);
-
-            Payment::create([
-                'user_id' => $request->user()->id,
-                'payment_intent_id' => $paymentIntent['payment_intent_id'],
-                'amount' => $request->amount,
-                'currency' => $request->currency,
-                'status' => 'pending',
+                ...$holdPeriodData,
             ]);
 
             return response()->json([
                 'success' => true,
-                'data' => $paymentIntent,
+                'data' => $checkoutSession,
             ]);
         } catch (\Exception $e) {
             Log::error('Create Payment Intent Failed: '.$e->getMessage());
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to create payment intent.',
-            ], 500);
-        }
-    }
+            $errorMessage = 'Failed to create payment intent.';
 
-    /**
-     * Test payment with card details.
-     */
-    public function testPayment(TestPaymentRequest $request): JsonResponse
-    {
-        try {
-            \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
-
-            $amountInCents = (int) round($request->amount * 100);
-
-            $paymentMethod = \Stripe\PaymentMethod::create([
-                'type' => 'card',
-                'card' => [
-                    'number' => preg_replace('/\s+/', '', $request->card_number),
-                    'exp_month' => $request->exp_month,
-                    'exp_year' => $request->exp_year,
-                    'cvc' => $request->cvc,
-                ],
-            ]);
-
-            $paymentIntent = \Stripe\PaymentIntent::create([
-                'amount' => $amountInCents,
-                'currency' => $request->currency,
-                'payment_method' => $paymentMethod->id,
-                'confirm' => true,
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'status' => $paymentIntent->status,
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Test Payment Failed: '.$e->getMessage());
+            if (config('app.debug')) {
+                $errorMessage .= ' Error: '.$e->getMessage();
+            }
 
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage(),
+                'message' => $errorMessage,
             ], 500);
         }
     }
@@ -244,6 +207,56 @@ class StripeController extends Controller
      */
     public function handleWebhook(Request $request): JsonResponse
     {
-        return response()->json(['received' => true]);
+        try {
+            $payload = $request->getContent();
+            $sigHeader = $request->header('Stripe-Signature');
+            $webhookSecret = config('services.stripe.webhook_secret');
+
+            if (empty($webhookSecret)) {
+                Log::warning('Stripe webhook secret not configured');
+
+                return response()->json(['error' => 'Webhook secret not configured'], 400);
+            }
+
+            $event = \Stripe\Webhook::constructEvent(
+                $payload,
+                $sigHeader,
+                $webhookSecret
+            );
+
+            // Handle different event types
+            $eventArray = $event->toArray();
+
+            switch ($event['type']) {
+                case 'checkout.session.completed':
+                    $this->webhookService->handleCheckoutSessionCompleted($eventArray);
+                    break;
+
+                case 'payment_intent.succeeded':
+                    $this->webhookService->handlePaymentIntentSucceeded($eventArray);
+                    break;
+
+                case 'payment_intent.payment_failed':
+                    $this->webhookService->handlePaymentIntentFailed($eventArray);
+                    break;
+
+                case 'payment_intent.canceled':
+                    $this->webhookService->handlePaymentIntentCanceled($eventArray);
+                    break;
+
+                default:
+                    Log::info('Unhandled webhook event type: '.$event['type']);
+            }
+
+            return response()->json(['received' => true]);
+        } catch (\Stripe\Exception\SignatureVerificationException $e) {
+            Log::error('Stripe webhook signature verification failed: '.$e->getMessage());
+
+            return response()->json(['error' => 'Invalid signature'], 400);
+        } catch (\Exception $e) {
+            Log::error('Stripe webhook handling failed: '.$e->getMessage());
+
+            return response()->json(['error' => 'Webhook processing failed'], 500);
+        }
     }
 }

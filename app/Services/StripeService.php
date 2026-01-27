@@ -111,61 +111,153 @@ class StripeService
     }
 
     /**
-     * Create PaymentIntent with hold period data in metadata.
+     * Create Checkout Session for one-time payment with hold period data.
      */
     public function createPaymentIntent(array $data): array
     {
         try {
+            // Check if Stripe secret is configured
+            $stripeSecret = config('services.stripe.secret');
+            if (empty($stripeSecret)) {
+                throw new \Exception('Stripe secret key is not configured. Please set STRIPE_SECRET in .env file.');
+            }
+
+            // Use provided return_url or fallback to config default
+            $returnUrl = $data['return_url'] ?? config('services.stripe.payment_return_url');
+
+            if (! $returnUrl) {
+                throw new \Exception('return_url is required. Please provide return_url in request or set STRIPE_PAYMENT_RETURN_URL in .env file.');
+            }
+
             // Prepare metadata for hold period
             $metadata = [
-                'user_id' => $data['user_id'],
+                'user_id' => (string) $data['user_id'],
             ];
 
             if (isset($data['hold_period_type'])) {
                 $metadata['hold_period_type'] = $data['hold_period_type'];
                 $metadata['hold_start_at'] = $data['hold_start_at'] ?? now()->toIso8601String();
                 $metadata['hold_end_at'] = $data['hold_end_at'] ?? now()->addDays(30)->toIso8601String();
-                $metadata['hold_days'] = $data['hold_days'] ?? 30;
+                $metadata['hold_days'] = (string) ($data['hold_days'] ?? 30);
             }
 
-            // Prepare PaymentIntent parameters
-            $paymentIntentParams = [
-                'amount' => $data['amount'],
-                'currency' => $data['currency'] ?? 'usd',
-                'metadata' => $metadata,
-            ];
+            // Create Checkout Session with payment capture (funds go to platform account)
+            // Note: For destination charges (direct to connected account), you would need to:
+            // 1. Get user's connected account ID
+            // 2. Use 'payment_intent_data.on_behalf_of' or 'payment_intent_data.transfer_data'
+            // For now, using platform account (standard approach for hold periods)
 
-            // Add redirect URLs if provided (for redirect-based payment methods)
-            if (isset($data['return_url'])) {
-                $paymentIntentParams['return_url'] = $data['return_url'];
-            }
-
-            $paymentIntent = \Stripe\PaymentIntent::create($paymentIntentParams);
-
-            // Store hold period data in cache for payment return handler
-            Cache::put(
-                "payment_intent_hold_{$paymentIntent->id}",
-                [
-                    'hold_period_type' => $data['hold_period_type'] ?? null,
-                    'hold_start_at' => $data['hold_start_at'] ?? null,
-                    'hold_end_at' => $data['hold_end_at'] ?? null,
-                    'hold_days' => $data['hold_days'] ?? null,
+            $checkoutSession = \Stripe\Checkout\Session::create([
+                'payment_intent_data' => [
+                    'metadata' => $metadata,
+                    'capture_method' => 'automatic', // Capture immediately to platform account
                 ],
-                now()->addDays(7) // Keep for 7 days
-            );
+                'line_items' => [[
+                    'price_data' => [
+                        'currency' => strtolower($data['currency'] ?? 'usd'),
+                        'product_data' => [
+                            'name' => 'Payment',
+                        ],
+                        'unit_amount' => $data['amount'],
+                    ],
+                    'quantity' => 1,
+                ]],
+                'mode' => 'payment',
+                'success_url' => $returnUrl.'?session_id={CHECKOUT_SESSION_ID}&status=success',
+                'cancel_url' => $returnUrl.'?session_id={CHECKOUT_SESSION_ID}&status=canceled',
+                'payment_method_types' => ['card'],
+            ], [
+                'expand' => ['payment_intent'],
+            ]);
 
-            return [
-                'payment_intent_id' => $paymentIntent->id,
-                'client_secret' => $paymentIntent->client_secret,
-                'hold_period' => $metadata['hold_period_type'] ? [
-                    'type' => $metadata['hold_period_type'],
-                    'start_at' => $metadata['hold_start_at'],
-                    'end_at' => $metadata['hold_end_at'],
-                    'days' => (int) $metadata['hold_days'],
-                ] : null,
+            // Get PaymentIntent created by Checkout Session
+            $paymentIntentId = null;
+
+            // Try to get from expanded payment_intent
+            if (isset($checkoutSession->payment_intent)) {
+                if (is_string($checkoutSession->payment_intent)) {
+                    $paymentIntentId = $checkoutSession->payment_intent;
+                } elseif (is_object($checkoutSession->payment_intent) && isset($checkoutSession->payment_intent->id)) {
+                    $paymentIntentId = $checkoutSession->payment_intent->id;
+                }
+            }
+
+            // If still not found, retrieve session again with expand
+            if (! $paymentIntentId) {
+                $retrievedSession = \Stripe\Checkout\Session::retrieve($checkoutSession->id, [
+                    'expand' => ['payment_intent'],
+                ]);
+
+                if (isset($retrievedSession->payment_intent)) {
+                    if (is_string($retrievedSession->payment_intent)) {
+                        $paymentIntentId = $retrievedSession->payment_intent;
+                    } elseif (is_object($retrievedSession->payment_intent)) {
+                        $paymentIntentId = $retrievedSession->payment_intent->id;
+                    }
+                }
+            }
+
+            // If PaymentIntent not found, log warning but still return checkout_url
+            // Webhook will handle PaymentIntent when payment succeeds
+            if (! $paymentIntentId) {
+                Log::warning('PaymentIntent not immediately available in checkout session', [
+                    'checkout_session_id' => $checkoutSession->id,
+                ]);
+            }
+
+            $response = [
+                'checkout_url' => $checkoutSession->url,
+                'checkout_session_id' => $checkoutSession->id,
             ];
+
+            // Add payment_intent_id if available
+            if ($paymentIntentId) {
+                $response['payment_intent_id'] = $paymentIntentId;
+
+                // Store hold period data in cache for webhook handler
+                if (isset($data['hold_period_type'])) {
+                    Cache::put(
+                        "payment_intent_hold_{$paymentIntentId}",
+                        [
+                            'hold_period_type' => $data['hold_period_type'],
+                            'hold_start_at' => $data['hold_start_at'] ?? null,
+                            'hold_end_at' => $data['hold_end_at'] ?? null,
+                            'hold_days' => $data['hold_days'] ?? null,
+                            'user_id' => $data['user_id'],
+                        ],
+                        now()->addDays(7)
+                    );
+                }
+            } else {
+                // Store session data in cache for webhook handler if payment_intent not available
+                if (isset($data['hold_period_type'])) {
+                    Cache::put(
+                        "checkout_session_hold_{$checkoutSession->id}",
+                        [
+                            'hold_period_type' => $data['hold_period_type'],
+                            'hold_start_at' => $data['hold_start_at'] ?? null,
+                            'hold_end_at' => $data['hold_end_at'] ?? null,
+                            'hold_days' => $data['hold_days'] ?? null,
+                            'user_id' => $data['user_id'],
+                        ],
+                        now()->addDays(7)
+                    );
+                }
+            }
+
+            // Add hold period info to response
+            if (isset($data['hold_period_type'])) {
+                $response['hold_period'] = [
+                    'type' => $data['hold_period_type'],
+                    'start_at' => $data['hold_start_at'] ?? now()->toIso8601String(),
+                    'end_at' => $data['hold_end_at'] ?? now()->addDays(30)->toIso8601String(),
+                    'days' => (int) ($data['hold_days'] ?? 30),
+                ];
+            }
+
+            return $response;
         } catch (\Exception $e) {
-            Log::error('Stripe PaymentIntent Creation Failed: '.$e->getMessage());
+            Log::error('Stripe Checkout Session Creation Failed: '.$e->getMessage());
             throw $e;
         }
     }
@@ -182,11 +274,24 @@ class StripeService
                 throw new \Exception('Stripe Connect account not found for user');
             }
 
-            // Create transfer in Stripe
+            // Get currency from payment
+            $payment = $hold->payment;
+            $currency = $payment ? strtolower($payment->currency) : 'usd';
+
+            // In test mode, we need to ensure the platform has sufficient balance
+            // For production, make sure payments are captured to platform account first
+
+            // Create transfer in Stripe (real API call - no simulation)
             $transfer = \Stripe\Transfer::create([
                 'amount' => (int) ($hold->amount * 100), // Convert to cents
-                'currency' => 'usd',
+                'currency' => $currency,
                 'destination' => $connectAccount->connect_account_id,
+                'description' => "Transfer for hold #{$hold->id}",
+                'metadata' => [
+                    'hold_id' => $hold->id,
+                    'user_id' => $hold->user_id,
+                    'payment_id' => $payment ? $payment->id : null,
+                ],
             ]);
 
             // Create transfer record
@@ -202,16 +307,26 @@ class StripeService
                 'stripe_transfer_id' => $transfer->id,
                 'stripe_connect_account_id' => $connectAccount->connect_account_id,
                 'amount' => $hold->amount,
-                'currency' => 'usd',
+                'currency' => $currency,
                 'status' => 'pending',
                 'transfer_type' => $type,
                 'admin_id' => $adminId,
                 'stripe_data' => $transfer->toArray(),
             ]);
 
+            // Update hold status to transferred
+            $hold->update([
+                'status' => 'transferred',
+                'transferred_at' => now(),
+            ]);
+
             return $transferRecord;
         } catch (\Exception $e) {
-            Log::error('Stripe Transfer Creation Failed: '.$e->getMessage());
+            Log::error('Stripe Transfer Creation Failed: '.$e->getMessage(), [
+                'hold_id' => $hold->id,
+                'user_id' => $hold->user_id,
+                'error' => $e->getMessage(),
+            ]);
             throw $e;
         }
     }

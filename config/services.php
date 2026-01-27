@@ -41,6 +41,13 @@ return [
         'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
         'auto_transfer_enabled' => env('STRIPE_AUTO_TRANSFER', false),
 
+        // Supported currencies for payment intents
+        'supported_currencies' => [
+            'usd' => 'USD',
+            'eur' => 'EUR',
+            'gbp' => 'GBP',
+        ],
+
         // Stripe Connect OAuth Return URL (set in .env file)
         'connect_return_url' => env('STRIPE_CONNECT_RETURN_URL', 'https://time-vault.devonlinetestserver.com/api/stripe/connect/return'),
 

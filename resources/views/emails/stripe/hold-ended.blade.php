@@ -15,7 +15,7 @@
         <!-- Content -->
         <div style="padding: 30px;">
             <p style="color: #000000; font-size: 16px; margin-top: 0;">Dear {{ $user->full_name }},</p>
-            
+
             <p style="color: #000000; font-size: 16px;">We are pleased to inform you that your payment hold period has ended and your funds are now ready for transfer.</p>
 
             <!-- Hold Details Box -->
@@ -40,9 +40,29 @@
                 </table>
             </div>
 
-            <p style="color: #000000; font-size: 16px;">You can now request a payout for this amount. The funds will be transferred to your connected account.</p>
+            <p style="color: #000000; font-size: 16px;">Your amount is ready! You can now request a payout and the funds will be automatically transferred to your connected Stripe account.</p>
 
-            <p style="color: #000000; font-size: 16px; margin-top: 30px;">To request your payout, please log in to your account and submit a payout request.</p>
+            <!-- Action Required Box -->
+            <div style="background-color: #fff3cd; padding: 20px; border-radius: 6px; margin: 25px 0; border-left: 4px solid #ff9800;">
+                <h3 style="color: #935510; margin-top: 0; font-size: 18px;">How to Get Your Payment:</h3>
+                <p style="color: #000000; font-size: 14px; margin: 10px 0;">
+                    To transfer this amount to your Stripe connected account, make an API request to:
+                </p>
+                <div style="background-color: #ffffff; padding: 15px; border-radius: 4px; font-family: monospace; font-size: 13px; color: #333; margin: 15px 0; border: 1px solid #e0e0e0;">
+                    <strong>POST</strong> {{ config('app.url') }}/api/payment-holds/{{ $hold->id }}/request-payout
+                </div>
+                <p style="color: #000000; font-size: 14px; margin: 10px 0;">
+                    <strong>Headers Required:</strong><br>
+                    <code style="background-color: #f5f5f5; padding: 2px 6px; border-radius: 3px;">Authorization: Bearer YOUR_TOKEN</code>
+                </p>
+                <p style="color: #666666; font-size: 13px; margin-top: 15px;">
+                    Once you make this request, the amount will be instantly transferred to your Stripe connected account.
+                </p>
+            </div>
+
+            <p style="color: #000000; font-size: 16px; margin-top: 30px;">
+                <strong>Note:</strong> Make sure your Stripe Connect account is properly set up before requesting the payout.
+            </p>
 
             <p style="color: #000000; font-size: 16px; margin-top: 20px;">
                 Best regards,<br>

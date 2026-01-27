@@ -433,6 +433,130 @@ Content-Type: application/json
 
 ---
 
+#### 16. Create Payment Intent
+**POST** `{{base_url}}/stripe/payment-intent`  
+**Route Name**: `stripe.payment-intent`
+
+**Headers:**
+```
+Authorization: Bearer {{token}}
+Content-Type: application/json
+```
+
+**Body (JSON) - Basic Payment (No Hold):**
+```json
+{
+    "amount": 100.00,
+    "currency": "usd",
+    "return_url": "https://yourapp.com/payment/success"
+}
+```
+
+**Body (JSON) - Payment with Hold Period (1 Month):**
+```json
+{
+    "amount": 100.00,
+    "currency": "usd",
+    "return_url": "https://yourapp.com/payment/success",
+    "hold_period_type": "1_month"
+}
+```
+
+**Body (JSON) - Payment with Hold Period (2 Months):**
+```json
+{
+    "amount": 100.00,
+    "currency": "usd",
+    "return_url": "https://yourapp.com/payment/success",
+    "hold_period_type": "2_months"
+}
+```
+
+**Body (JSON) - Payment with Hold Period (6 Months):**
+```json
+{
+    "amount": 100.00,
+    "currency": "usd",
+    "return_url": "https://yourapp.com/payment/success",
+    "hold_period_type": "6_months"
+}
+```
+
+**Body (JSON) - Payment with Hold Period (1 Year):**
+```json
+{
+    "amount": 100.00,
+    "currency": "usd",
+    "return_url": "https://yourapp.com/payment/success",
+    "hold_period_type": "1_year"
+}
+```
+
+**Body (JSON) - Payment with Custom Hold Period:**
+```json
+{
+    "amount": 100.00,
+    "currency": "usd",
+    "return_url": "https://yourapp.com/payment/success",
+    "hold_period_type": "custom",
+    "hold_start_at": "2026-01-15",
+    "hold_end_at": "2026-03-15",
+    "hold_days": 60
+}
+```
+
+**⚠️ Date Format Notes:**
+- Use format: `YYYY-MM-DD` (e.g., "2026-01-15")
+- `hold_start_at` must be today or a future date
+- `hold_end_at` must be after `hold_start_at`
+- Minimum hold period: 30 days
+
+**Expected Response (200):**
+```json
+{
+    "success": true,
+    "data": {
+        "payment_intent_id": "pi_xxxxxxxxxxxxx",
+        "client_secret": "pi_xxxxxxxxxxxxx_secret_xxxxxxxxxxxxx",
+        "hold_period": {
+            "type": "1_month",
+            "start_at": "2026-01-08T12:00:00Z",
+            "end_at": "2026-02-08T12:00:00Z",
+            "days": 30
+        }
+    }
+}
+```
+
+**⚠️ Important Notes:**
+- Minimum amount: $1.00
+- Supported currencies: USD, EUR, GBP (check config)
+- Hold period types: `1_month`, `2_months`, `6_months`, `1_year`, `custom`
+- Custom hold period requires `hold_start_at` and `hold_end_at` (minimum 30 days)
+- If hold period is provided, data is stored in both `payments` and `payment_holds` tables
+- If no hold period, only `payments` table is used
+
+**Database Verification:**
+After successful request, check:
+1. `payments` table - Should have new record with:
+   - `user_id` = authenticated user ID
+   - `payment_intent_id` = Stripe PaymentIntent ID
+   - `amount` = payment amount
+   - `currency` = currency code
+   - `status` = 'pending'
+
+2. `payment_holds` table (if hold_period_type provided) - Should have new record with:
+   - `payment_id` = ID from payments table
+   - `user_id` = authenticated user ID
+   - `amount` = payment amount
+   - `hold_start_at` = start date
+   - `hold_end_at` = end date
+   - `hold_days` = number of days
+   - `hold_period_type` = selected type
+   - `status` = 'holding'
+
+---
+
 ## 🔒 Testing Security Features
 
 ### 1. Test Rate Limiting
