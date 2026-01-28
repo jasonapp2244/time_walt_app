@@ -28,10 +28,9 @@ class CreatePaymentIntentRequest extends FormRequest
         return [
             'amount' => ['required', 'numeric', 'min:1'], // amount in dollars (minimum $1.00)
             'currency' => ['required', 'string', 'size:3', Rule::in($supportedCurrencies)],
-            'hold_period_type' => ['nullable', 'string', Rule::in(['1_month', '2_months', '6_months', '1_year', 'custom'])],
-            'hold_start_at' => ['nullable', 'date', 'after_or_equal:today'],
-            'hold_end_at' => ['nullable', 'date', 'after:hold_start_at'],
-            'hold_days' => ['nullable', 'integer', 'min:30'],
+            'hold_period_type' => ['required', 'string', Rule::in(['custom'])], // Only custom hold period allowed
+            'hold_start_at' => ['required', 'date', 'after_or_equal:today'], // Required for custom period
+            'hold_end_at' => ['required', 'date', 'after:hold_start_at'], // Required for custom period
             'return_url' => ['nullable', 'url', 'max:500'], // Optional - will use config default if not provided
         ];
     }
@@ -42,39 +41,18 @@ class CreatePaymentIntentRequest extends FormRequest
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {
-            // If custom period, start and end dates required
-            if ($this->hold_period_type === 'custom') {
-                if (! $this->hold_start_at || ! $this->hold_end_at) {
-                    $validator->errors()->add('hold_period_type', 'Start and end dates are required for custom period.');
-                }
-
-                // Check minimum 30 days
-                if ($this->hold_start_at && $this->hold_end_at) {
-                    try {
-                        $startDate = \Carbon\Carbon::parse($this->hold_start_at)->startOfDay();
-                        $endDate = \Carbon\Carbon::parse($this->hold_end_at)->startOfDay();
-                        $days = $startDate->diffInDays($endDate);
-
-                        if ($days < 30) {
-                            $validator->errors()->add('hold_end_at', 'Hold period must be at least 30 days.');
-                        }
-                    } catch (\Exception $e) {
-                        $validator->errors()->add('hold_start_at', 'Invalid date format.');
-                    }
-                }
-            }
-
-            // Validate hold_start_at is today or future (for all hold types)
-            if ($this->hold_start_at) {
+            // Validate minimum 30 days hold period
+            if ($this->hold_start_at && $this->hold_end_at) {
                 try {
                     $startDate = \Carbon\Carbon::parse($this->hold_start_at)->startOfDay();
-                    $today = \Carbon\Carbon::today();
+                    $endDate = \Carbon\Carbon::parse($this->hold_end_at)->startOfDay();
+                    $days = $startDate->diffInDays($endDate);
 
-                    if ($startDate->lt($today)) {
-                        $validator->errors()->add('hold_start_at', 'Hold start date must be today or a future date.');
+                    if ($days < 30) {
+                        $validator->errors()->add('hold_end_at', 'Hold period must be at least 30 days. Current period: '.$days.' days.');
                     }
                 } catch (\Exception $e) {
-                    // Date parsing error already handled by 'date' rule
+                    $validator->errors()->add('hold_start_at', 'Invalid date format.');
                 }
             }
         });
@@ -96,14 +74,15 @@ class CreatePaymentIntentRequest extends FormRequest
             'amount.numeric' => 'Amount must be a valid number.',
             'currency.required' => 'Currency is required.',
             'currency.in' => "Currency must be one of: {$currencyList}.",
-            'return_url.required' => 'Return URL is required for checkout session.',
             'return_url.url' => 'Return URL must be a valid URL.',
-            'hold_period_type.in' => 'Invalid hold period type.',
+            'hold_period_type.required' => 'Hold period type is required.',
+            'hold_period_type.in' => 'Hold period type must be "custom".',
+            'hold_start_at.required' => 'Hold start date is required.',
             'hold_start_at.date' => 'Hold start date must be a valid date.',
             'hold_start_at.after_or_equal' => 'Hold start date must be today or a future date.',
+            'hold_end_at.required' => 'Hold end date is required.',
             'hold_end_at.date' => 'Hold end date must be a valid date.',
-            'hold_end_at.after' => 'End date must be after start date.',
-            'hold_days.min' => 'Minimum hold period is 30 days.',
+            'hold_end_at.after' => 'Hold end date must be after start date.',
         ];
     }
 }

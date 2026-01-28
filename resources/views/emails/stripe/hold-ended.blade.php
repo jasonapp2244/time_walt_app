@@ -13,58 +13,32 @@
         </div>
 
         <!-- Content -->
-        <div style="padding: 30px;">
-            <p style="color: #000000; font-size: 16px; margin-top: 0;">Dear {{ $user->full_name }},</p>
+        <div style="padding: 40px 30px;">
+            <p style="color: #000000; font-size: 18px; margin-top: 0;">Dear {{ $user->full_name }},</p>
 
-            <p style="color: #000000; font-size: 16px;">We are pleased to inform you that your payment hold period has ended and your funds are now ready for transfer.</p>
+            <p style="color: #000000; font-size: 16px; line-height: 1.8;">Great news! Your hold period has ended and your funds are now ready for transfer.</p>
 
-            <!-- Hold Details Box -->
-            <div style="background-color: #f2cf7a; padding: 20px; border-radius: 6px; margin: 25px 0; border-left: 4px solid #935510;">
-                <table style="width: 100%; border-collapse: collapse;">
-                    <tr>
-                        <td style="padding: 8px 0; color: #000000; font-weight: bold;">Amount:</td>
-                        <td style="padding: 8px 0; color: #000000; text-align: right; font-size: 18px; font-weight: bold;">${{ number_format($hold->amount, 2) }}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 8px 0; color: #000000; font-weight: bold;">Hold Period:</td>
-                        <td style="padding: 8px 0; color: #000000; text-align: right;">{{ ucfirst(str_replace('_', ' ', $hold->hold_period_type ?? 'N/A')) }}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 8px 0; color: #000000; font-weight: bold;">Hold Start Date:</td>
-                        <td style="padding: 8px 0; color: #000000; text-align: right;">{{ $hold->hold_start_at?->format('F d, Y') ?? 'N/A' }}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 8px 0; color: #000000; font-weight: bold;">Hold End Date:</td>
-                        <td style="padding: 8px 0; color: #000000; text-align: right;">{{ $hold->hold_end_at?->format('F d, Y') ?? 'N/A' }}</td>
-                    </tr>
-                </table>
-            </div>
-
-            <p style="color: #000000; font-size: 16px;">Your amount is ready! You can now request a payout and the funds will be automatically transferred to your connected Stripe account.</p>
-
-            <!-- Action Required Box -->
-            <div style="background-color: #fff3cd; padding: 20px; border-radius: 6px; margin: 25px 0; border-left: 4px solid #ff9800;">
-                <h3 style="color: #935510; margin-top: 0; font-size: 18px;">How to Get Your Payment:</h3>
-                <p style="color: #000000; font-size: 14px; margin: 10px 0;">
-                    To transfer this amount to your Stripe connected account, make an API request to:
+            <!-- Amount Box -->
+            <div style="background-color: #f2cf7a; padding: 25px; border-radius: 8px; margin: 30px 0; text-align: center; border-left: 4px solid #935510;">
+                <p style="color: #000000; font-size: 20px; font-weight: bold; margin: 0;">
+                    ${{ number_format($hold->amount, 2) }} USD
                 </p>
-                <div style="background-color: #ffffff; padding: 15px; border-radius: 4px; font-family: monospace; font-size: 13px; color: #333; margin: 15px 0; border: 1px solid #e0e0e0;">
-                    <strong>POST</strong> {{ config('app.url') }}/api/payment-holds/{{ $hold->id }}/request-payout
-                </div>
-                <p style="color: #000000; font-size: 14px; margin: 10px 0;">
-                    <strong>Headers Required:</strong><br>
-                    <code style="background-color: #f5f5f5; padding: 2px 6px; border-radius: 3px;">Authorization: Bearer YOUR_TOKEN</code>
-                </p>
-                <p style="color: #666666; font-size: 13px; margin-top: 15px;">
-                    Once you make this request, the amount will be instantly transferred to your Stripe connected account.
+                <p style="color: #666666; font-size: 14px; margin: 10px 0 0 0;">
+                    Ready for payout
                 </p>
             </div>
 
-            <p style="color: #000000; font-size: 16px; margin-top: 30px;">
-                <strong>Note:</strong> Make sure your Stripe Connect account is properly set up before requesting the payout.
-            </p>
+            <p style="color: #000000; font-size: 16px; line-height: 1.8; text-align: center;">You can now request your payout through the app.</p>
 
-            <p style="color: #000000; font-size: 16px; margin-top: 20px;">
+            <!-- Button -->
+            <div style="text-align: center; margin: 35px 0;">
+                <a href="{{ config('app.frontend_url', config('app.url')) }}/payment-holds" 
+                   style="display: inline-block; background-color: #935510; color: #f2cf7a; padding: 15px 40px; text-decoration: none; border-radius: 6px; font-size: 16px; font-weight: bold;">
+                    Request Payout
+                </a>
+            </div>
+
+            <p style="color: #000000; font-size: 16px; margin-top: 30px; line-height: 1.8;">
                 Best regards,<br>
                 <strong style="color: #935510;">{{ config('app.name') }} Team</strong>
             </p>

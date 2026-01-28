@@ -161,11 +161,11 @@ class StripeController extends Controller
                     'hold_period_type' => $request->hold_period_type,
                     'hold_start_at' => $request->hold_start_at,
                     'hold_end_at' => $request->hold_end_at,
-                    'hold_days' => $request->hold_days,
+                    // 'hold_days' => $request->hold_days,
                 ];
             }
 
-            // Create Checkout Session (Payment and PaymentHold will be created via webhook when payment succeeds)
+            // Create Checkout Session (NO webhook - use verify-payment endpoint after payment)
             $checkoutSession = $this->stripeService->createPaymentIntent([
                 'user_id' => $request->user()->id,
                 'amount' => $amountInCents,
@@ -176,6 +176,7 @@ class StripeController extends Controller
 
             return response()->json([
                 'success' => true,
+                'message' => 'Checkout session created. After payment, call verify-payment endpoint with session_id.',
                 'data' => $checkoutSession,
             ]);
         } catch (\Exception $e) {
@@ -195,11 +196,342 @@ class StripeController extends Controller
     }
 
     /**
+     * Verify payment and create database records (NO WEBHOOK NEEDED).
+     */
+    public function verifyPayment(Request $request): JsonResponse
+    {
+        try {
+            $request->validate([
+                'session_id' => 'required|string',
+            ]);
+
+            \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
+
+            $sessionId = $request->input('session_id');
+
+            Log::info('=== VERIFY PAYMENT CALLED ===', [
+                'session_id' => $sessionId,
+                'user_id' => $request->user()->id,
+            ]);
+
+            // Retrieve checkout session from Stripe
+            $session = \Stripe\Checkout\Session::retrieve([
+                'id' => $sessionId,
+                'expand' => ['payment_intent'],
+            ]);
+
+            $paymentIntentId = $session->payment_intent->id ?? null;
+
+            if (! $paymentIntentId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Payment intent not found in session.',
+                ], 404);
+            }
+
+            // Get payment intent details
+            $paymentIntent = is_string($session->payment_intent)
+                ? \Stripe\PaymentIntent::retrieve($paymentIntentId)
+                : $session->payment_intent;
+
+            $userId = $paymentIntent->metadata->user_id ?? null;
+
+            // Verify user matches
+            if ($userId != $request->user()->id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Payment does not belong to this user.',
+                ], 403);
+            }
+
+            // Get amount and currency
+            $amount = ($session->amount_total ?? 0) / 100;
+            $currency = $session->currency ?? 'usd';
+
+            // Check payment status
+            if ($paymentIntent->status !== 'succeeded') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Payment not completed yet.',
+                    'data' => [
+                        'status' => $paymentIntent->status,
+                    ],
+                ], 400);
+            }
+
+            // ✅ PAYMENT SUCCEEDED - Create database records
+            $payment = Payment::where('payment_intent_id', $paymentIntentId)->first();
+
+            if ($payment) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Payment already recorded.',
+                    'data' => [
+                        'payment_id' => $payment->id,
+                        'amount' => $payment->amount,
+                        'status' => $payment->status,
+                    ],
+                ]);
+            }
+
+            // Create payment record
+            $payment = Payment::create([
+                'user_id' => $userId,
+                'payment_intent_id' => $paymentIntentId,
+                'amount' => $amount,
+                'currency' => $currency,
+                'status' => 'succeeded',
+                'paid_at' => now(),
+                'stripe_data' => $paymentIntent->toArray(),
+            ]);
+
+            Log::info('✅ Payment record created via verify-payment', [
+                'payment_id' => $payment->id,
+                'amount' => $amount,
+            ]);
+
+            // Create payment hold if hold period data exists
+            $hold = null;
+            if (isset($paymentIntent->metadata->hold_period_type)) {
+                $holdPeriodData = [
+                    'hold_period_type' => $paymentIntent->metadata->hold_period_type,
+                    'hold_start_at' => $paymentIntent->metadata->hold_start_at ?? null,
+                    'hold_end_at' => $paymentIntent->metadata->hold_end_at ?? null,
+                    'hold_days' => $paymentIntent->metadata->hold_days ?? null,
+                ];
+
+                $hold = $this->paymentHoldService->createFromPayment($payment, $holdPeriodData);
+
+                Log::info('✅ PaymentHold record created via verify-payment', [
+                    'hold_id' => $hold->id,
+                ]);
+            }
+
+            // Send email notification to user and admin (check both transaction_alert and email_alert)
+            $userSettings = \App\Models\UserNotificationSetting::where('user_id', $payment->user_id)->first();
+
+            Log::info('📧 Checking email notification settings', [
+                'payment_id' => $payment->id,
+                'user_id' => $payment->user_id,
+                'settings_found' => $userSettings ? 'YES' : 'NO',
+                'transaction_alert_raw' => $userSettings ? $userSettings->transaction_alert : 'NOT SET',
+                'email_alert_raw' => $userSettings ? $userSettings->email_alert : 'NOT SET',
+                'transaction_alert_int' => $userSettings ? (int) $userSettings->transaction_alert : 'NOT SET',
+                'email_alert_int' => $userSettings ? (int) $userSettings->email_alert : 'NOT SET',
+            ]);
+
+            // Both must be 1 to send email (if settings exist)
+            // Use strict comparison with integer cast
+            if ($userSettings) {
+                $transactionEnabled = ((int) $userSettings->transaction_alert) === 1;
+                $emailEnabled = ((int) $userSettings->email_alert) === 1;
+                $shouldSendEmail = $transactionEnabled && $emailEnabled;
+
+                Log::info('📧 Email settings parsed', [
+                    'transaction_enabled' => $transactionEnabled ? 'YES' : 'NO',
+                    'email_enabled' => $emailEnabled ? 'YES' : 'NO',
+                ]);
+            } else {
+                // No settings = send email (default behavior)
+                $shouldSendEmail = true;
+                Log::info('📧 No settings found - using default (SEND)');
+            }
+
+            Log::info('📧 Final email decision', [
+                'should_send' => $shouldSendEmail ? 'YES' : 'NO',
+            ]);
+
+            if ($shouldSendEmail) {
+                \App\Jobs\SendPaymentSuccessNotification::dispatch($payment);
+                Log::info('✅ Payment success email SENT', [
+                    'payment_id' => $payment->id,
+                    'user_id' => $payment->user_id,
+                ]);
+            } else {
+                Log::info('❌ Payment success email BLOCKED', [
+                    'payment_id' => $payment->id,
+                    'user_id' => $payment->user_id,
+                    'reason' => 'User disabled email or transaction alerts',
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Payment verified and records created successfully.',
+                'data' => [
+                    'payment' => [
+                        'id' => $payment->id,
+                        'payment_intent_id' => $payment->payment_intent_id,
+                        'amount' => (float) $payment->amount,
+                        'currency' => $payment->currency,
+                        'status' => $payment->status,
+                        'paid_at' => $payment->paid_at->toIso8601String(),
+                    ],
+                    'hold' => $hold ? [
+                        'id' => $hold->id,
+                        'amount' => (float) $hold->amount,
+                        'status' => $hold->status,
+                        'hold_start_at' => $hold->hold_start_at->toIso8601String(),
+                        'hold_end_at' => $hold->hold_end_at->toIso8601String(),
+                        'hold_days' => $hold->hold_days,
+                    ] : null,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Verify Payment Failed: '.$e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to verify payment: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Handle Stripe payment return.
      */
     public function handlePaymentReturn(Request $request): RedirectResponse
     {
-        return redirect(config('services.stripe.payment_success_url'));
+        // Log that method is called
+        Log::info('=== PAYMENT RETURN CALLED ===', [
+            'url' => $request->fullUrl(),
+            'query_params' => $request->query(),
+            'method' => $request->method(),
+            'ip' => $request->ip(),
+        ]);
+
+        try {
+            \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
+
+            $sessionId = $request->query('session_id');
+            $status = $request->query('status'); // 'success' or 'canceled'
+
+            Log::info('Payment return parameters', [
+                'session_id' => $sessionId,
+                'status' => $status,
+            ]);
+
+            if (! $sessionId) {
+                Log::error('Payment return: session_id missing', [
+                    'all_params' => $request->all(),
+                ]);
+
+                return redirect(config('services.stripe.payment_failed_url'));
+            }
+
+            // Retrieve checkout session from Stripe
+            $session = \Stripe\Checkout\Session::retrieve([
+                'id' => $sessionId,
+                'expand' => ['payment_intent'],
+            ]);
+
+            $paymentIntentId = $session->payment_intent->id ?? null;
+
+            if (! $paymentIntentId) {
+                Log::error('Payment return: payment_intent_id missing', [
+                    'session_id' => $sessionId,
+                ]);
+
+                return redirect(config('services.stripe.payment_failed_url'));
+            }
+
+            // Get payment intent details
+            $paymentIntent = is_string($session->payment_intent)
+                ? \Stripe\PaymentIntent::retrieve($paymentIntentId)
+                : $session->payment_intent;
+
+            $userId = $paymentIntent->metadata->user_id ?? null;
+
+            if (! $userId) {
+                Log::error('Payment return: user_id missing from metadata', [
+                    'payment_intent_id' => $paymentIntentId,
+                ]);
+
+                return redirect(config('services.stripe.payment_failed_url'));
+            }
+
+            // Get amount and currency
+            $amount = ($session->amount_total ?? 0) / 100;
+            $currency = $session->currency ?? 'usd';
+
+            // Check if payment already exists
+            $payment = Payment::where('payment_intent_id', $paymentIntentId)->first();
+
+            // Handle based on payment status
+            if ($status === 'success' && $paymentIntent->status === 'succeeded') {
+                // SUCCESS: Create database records
+                if (! $payment) {
+                    // Create payment record
+                    $payment = Payment::create([
+                        'user_id' => $userId,
+                        'payment_intent_id' => $paymentIntentId,
+                        'amount' => $amount,
+                        'currency' => $currency,
+                        'status' => 'succeeded',
+                        'paid_at' => now(),
+                        'stripe_data' => $paymentIntent->toArray(),
+                    ]);
+
+                    Log::info('✅ Payment SUCCESS - Record created', [
+                        'payment_id' => $payment->id,
+                        'payment_intent_id' => $paymentIntentId,
+                        'amount' => $amount,
+                    ]);
+                } else {
+                    // Update existing payment
+                    $payment->update([
+                        'status' => 'succeeded',
+                        'paid_at' => now(),
+                        'stripe_data' => $paymentIntent->toArray(),
+                    ]);
+
+                    Log::info('✅ Payment SUCCESS - Record updated', [
+                        'payment_id' => $payment->id,
+                    ]);
+                }
+
+                // Create payment hold if hold period data exists
+                if (isset($paymentIntent->metadata->hold_period_type) && ! $payment->hold) {
+                    $holdPeriodData = [
+                        'hold_period_type' => $paymentIntent->metadata->hold_period_type,
+                        'hold_start_at' => $paymentIntent->metadata->hold_start_at ?? null,
+                        'hold_end_at' => $paymentIntent->metadata->hold_end_at ?? null,
+                        'hold_days' => $paymentIntent->metadata->hold_days ?? null,
+                    ];
+
+                    $this->paymentHoldService->createFromPayment($payment, $holdPeriodData);
+
+                    Log::info('✅ PaymentHold record created', [
+                        'payment_id' => $payment->id,
+                    ]);
+                }
+
+                return redirect(config('services.stripe.payment_success_url'));
+            } elseif ($status === 'canceled' || $paymentIntent->status === 'canceled') {
+                // CANCELED: Do NOT store in database
+                Log::info('❌ Payment CANCELED - No database record created', [
+                    'payment_intent_id' => $paymentIntentId,
+                    'user_id' => $userId,
+                ]);
+
+                return redirect(config('services.stripe.payment_failed_url'));
+            } else {
+                // FAILED: Do NOT store in database
+                $failureReason = $paymentIntent->last_payment_error->message ?? 'Payment failed';
+
+                Log::error('❌ Payment FAILED - No database record created', [
+                    'payment_intent_id' => $paymentIntentId,
+                    'user_id' => $userId,
+                    'reason' => $failureReason,
+                ]);
+
+                return redirect(config('services.stripe.payment_failed_url'));
+            }
+        } catch (\Exception $e) {
+            Log::error('Payment return handling failed: '.$e->getMessage());
+
+            return redirect(config('services.stripe.payment_failed_url'));
+        }
     }
 
     /**

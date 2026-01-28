@@ -51,8 +51,13 @@ class CheckPaymentHolds extends Command
                 'ready_at' => now(),
             ]);
 
-            // Send email notification
-            SendHoldPeriodEndedNotification::dispatch($hold);
+            // Send email notification (check both transaction_alert and email_alert)
+            $userSettings = \App\Models\UserNotificationSetting::where('user_id', $hold->user_id)->first();
+            $shouldSendEmail = ! $userSettings || ($userSettings->transaction_alert && $userSettings->email_alert);
+
+            if ($shouldSendEmail) {
+                SendHoldPeriodEndedNotification::dispatch($hold);
+            }
 
             // Optionally: Auto create transfer if enabled
             if (config('services.stripe.auto_transfer_enabled')) {

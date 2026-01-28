@@ -13,48 +13,21 @@
         </div>
 
         <!-- Content -->
-        <div style="padding: 30px;">
-            <p style="color: #000000; font-size: 16px; margin-top: 0;">Dear {{ $user->full_name }},</p>
+        <div style="padding: 40px 30px;">
+            <p style="color: #000000; font-size: 18px; margin-top: 0;">Dear {{ $user->full_name }},</p>
             
-            <p style="color: #000000; font-size: 16px;">We regret to inform you that your payment could not be processed.</p>
+            <p style="color: #000000; font-size: 16px; line-height: 1.8;">We regret to inform you that your payment could not be processed.</p>
 
-            <!-- Payment Details Box -->
-            <div style="background-color: #fff3cd; padding: 20px; border-radius: 6px; margin: 25px 0; border-left: 4px solid #935510;">
-                <table style="width: 100%; border-collapse: collapse;">
-                    <tr>
-                        <td style="padding: 8px 0; color: #000000; font-weight: bold;">Payment Amount:</td>
-                        <td style="padding: 8px 0; color: #000000; text-align: right; font-size: 18px; font-weight: bold;">${{ number_format($payment->amount, 2) }}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 8px 0; color: #000000; font-weight: bold;">Currency:</td>
-                        <td style="padding: 8px 0; color: #000000; text-align: right; text-transform: uppercase;">{{ $payment->currency }}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 8px 0; color: #000000; font-weight: bold;">Payment ID:</td>
-                        <td style="padding: 8px 0; color: #000000; text-align: right; font-family: monospace; font-size: 12px;">{{ $payment->payment_intent_id }}</td>
-                    </tr>
-                </table>
-            </div>
-
-            <!-- Failure Reason -->
-            <div style="background-color: #f9f9f9; padding: 15px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #935510;">
-                <p style="color: #000000; font-size: 14px; margin: 0;">
-                    <strong>Reason:</strong> {{ $reason }}
+            <!-- Payment Amount -->
+            <div style="background-color: #fff3cd; padding: 25px; border-radius: 8px; margin: 30px 0; text-align: center; border-left: 4px solid #935510;">
+                <p style="color: #000000; font-size: 20px; font-weight: bold; margin: 0;">
+                    ${{ number_format($payment->amount, 2) }} {{ strtoupper($payment->currency) }}
                 </p>
             </div>
 
-            <p style="color: #000000; font-size: 16px;">Please check your payment method and try again. Common reasons for payment failure include:</p>
+            <p style="color: #000000; font-size: 16px; line-height: 1.8;">Please check your payment method and try again.</p>
 
-            <ul style="color: #000000; font-size: 14px; padding-left: 20px;">
-                <li>Insufficient funds</li>
-                <li>Incorrect card details</li>
-                <li>Card expired or blocked</li>
-                <li>Bank security restrictions</li>
-            </ul>
-
-            <p style="color: #000000; font-size: 16px; margin-top: 30px;">If you continue to experience issues, please contact your bank or card issuer.</p>
-
-            <p style="color: #000000; font-size: 16px; margin-top: 20px;">
+            <p style="color: #000000; font-size: 16px; margin-top: 30px; line-height: 1.8;">
                 Best regards,<br>
                 <strong style="color: #935510;">{{ config('app.name') }} Team</strong>
             </p>

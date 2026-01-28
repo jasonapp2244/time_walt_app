@@ -105,9 +105,11 @@ class WebhookService
             $this->paymentHoldService->createFromPayment($payment, $holdPeriodData);
         }
 
-        // Send email notification
+        // Send email notification (check both transaction_alert and email_alert)
         $userSettings = UserNotificationSetting::where('user_id', $userId)->first();
-        if (! $userSettings || $userSettings->email_alert) {
+        $shouldSendEmail = ! $userSettings || ($userSettings->transaction_alert && $userSettings->email_alert);
+
+        if ($shouldSendEmail) {
             SendPaymentSuccessNotification::dispatch($payment);
         }
     }
@@ -144,9 +146,11 @@ class WebhookService
             $this->paymentHoldService->createFromPayment($payment, $holdPeriodData);
         }
 
-        // Send email notification (check user preferences)
+        // Send email notification (check both transaction_alert and email_alert)
         $userSettings = UserNotificationSetting::where('user_id', $payment->user_id)->first();
-        if (! $userSettings || $userSettings->email_alert) {
+        $shouldSendEmail = ! $userSettings || ($userSettings->transaction_alert && $userSettings->email_alert);
+
+        if ($shouldSendEmail) {
             SendPaymentSuccessNotification::dispatch($payment);
         }
     }
@@ -227,9 +231,11 @@ class WebhookService
                 'transferred_at' => now(),
             ]);
 
-            // Send email notification
+            // Send email notification (check both transaction_alert and email_alert)
             $userSettings = UserNotificationSetting::where('user_id', $transferRecord->user_id)->first();
-            if (! $userSettings || $userSettings->email_alert) {
+            $shouldSendEmail = ! $userSettings || ($userSettings->transaction_alert && $userSettings->email_alert);
+
+            if ($shouldSendEmail) {
                 SendTransferCompletedNotification::dispatch($transferRecord);
             }
         }

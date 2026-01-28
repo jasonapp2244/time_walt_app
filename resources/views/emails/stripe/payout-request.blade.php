@@ -13,42 +13,21 @@
         </div>
 
         <!-- Content -->
-        <div style="padding: 30px;">
-            <p style="color: #000000; font-size: 16px; margin-top: 0;">Dear {{ $user->full_name }},</p>
+        <div style="padding: 40px 30px;">
+            <p style="color: #000000; font-size: 18px; margin-top: 0;">Dear {{ $user->full_name }},</p>
             
-            <p style="color: #000000; font-size: 16px;">We have received your payout request. Your transfer is being processed and will be completed shortly.</p>
+            <p style="color: #000000; font-size: 16px; line-height: 1.8;">We have received your payout request. Your transfer is being processed and will be completed shortly.</p>
 
-            <!-- Transfer Details Box -->
-            <div style="background-color: #f2cf7a; padding: 20px; border-radius: 6px; margin: 25px 0; border-left: 4px solid #935510;">
-                <table style="width: 100%; border-collapse: collapse;">
-                    <tr>
-                        <td style="padding: 8px 0; color: #000000; font-weight: bold;">Payout Amount:</td>
-                        <td style="padding: 8px 0; color: #000000; text-align: right; font-size: 18px; font-weight: bold;">${{ number_format($transfer->amount, 2) }}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 8px 0; color: #000000; font-weight: bold;">Currency:</td>
-                        <td style="padding: 8px 0; color: #000000; text-align: right; text-transform: uppercase;">{{ $transfer->currency }}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 8px 0; color: #000000; font-weight: bold;">Transfer ID:</td>
-                        <td style="padding: 8px 0; color: #000000; text-align: right; font-family: monospace; font-size: 12px;">{{ $transfer->stripe_transfer_id }}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 8px 0; color: #000000; font-weight: bold;">Request Date:</td>
-                        <td style="padding: 8px 0; color: #000000; text-align: right;">{{ $transfer->created_at->format('F d, Y h:i A') }}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 8px 0; color: #000000; font-weight: bold;">Status:</td>
-                        <td style="padding: 8px 0; color: #000000; text-align: right; text-transform: capitalize;">{{ $transfer->status }}</td>
-                    </tr>
-                </table>
+            <!-- Payout Amount -->
+            <div style="background-color: #f2cf7a; padding: 25px; border-radius: 8px; margin: 30px 0; text-align: center; border-left: 4px solid #935510;">
+                <p style="color: #000000; font-size: 20px; font-weight: bold; margin: 0;">
+                    ${{ number_format($transfer->amount, 2) }} {{ strtoupper($transfer->currency) }}
+                </p>
             </div>
 
-            <p style="color: #000000; font-size: 16px;">Your payout request is currently being processed. You will receive a confirmation email once the transfer is completed.</p>
+            <p style="color: #000000; font-size: 16px; line-height: 1.8;">You will receive a confirmation email once the transfer is completed.</p>
 
-            <p style="color: #000000; font-size: 16px; margin-top: 30px;">Thank you for your patience!</p>
-
-            <p style="color: #000000; font-size: 16px; margin-top: 20px;">
+            <p style="color: #000000; font-size: 16px; margin-top: 30px; line-height: 1.8;">
                 Best regards,<br>
                 <strong style="color: #935510;">{{ config('app.name') }} Team</strong>
             </p>

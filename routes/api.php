@@ -46,6 +46,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::post('/connect/create', [StripeController::class, 'createConnectAccount'])->name('connect.create');
         Route::post('/connect/onboarding-link', [StripeController::class, 'getOnboardingLink'])->name('connect.onboarding-link');
         Route::post('/payment-intent', [StripeController::class, 'createPaymentIntent'])->name('payment-intent');
+        Route::post('/verify-payment', [StripeController::class, 'verifyPayment'])->name('verify-payment');
     });
 
     // Payment Holds Routes (User)
@@ -53,6 +54,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::get('/', [\App\Http\Controllers\Api\PaymentHoldController::class, 'index'])->name('index');
         Route::get('/summary', [\App\Http\Controllers\Api\PaymentHoldController::class, 'summary'])->name('summary');
         Route::post('/{hold_id}/request-payout', [\App\Http\Controllers\Api\PaymentHoldController::class, 'requestPayout'])->name('request-payout');
+        Route::post('/withdraw', [\App\Http\Controllers\Api\PaymentHoldController::class, 'withdraw'])->name('withdraw');
     });
 
     // Admin Routes

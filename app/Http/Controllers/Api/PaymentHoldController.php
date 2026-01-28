@@ -3,12 +3,16 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Stripe\WithdrawPayoutRequest;
 use App\Jobs\SendPayoutRequestNotification;
 use App\Models\PaymentHold;
+use App\Models\StripeConnectAccount;
+use App\Models\Transfer;
 use App\Models\UserNotificationSetting;
 use App\Services\StripeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class PaymentHoldController extends Controller
@@ -133,9 +137,11 @@ class PaymentHoldController extends Controller
             // Create transfer
             $transfer = $this->stripeService->createTransfer($hold, 'user_requested');
 
-            // Send email notification to user and admin (check user preferences)
+            // Send email notification to user and admin (check both transaction_alert and email_alert)
             $userSettings = UserNotificationSetting::where('user_id', $hold->user_id)->first();
-            if (! $userSettings || $userSettings->email_alert) {
+            $shouldSendEmail = ! $userSettings || ($userSettings->transaction_alert && $userSettings->email_alert);
+
+            if ($shouldSendEmail) {
                 SendPayoutRequestNotification::dispatch($transfer);
             }
 
@@ -157,12 +163,29 @@ class PaymentHoldController extends Controller
                     'currency' => $transfer->currency,
                 ],
             ]);
-        } catch (\Exception $e) {
-            Log::error('User Payout Request Failed: '.$e->getMessage());
+        } catch (\Stripe\Exception\ApiErrorException $e) {
+            // Stripe-specific errors
+            Log::error('Stripe Payout Request Failed', [
+                'error' => $e->getMessage(),
+                'hold_id' => $holdId ?? null,
+                'user_id' => $request->user()->id ?? null,
+            ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to process payout request: '.$e->getMessage(),
+                'message' => 'Unable to process payout request. Please try again later or contact support.',
+            ], 500);
+        } catch (\Exception $e) {
+            // General errors
+            Log::error('User Payout Request Failed', [
+                'error' => $e->getMessage(),
+                'hold_id' => $holdId ?? null,
+                'user_id' => $request->user()->id ?? null,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred while processing your request. Please try again later.',
             ], 500);
         }
     }
@@ -229,6 +252,168 @@ class PaymentHoldController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to retrieve payment holds summary.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Withdraw specific amount from available holds (partial payout).
+     */
+    public function withdraw(WithdrawPayoutRequest $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+            $requestedAmount = $request->amount;
+
+            // Find all available holds for this user
+            $availableHolds = PaymentHold::where('user_id', $user->id)
+                ->where('status', 'ready_for_transfer')
+                ->whereDoesntHave('transfer')
+                ->orderBy('hold_end_at', 'asc')
+                ->get();
+
+            if ($availableHolds->isEmpty()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No funds available for withdrawal. Hold period not completed yet.',
+                ], 400);
+            }
+
+            // Calculate total available amount
+            $totalAvailable = $availableHolds->sum('amount');
+
+            if ($requestedAmount > $totalAvailable) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Insufficient available funds. Available: \${$totalAvailable}, Requested: \${$requestedAmount}",
+                    'data' => [
+                        'available_amount' => (float) $totalAvailable,
+                        'requested_amount' => (float) $requestedAmount,
+                    ],
+                ], 400);
+            }
+
+            // Check if user has Stripe Connect account
+            $connectAccount = StripeConnectAccount::where('user_id', $user->id)->first();
+
+            if (! $connectAccount) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Stripe Connect account not found. Please complete account setup.',
+                ], 400);
+            }
+
+            DB::beginTransaction();
+
+            try {
+                $remainingAmount = $requestedAmount;
+                $processedHolds = [];
+
+                // Process holds until we've transferred the requested amount
+                foreach ($availableHolds as $hold) {
+                    if ($remainingAmount <= 0) {
+                        break;
+                    }
+
+                    $amountFromThisHold = min($remainingAmount, $hold->amount);
+
+                    // Get currency from payment
+                    $payment = $hold->payment;
+                    $currency = $payment ? strtolower($payment->currency) : 'usd';
+
+                    // Create Stripe transfer for this amount
+                    \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
+
+                    $transfer = \Stripe\Transfer::create([
+                        'amount' => (int) ($amountFromThisHold * 100),
+                        'currency' => $currency,
+                        'destination' => $connectAccount->connect_account_id,
+                        'description' => "Partial withdrawal from hold #{$hold->id}",
+                        'metadata' => [
+                            'hold_id' => $hold->id,
+                            'user_id' => $user->id,
+                            'payment_id' => $payment ? $payment->id : null,
+                            'withdrawal_type' => 'partial',
+                        ],
+                    ]);
+
+                    // Create transfer record
+                    $transferRecord = Transfer::create([
+                        'hold_id' => $hold->id,
+                        'user_id' => $user->id,
+                        'stripe_transfer_id' => $transfer->id,
+                        'stripe_connect_account_id' => $connectAccount->connect_account_id,
+                        'amount' => $amountFromThisHold,
+                        'currency' => $currency,
+                        'status' => 'pending',
+                        'transfer_type' => 'user_requested_partial',
+                        'admin_id' => null,
+                        'stripe_data' => $transfer->toArray(),
+                    ]);
+
+                    // Update hold status
+                    $hold->update([
+                        'status' => 'transferred',
+                        'transferred_at' => now(),
+                    ]);
+
+                    $processedHolds[] = [
+                        'hold_id' => $hold->id,
+                        'amount' => (float) $amountFromThisHold,
+                        'transfer_id' => $transferRecord->id,
+                    ];
+
+                    $remainingAmount -= $amountFromThisHold;
+
+                    // Send email notification (check both transaction_alert and email_alert)
+                    $userSettings = UserNotificationSetting::where('user_id', $user->id)->first();
+                    $shouldSendEmail = ! $userSettings || ($userSettings->transaction_alert && $userSettings->email_alert);
+
+                    if ($shouldSendEmail) {
+                        SendPayoutRequestNotification::dispatch($transferRecord);
+                    }
+                }
+
+                DB::commit();
+
+                Log::info('Partial withdrawal completed', [
+                    'user_id' => $user->id,
+                    'requested_amount' => $requestedAmount,
+                    'processed_holds' => count($processedHolds),
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => "Withdrawal request for \${$requestedAmount} submitted successfully.",
+                    'data' => [
+                        'total_amount' => (float) $requestedAmount,
+                        'holds_processed' => $processedHolds,
+                        'status' => 'pending',
+                    ],
+                ]);
+            } catch (\Exception $e) {
+                DB::rollBack();
+                throw $e;
+            }
+        } catch (\Stripe\Exception\ApiErrorException $e) {
+            Log::error('Stripe withdrawal failed', [
+                'error' => $e->getMessage(),
+                'user_id' => $request->user()->id ?? null,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to process withdrawal request. Please try again later or contact support.',
+            ], 500);
+        } catch (\Exception $e) {
+            Log::error('Withdrawal request failed', [
+                'error' => $e->getMessage(),
+                'user_id' => $request->user()->id ?? null,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred while processing your withdrawal. Please try again later.',
             ], 500);
         }
     }
