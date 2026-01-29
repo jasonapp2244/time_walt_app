@@ -22,54 +22,111 @@ class PaymentHoldController extends Controller
     ) {}
 
     /**
-     * Get user's payment holds.
+     * Get user's transaction history (checkout & transfer) with pagination.
      */
     public function index(Request $request): JsonResponse
     {
         try {
             $user = $request->user();
 
+            // Get per_page from request, default to 15
+            $perPage = $request->input('per_page', 15);
+            $perPage = min(max((int) $perPage, 1), 100); // Between 1 and 100
+
             $holds = PaymentHold::where('user_id', $user->id)
                 ->with(['payment', 'transfer'])
                 ->orderBy('created_at', 'desc')
-                ->get();
+                ->paginate($perPage);
 
-            $formattedHolds = $holds->map(function ($hold) {
-                return [
-                    'id' => $hold->id,
+            // Build transaction history
+            $transactions = [];
+
+            foreach ($holds as $hold) {
+                // Calculate hold duration details
+                $holdDuration = $this->calculateHoldDuration($hold);
+
+                // TRANSACTION IN: Checkout Success (Money Coming In)
+                $transactions[] = [
+                    'transaction_type' => 'checkout',
+                    'transaction_id' => "CHK-{$hold->id}",
+                    'hold_id' => $hold->id,
                     'amount' => (float) $hold->amount,
-                    'status' => $hold->status,
-                    'hold_start_at' => $hold->hold_start_at?->toIso8601String(),
-                    'hold_end_at' => $hold->hold_end_at?->toIso8601String(),
-                    'hold_days' => $hold->hold_days,
-                    'hold_period_type' => $hold->hold_period_type,
-                    'ready_at' => $hold->ready_at?->toIso8601String(),
-                    'transferred_at' => $hold->transferred_at?->toIso8601String(),
-                    'can_request_payout' => $this->canRequestPayout($hold),
-                    'payment' => [
-                        'id' => $hold->payment->id,
+                    'currency' => $hold->payment ? strtoupper($hold->payment->currency) : 'USD',
+                    'status' => $hold->payment ? $hold->payment->status : 'unknown',
+                    'date' => $hold->created_at->toIso8601String(),
+                    'description' => 'Checkout payment received',
+                    'hold_duration' => $holdDuration,
+                    'payment_details' => [
+                        'payment_id' => $hold->payment->id,
                         'payment_intent_id' => $hold->payment->payment_intent_id,
-                        'status' => $hold->payment->status,
+                        'hold_status' => $hold->status,
+                        'can_request_payout' => $this->canRequestPayout($hold),
                     ],
-                    'transfer' => $hold->transfer ? [
-                        'id' => $hold->transfer->id,
-                        'status' => $hold->transfer->status,
-                        'stripe_transfer_id' => $hold->transfer->stripe_transfer_id,
-                    ] : null,
                 ];
+
+                // TRANSACTION OUT: Transfer (Money Going Out)
+                if ($hold->transfer) {
+                    $transactions[] = [
+                        'transaction_type' => 'transfer',
+                        'transaction_id' => "TRF-{$hold->transfer->id}",
+                        'hold_id' => $hold->id,
+                        'amount' => (float) $hold->transfer->amount,
+                        'currency' => strtoupper($hold->transfer->currency),
+                        'status' => $hold->transfer->status,
+                        'date' => $hold->transfer->created_at->toIso8601String(),
+                        'description' => 'Transfer to Stripe Connect account',
+                        'transfer_details' => [
+                            'transfer_id' => $hold->transfer->id,
+                            'stripe_transfer_id' => $hold->transfer->stripe_transfer_id,
+                            'transfer_type' => $hold->transfer->transfer_type,
+                            'transferred_at' => $hold->transferred_at?->toIso8601String(),
+                        ],
+                    ];
+                }
+            }
+
+            // Sort all transactions by date (newest first)
+            usort($transactions, function ($a, $b) {
+                return strtotime($b['date']) - strtotime($a['date']);
             });
+
+            // Calculate summary
+            $checkoutTotal = collect($transactions)
+                ->where('transaction_type', 'checkout')
+                ->where('status', 'succeeded')
+                ->sum('amount');
+
+            $transferTotal = collect($transactions)
+                ->where('transaction_type', 'transfer')
+                ->where('status', 'completed')
+                ->sum('amount');
 
             return response()->json([
                 'success' => true,
-                'message' => 'Payment holds retrieved successfully.',
-                'data' => $formattedHolds,
+                'message' => 'Transaction history retrieved successfully.',
+                'summary' => [
+                    'total_checkout_amount' => (float) $checkoutTotal,
+                    'total_transferred_amount' => (float) $transferTotal,
+                    'pending_balance' => (float) ($checkoutTotal - $transferTotal),
+                    'total_transactions' => count($transactions),
+                ],
+                'transactions' => $transactions,
+                'pagination' => [
+                    'current_page' => $holds->currentPage(),
+                    'per_page' => $holds->perPage(),
+                    'total' => $holds->total(),
+                    'last_page' => $holds->lastPage(),
+                    'from' => $holds->firstItem(),
+                    'to' => $holds->lastItem(),
+                    'has_more_pages' => $holds->hasMorePages(),
+                ],
             ]);
         } catch (\Exception $e) {
-            Log::error('Get Payment Holds Failed: '.$e->getMessage());
+            Log::error('Get Transaction History Failed: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to retrieve payment holds.',
+                'message' => 'Failed to retrieve transaction history.',
             ], 500);
         }
     }
@@ -191,67 +248,72 @@ class PaymentHoldController extends Controller
     }
 
     /**
-     * Get user's payment holds summary/statistics.
+     * Get user's wallet balance summary.
      */
     public function summary(Request $request): JsonResponse
     {
         try {
             $user = $request->user();
 
+            // Get all holds for this user
             $holds = PaymentHold::where('user_id', $user->id)->get();
 
-            // Calculate totals by status
-            $totalLocked = $holds->where('status', 'holding')->sum('amount');
-            $totalReadyForTransfer = $holds->where('status', 'ready_for_transfer')->sum('amount');
-            $totalTransferred = $holds->where('status', 'transferred')->sum('amount');
+            // Get all transfers to calculate actual transferred amounts
+            $transfers = Transfer::where('user_id', $user->id)->get();
 
-            // Counts
-            $lockedCount = $holds->where('status', 'holding')->count();
-            $readyCount = $holds->where('status', 'ready_for_transfer')->count();
-            $transferredCount = $holds->where('status', 'transferred')->count();
+            // Calculate total received from checkouts
+            $totalCheckoutAmount = $holds->sum('amount');
 
-            // Total amount (all statuses)
-            $totalAmount = $holds->sum('amount');
+            // Calculate total actually transferred from wallet
+            $totalTransferredFromWallet = $transfers->whereIn('status', ['completed', 'pending'])->sum('amount');
 
-            // Available for payout (ready_for_transfer + holding with period complete)
-            $availableForPayout = $holds->filter(function ($hold) {
-                return $this->canRequestPayout($hold);
-            })->sum('amount');
-
-            // Upcoming (holding with period not complete)
-            $upcomingPayouts = $holds->where('status', 'holding')
+            // LOCKED AMOUNT: Money still in hold period (cannot be withdrawn yet)
+            $lockedAmount = $holds
+                ->where('status', 'holding')
                 ->filter(function ($hold) {
                     return $hold->hold_end_at && $hold->hold_end_at->isFuture();
                 })
                 ->sum('amount');
 
+            // READY FOR TRANSFER: Money that completed hold period (can be withdrawn)
+            // Includes: status='ready_for_transfer' OR status='holding' with completed period
+            $readyForTransferAmount = $holds
+                ->where('status', 'ready_for_transfer')
+                ->sum('amount');
+
+            $holdingButReady = $holds
+                ->where('status', 'holding')
+                ->filter(function ($hold) {
+                    return $hold->hold_end_at && $hold->hold_end_at->isPast();
+                })
+                ->sum('amount');
+
+            $totalReadyForTransfer = $readyForTransferAmount + $holdingButReady;
+
+            // TOTAL BALANCE: Money in your wallet (not yet transferred out)
+            // Total Balance = Total Received - Total Transferred
+            $totalBalance = $totalCheckoutAmount - $totalTransferredFromWallet;
+
+            // Make sure total_balance matches locked + ready
+            // (transferred holds have amount=0 in calculations above)
+            $calculatedBalance = $lockedAmount + $totalReadyForTransfer;
+
             return response()->json([
                 'success' => true,
-                'message' => 'Payment holds summary retrieved successfully.',
-                'data' => [
-                    'summary' => [
-                        'total_amount' => (float) $totalAmount,
-                        'total_locked' => (float) $totalLocked,
-                        'total_ready_for_transfer' => (float) $totalReadyForTransfer,
-                        'total_transferred' => (float) $totalTransferred,
-                        'available_for_payout' => (float) $availableForPayout,
-                        'upcoming_payouts' => (float) $upcomingPayouts,
-                    ],
-                    'counts' => [
-                        'total' => $holds->count(),
-                        'locked' => $lockedCount,
-                        'ready_for_transfer' => $readyCount,
-                        'transferred' => $transferredCount,
-                        'available_for_payout' => $holds->filter(fn ($h) => $this->canRequestPayout($h))->count(),
-                    ],
+                'message' => 'Balance summary retrieved successfully.',
+                'summary' => [
+                    'total_balance' => (float) $calculatedBalance,
+                    'total_locked_amount' => (float) $lockedAmount,
+                    'total_ready_for_transfer_amount' => (float) $totalReadyForTransfer,
+                    'currency' => 'USD',
                 ],
             ]);
         } catch (\Exception $e) {
-            Log::error('Get Payment Holds Summary Failed: '.$e->getMessage());
+            Log::error('Get Balance Summary Failed: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to retrieve payment holds summary.',
+                'message' => 'Failed to retrieve balance summary.',
             ], 500);
         }
     }
@@ -416,6 +478,38 @@ class PaymentHoldController extends Controller
                 'message' => 'An error occurred while processing your withdrawal. Please try again later.',
             ], 500);
         }
+    }
+
+    /**
+     * Calculate hold duration details for a payment hold.
+     */
+    protected function calculateHoldDuration(PaymentHold $hold): array
+    {
+        $holdDuration = [
+            'hold_days' => $hold->hold_days,
+            'hold_period_type' => $hold->hold_period_type,
+            'hold_start_at' => $hold->hold_start_at?->toIso8601String(),
+            'hold_end_at' => $hold->hold_end_at?->toIso8601String(),
+            'days_elapsed' => null,
+            'days_remaining' => null,
+            'is_complete' => false,
+        ];
+
+        if ($hold->hold_start_at && $hold->hold_end_at) {
+            $now = now();
+
+            // Calculate days elapsed since hold started
+            $holdDuration['days_elapsed'] = max(0, $hold->hold_start_at->diffInDays($now));
+
+            // Calculate days remaining (can be negative if overdue)
+            $daysRemaining = $now->diffInDays($hold->hold_end_at, false);
+            $holdDuration['days_remaining'] = $daysRemaining >= 0 ? $daysRemaining : 0;
+
+            // Check if hold period is complete
+            $holdDuration['is_complete'] = $hold->hold_end_at->isPast();
+        }
+
+        return $holdDuration;
     }
 
     /**
