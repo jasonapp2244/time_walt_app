@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Jobs\SendTransferCompletedNotification;
+use App\Jobs\SendTransferCompletedSummaryNotification;
 use App\Models\Transfer;
 use App\Models\UserNotificationSetting;
 use Illuminate\Console\Command;
@@ -46,6 +47,7 @@ class VerifyPendingTransfers extends Command
 
         $successCount = 0;
         $failedCount = 0;
+        $completedTransfersByUser = []; // Group completed transfers by user
 
         foreach ($transfers as $transfer) {
             try {
@@ -67,24 +69,26 @@ class VerifyPendingTransfers extends Command
                         'stripe_data' => $stripeTransfer->toArray(),
                     ]);
 
-                    // Update hold status
+                    // Update hold with remaining_amount calculation
                     if ($transfer->hold) {
-                        $transfer->hold->update([
-                            'status' => 'transferred',
-                            'transferred_at' => now(),
+                        $hold = $transfer->hold;
+                        // Calculate remaining amount
+                        $currentRemaining = $hold->remaining_amount ?? $hold->amount;
+                        $newRemainingAmount = max(0, $currentRemaining - $transfer->amount);
+
+                        // Update hold status and remaining_amount
+                        $hold->update([
+                            'remaining_amount' => $newRemainingAmount,
+                            'status' => $newRemainingAmount <= 0 ? 'transferred' : 'partial_transferred',
+                            'transferred_at' => $newRemainingAmount <= 0 ? now() : $hold->transferred_at,
                         ]);
                     }
 
-                    // Send success email to user and admin (check both transaction_alert and email_alert)
-                    $userSettings = UserNotificationSetting::where('user_id', $transfer->user_id)->first();
-                    $shouldSendEmail = ! $userSettings || ($userSettings->transaction_alert && $userSettings->email_alert);
-
-                    if ($shouldSendEmail) {
-                        SendTransferCompletedNotification::dispatch($transfer);
-                        $this->info("✅ Success email sent for transfer ID: {$transfer->id}");
-                    } else {
-                        $this->info("📧 Email skipped (user settings) for transfer ID: {$transfer->id}");
+                    // Collect completed transfers by user for batching
+                    if (! isset($completedTransfersByUser[$transfer->user_id])) {
+                        $completedTransfersByUser[$transfer->user_id] = [];
                     }
+                    $completedTransfersByUser[$transfer->user_id][] = $transfer;
 
                     $this->info("✅ Transfer ID: {$transfer->id} verified and completed");
                     $successCount++;
@@ -113,6 +117,34 @@ class VerifyPendingTransfers extends Command
                     'error' => $e->getMessage(),
                 ]);
                 $failedCount++;
+            }
+        }
+
+        // Send batched email notifications for each user
+        foreach ($completedTransfersByUser as $userId => $userTransfers) {
+            $userSettings = UserNotificationSetting::where('user_id', $userId)->first();
+            $shouldSendEmail = ! $userSettings || ($userSettings->transaction_alert && $userSettings->email_alert);
+
+            if ($shouldSendEmail && ! empty($userTransfers)) {
+                // Load relationships
+                $transfers = Transfer::whereIn('id', collect($userTransfers)->pluck('id')->toArray())
+                    ->with(['hold.payment', 'user'])
+                    ->get();
+
+                if ($transfers->count() > 1) {
+                    // Multiple transfers - send summary email
+                    $totalAmount = $transfers->sum('amount');
+                    SendTransferCompletedSummaryNotification::dispatch(
+                        $transfers->first()->user,
+                        $transfers,
+                        $totalAmount
+                    );
+                    $this->info("✅ Summary email sent for user ID: {$userId} ({$transfers->count()} transfers)");
+                } else {
+                    // Single transfer - send individual email
+                    SendTransferCompletedNotification::dispatch($transfers->first());
+                    $this->info("✅ Success email sent for transfer ID: {$transfers->first()->id}");
+                }
             }
         }
 

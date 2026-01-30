@@ -3,8 +3,10 @@
 use App\Http\Controllers\Api\Admin\TransferController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\PrivacyPolicyController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\StripeController;
+use App\Http\Controllers\Api\TransactionHistoryController;
 use Illuminate\Support\Facades\Route;
 
 // Public Authentication Routes with Rate Limiting
@@ -17,6 +19,11 @@ Route::prefix('auth')->name('auth.')->group(function () {
     Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->name('forgot-password')->middleware('throttle:3,1');
     Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('reset-password')->middleware('throttle:5,1');
 });
+
+// Public Privacy Policy Routes (Mobile View - Read-Only)
+Route::get('/privacy-policy', [PrivacyPolicyController::class, 'active'])
+    ->name('privacy-policy.active')
+    ->middleware('throttle:60,1');
 
 // Protected Routes (Require Authentication)
 // Rate limit: 60 requests per minute for authenticated users
@@ -55,6 +62,15 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::get('/summary', [\App\Http\Controllers\Api\PaymentHoldController::class, 'summary'])->name('summary');
         Route::post('/{hold_id}/request-payout', [\App\Http\Controllers\Api\PaymentHoldController::class, 'requestPayout'])->name('request-payout');
         Route::post('/withdraw', [\App\Http\Controllers\Api\PaymentHoldController::class, 'withdraw'])->name('withdraw');
+    });
+
+    // Transaction History Routes
+    Route::prefix('transactions')->name('transactions.')->group(function () {
+        Route::get('/all', [TransactionHistoryController::class, 'all'])->name('all');
+        Route::get('/checkouts', [TransactionHistoryController::class, 'checkouts'])->name('checkouts');
+        Route::get('/withdraws', [TransactionHistoryController::class, 'withdraws'])->name('withdraws');
+        Route::get('/hold-amounts', [TransactionHistoryController::class, 'holdAmounts'])->name('hold-amounts');
+        Route::get('/ready-for-transfer', [TransactionHistoryController::class, 'readyForTransfer'])->name('ready-for-transfer');
     });
 
     // Admin Routes

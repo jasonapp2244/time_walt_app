@@ -44,5 +44,8 @@ class DatabaseSeeder extends Seeder
             'lock_alert' => true,
             'unlock_alert' => true,
         ]);
+
+        // Seed Privacy Policy
+        $this->call(PrivacyPolicySeeder::class);
     }
 }

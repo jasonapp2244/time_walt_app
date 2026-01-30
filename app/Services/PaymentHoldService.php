@@ -38,6 +38,7 @@ class PaymentHoldService
             'payment_id' => $payment->id,
             'user_id' => $payment->user_id,
             'amount' => $payment->amount,
+            'remaining_amount' => $payment->amount, // Initialize remaining_amount = amount
             'hold_start_at' => $startDate,
             'hold_end_at' => $endDate,
             'hold_days' => $holdDays,

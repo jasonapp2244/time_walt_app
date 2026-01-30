@@ -151,22 +151,27 @@ class PaymentHoldController extends Controller
                 ], 404);
             }
 
-            // Check if already transferred
-            if ($hold->status === 'transferred') {
+            // Check if already fully transferred
+            $remainingAmount = $hold->remaining_amount ?? $hold->amount;
+            if ($hold->status === 'transferred' || $remainingAmount <= 0) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Payout already completed for this hold.',
                 ], 400);
             }
 
-            // Check if transfer already exists
-            if ($hold->transfer) {
+            // Check if there's a pending transfer for this hold
+            $pendingTransfer = Transfer::where('hold_id', $hold->id)
+                ->whereIn('status', ['pending', 'processing'])
+                ->first();
+
+            if ($pendingTransfer) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Payout request already exists for this hold.',
                     'data' => [
-                        'transfer_id' => $hold->transfer->id,
-                        'status' => $hold->transfer->status,
+                        'transfer_id' => $pendingTransfer->id,
+                        'status' => $pendingTransfer->status,
                     ],
                 ], 400);
             }
@@ -273,22 +278,29 @@ class PaymentHoldController extends Controller
                 ->filter(function ($hold) {
                     return $hold->hold_end_at && $hold->hold_end_at->isFuture();
                 })
-                ->sum('amount');
+                ->sum(function ($hold) {
+                    return $hold->remaining_amount ?? $hold->amount;
+                });
 
             // READY FOR TRANSFER: Money that completed hold period (can be withdrawn)
-            // Includes: status='ready_for_transfer' OR status='holding' with completed period
+            // Includes: status='ready_for_transfer' OR status='partial_transferred' OR status='holding' with completed period
             $readyForTransferAmount = $holds
-                ->where('status', 'ready_for_transfer')
-                ->sum('amount');
-
-            $holdingButReady = $holds
-                ->where('status', 'holding')
-                ->filter(function ($hold) {
-                    return $hold->hold_end_at && $hold->hold_end_at->isPast();
+                ->where(function ($query) {
+                    $query->where('status', 'ready_for_transfer')
+                        ->orWhere('status', 'partial_transferred')
+                        ->orWhere(function ($q) {
+                            $q->where('status', 'holding')
+                                ->whereNotNull('hold_end_at')
+                                ->where('hold_end_at', '<=', now());
+                        });
                 })
-                ->sum('amount');
+                ->sum(function ($hold) {
+                    $remaining = $hold->remaining_amount ?? $hold->amount;
 
-            $totalReadyForTransfer = $readyForTransferAmount + $holdingButReady;
+                    return $remaining > 0 ? $remaining : 0;
+                });
+
+            $totalReadyForTransfer = $readyForTransferAmount;
 
             // TOTAL BALANCE: Money in your wallet (not yet transferred out)
             // Total Balance = Total Received - Total Transferred
@@ -328,11 +340,61 @@ class PaymentHoldController extends Controller
             $requestedAmount = $request->amount;
 
             // Find all available holds for this user
+            // Include holds with remaining_amount > 0, regardless of status (as long as hold period is complete)
             $availableHolds = PaymentHold::where('user_id', $user->id)
-                ->where('status', 'ready_for_transfer')
-                ->whereDoesntHave('transfer')
+                ->where(function ($query) {
+                    // Status-based conditions
+                    $query->where('status', 'ready_for_transfer')
+                        ->orWhere('status', 'partial_transferred')
+                        ->orWhere(function ($q) {
+                            // Holding status but hold period completed
+                            $q->where('status', 'holding')
+                                ->whereNotNull('hold_end_at')
+                                ->where('hold_end_at', '<=', now());
+                        })
+                        ->orWhere(function ($q) {
+                            // Transferred status but still has remaining_amount > 0 (data inconsistency fix)
+                            $q->where('status', 'transferred')
+                                ->where('remaining_amount', '>', 0);
+                        });
+                })
+                ->with('payment') // Eager load payment relationship
                 ->orderBy('hold_end_at', 'asc')
-                ->get();
+                ->get()
+                ->map(function ($hold) {
+                    // Calculate and set remaining_amount if not set
+                    if ($hold->remaining_amount === null) {
+                        // Calculate remaining: amount - sum of completed/pending transfers
+                        $transferredAmount = \App\Models\Transfer::where('hold_id', $hold->id)
+                            ->whereIn('status', ['completed', 'pending'])
+                            ->sum('amount');
+                        $hold->remaining_amount = max(0, $hold->amount - $transferredAmount);
+                        // Update the hold if remaining_amount was null
+                        if ($hold->remaining_amount !== $hold->amount) {
+                            $hold->update(['remaining_amount' => $hold->remaining_amount]);
+                        }
+                    }
+
+                    // Fix status inconsistency: if status is 'transferred' but remaining_amount > 0, change to 'partial_transferred'
+                    if ($hold->status === 'transferred' && $hold->remaining_amount > 0) {
+                        $hold->update(['status' => 'partial_transferred']);
+                        $hold->status = 'partial_transferred';
+                    }
+
+                    return $hold;
+                })
+                ->filter(function ($hold) {
+                    // Ensure hold period is complete (if holding status)
+                    if ($hold->status === 'holding') {
+                        if (! $hold->hold_end_at || $hold->hold_end_at->isFuture()) {
+                            return false; // Hold period not complete
+                        }
+                    }
+                    // Filter by remaining_amount > 0
+                    $remaining = (float) ($hold->remaining_amount ?? $hold->amount);
+
+                    return $remaining > 0;
+                });
 
             if ($availableHolds->isEmpty()) {
                 return response()->json([
@@ -341,8 +403,29 @@ class PaymentHoldController extends Controller
                 ], 400);
             }
 
-            // Calculate total available amount
-            $totalAvailable = $availableHolds->sum('amount');
+            // Calculate total available amount - ALWAYS use remaining_amount
+            $totalAvailable = 0;
+            $holdDetails = [];
+
+            foreach ($availableHolds as $hold) {
+                $remaining = (float) ($hold->remaining_amount ?? $hold->amount);
+                $totalAvailable += $remaining;
+                $holdDetails[] = [
+                    'hold_id' => $hold->id,
+                    'original_amount' => (float) $hold->amount,
+                    'remaining_amount' => (float) ($hold->remaining_amount ?? $hold->amount),
+                    'status' => $hold->status,
+                ];
+            }
+
+            // Log for debugging
+            Log::info('Withdrawal availability check', [
+                'user_id' => $user->id,
+                'requested_amount' => $requestedAmount,
+                'total_available' => $totalAvailable,
+                'holds_count' => $availableHolds->count(),
+                'hold_details' => $holdDetails,
+            ]);
 
             if ($requestedAmount > $totalAvailable) {
                 return response()->json([
@@ -351,6 +434,7 @@ class PaymentHoldController extends Controller
                     'data' => [
                         'available_amount' => (float) $totalAvailable,
                         'requested_amount' => (float) $requestedAmount,
+                        'holds_count' => $availableHolds->count(),
                     ],
                 ], 400);
             }
@@ -377,11 +461,35 @@ class PaymentHoldController extends Controller
                         break;
                     }
 
-                    $amountFromThisHold = min($remainingAmount, $hold->amount);
+                    // Use remaining_amount - it should be set by the map function above
+                    // If somehow still null, calculate it on the fly
+                    if ($hold->remaining_amount === null) {
+                        $transferredAmount = \App\Models\Transfer::where('hold_id', $hold->id)
+                            ->whereIn('status', ['completed', 'pending'])
+                            ->sum('amount');
+                        $hold->remaining_amount = max(0, $hold->amount - $transferredAmount);
+                    }
 
-                    // Get currency from payment
+                    $availableInHold = (float) $hold->remaining_amount;
+
+                    // Skip if no amount available in this hold
+                    if ($availableInHold <= 0) {
+                        continue;
+                    }
+
+                    $amountFromThisHold = min($remainingAmount, $availableInHold);
+
+                    // Get currency from payment (ensure payment is loaded)
                     $payment = $hold->payment;
-                    $currency = $payment ? strtolower($payment->currency) : 'usd';
+                    if (! $payment) {
+                        Log::warning('Payment not found for hold', [
+                            'hold_id' => $hold->id,
+                            'user_id' => $user->id,
+                        ]);
+
+                        continue; // Skip this hold if payment is missing
+                    }
+                    $currency = strtolower($payment->currency);
 
                     // Create Stripe transfer for this amount
                     \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
@@ -390,12 +498,12 @@ class PaymentHoldController extends Controller
                         'amount' => (int) ($amountFromThisHold * 100),
                         'currency' => $currency,
                         'destination' => $connectAccount->connect_account_id,
-                        'description' => "Partial withdrawal from hold #{$hold->id}",
+                        'description' => "Withdrawal from hold #{$hold->id}",
                         'metadata' => [
                             'hold_id' => $hold->id,
                             'user_id' => $user->id,
                             'payment_id' => $payment ? $payment->id : null,
-                            'withdrawal_type' => 'partial',
+                            'withdrawal_type' => $amountFromThisHold < $availableInHold ? 'partial' : 'full',
                         ],
                     ]);
 
@@ -408,15 +516,19 @@ class PaymentHoldController extends Controller
                         'amount' => $amountFromThisHold,
                         'currency' => $currency,
                         'status' => 'pending',
-                        'transfer_type' => 'user_requested_partial',
+                        'transfer_type' => $amountFromThisHold < $availableInHold ? 'user_requested_partial' : 'user_requested',
                         'admin_id' => null,
                         'stripe_data' => $transfer->toArray(),
                     ]);
 
-                    // Update hold status
+                    // Calculate new remaining amount
+                    $newRemainingAmount = $availableInHold - $amountFromThisHold;
+
+                    // Update hold with remaining_amount and appropriate status
                     $hold->update([
-                        'status' => 'transferred',
-                        'transferred_at' => now(),
+                        'remaining_amount' => $newRemainingAmount,
+                        'status' => $newRemainingAmount <= 0 ? 'transferred' : 'partial_transferred',
+                        'transferred_at' => $newRemainingAmount <= 0 ? now() : $hold->transferred_at,
                     ]);
 
                     $processedHolds[] = [
@@ -426,31 +538,88 @@ class PaymentHoldController extends Controller
                     ];
 
                     $remainingAmount -= $amountFromThisHold;
+                }
 
-                    // Send email notification (check both transaction_alert and email_alert)
-                    $userSettings = UserNotificationSetting::where('user_id', $user->id)->first();
-                    $shouldSendEmail = ! $userSettings || ($userSettings->transaction_alert && $userSettings->email_alert);
+                // Check if any holds were processed
+                if (empty($processedHolds)) {
+                    DB::rollBack();
+                    Log::warning('No holds processed for withdrawal', [
+                        'user_id' => $user->id,
+                        'requested_amount' => $requestedAmount,
+                        'available_holds_count' => $availableHolds->count(),
+                    ]);
 
-                    if ($shouldSendEmail) {
-                        SendPayoutRequestNotification::dispatch($transferRecord);
-                    }
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'No holds could be processed. Please check your available balance.',
+                    ], 400);
+                }
+
+                // Check if full amount was processed
+                $totalProcessed = collect($processedHolds)->sum('amount');
+                if ($totalProcessed < $requestedAmount) {
+                    Log::warning('Partial amount processed', [
+                        'user_id' => $user->id,
+                        'requested_amount' => $requestedAmount,
+                        'processed_amount' => $totalProcessed,
+                    ]);
                 }
 
                 DB::commit();
 
-                Log::info('Partial withdrawal completed', [
+                // Send ONE email notification with all transfers (check both transaction_alert and email_alert)
+                $userSettings = UserNotificationSetting::where('user_id', $user->id)->first();
+                $shouldSendEmail = ! $userSettings || ($userSettings->transaction_alert && $userSettings->email_alert);
+
+                if ($shouldSendEmail && ! empty($processedHolds)) {
+                    // Get all transfer records
+                    $transferIds = collect($processedHolds)->pluck('transfer_id')->toArray();
+                    $transfers = Transfer::whereIn('id', $transferIds)
+                        ->with(['hold.payment', 'user'])
+                        ->get();
+
+                    // Send single email with all transfer details
+                    \App\Jobs\SendWithdrawalSummaryNotification::dispatch($user, $transfers, $requestedAmount, $totalProcessed);
+                }
+
+                Log::info('Withdrawal completed', [
                     'user_id' => $user->id,
                     'requested_amount' => $requestedAmount,
+                    'processed_amount' => $totalProcessed,
                     'processed_holds' => count($processedHolds),
                 ]);
+
+                // Get transfer details for response
+                $transferDetails = [];
+                foreach ($processedHolds as $processedHold) {
+                    $transfer = Transfer::find($processedHold['transfer_id']);
+                    if ($transfer) {
+                        $transferDetails[] = [
+                            'hold_id' => $processedHold['hold_id'],
+                            'transfer_id' => $transfer->id,
+                            'stripe_transfer_id' => $transfer->stripe_transfer_id,
+                            'amount' => (float) $transfer->amount,
+                            'currency' => strtoupper($transfer->currency),
+                            'status' => $transfer->status,
+                        ];
+                    }
+                }
 
                 return response()->json([
                     'success' => true,
                     'message' => "Withdrawal request for \${$requestedAmount} submitted successfully.",
                     'data' => [
-                        'total_amount' => (float) $requestedAmount,
+                        'requested_amount' => (float) $requestedAmount,
+                        'processed_amount' => (float) $totalProcessed,
+                        'total_transfers' => count($processedHolds),
                         'holds_processed' => $processedHolds,
+                        'transfers' => $transferDetails,
                         'status' => 'pending',
+                        'summary' => [
+                            'requested' => (float) $requestedAmount,
+                            'processed' => (float) $totalProcessed,
+                            'difference' => (float) ($requestedAmount - $totalProcessed),
+                        ],
                     ],
                 ]);
             } catch (\Exception $e) {
@@ -460,22 +629,30 @@ class PaymentHoldController extends Controller
         } catch (\Stripe\Exception\ApiErrorException $e) {
             Log::error('Stripe withdrawal failed', [
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
                 'user_id' => $request->user()->id ?? null,
+                'requested_amount' => $request->input('amount'),
             ]);
 
             return response()->json([
                 'success' => false,
                 'message' => 'Unable to process withdrawal request. Please try again later or contact support.',
+                'error' => config('app.debug') ? $e->getMessage() : null,
             ], 500);
         } catch (\Exception $e) {
             Log::error('Withdrawal request failed', [
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
                 'user_id' => $request->user()->id ?? null,
+                'requested_amount' => $request->input('amount'),
             ]);
 
             return response()->json([
                 'success' => false,
                 'message' => 'An error occurred while processing your withdrawal. Please try again later.',
+                'error' => config('app.debug') ? $e->getMessage() : null,
             ], 500);
         }
     }
@@ -517,13 +694,23 @@ class PaymentHoldController extends Controller
      */
     protected function canRequestPayout(PaymentHold $hold): bool
     {
-        // Already transferred
+        // Check remaining amount
+        $remainingAmount = $hold->remaining_amount ?? $hold->amount;
+        if ($remainingAmount <= 0) {
+            return false;
+        }
+
+        // Already fully transferred
         if ($hold->status === 'transferred') {
             return false;
         }
 
-        // Already has transfer
-        if ($hold->transfer) {
+        // Check if there's a pending transfer
+        $pendingTransfer = Transfer::where('hold_id', $hold->id)
+            ->whereIn('status', ['pending', 'processing'])
+            ->exists();
+
+        if ($pendingTransfer) {
             return false;
         }
 
@@ -532,8 +719,9 @@ class PaymentHoldController extends Controller
             return false;
         }
 
-        // If status is ready_for_transfer or holding (and period complete)
+        // If status is ready_for_transfer, partial_transferred, or holding (and period complete)
         return $hold->status === 'ready_for_transfer' ||
+               $hold->status === 'partial_transferred' ||
                ($hold->status === 'holding' && $hold->hold_end_at && $hold->hold_end_at->isPast());
     }
 }

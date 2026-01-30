@@ -11,6 +11,7 @@ use App\Models\PaymentHold;
 use App\Models\StripeConnectAccount;
 use App\Models\Transfer;
 use App\Models\UserNotificationSetting;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class WebhookService
@@ -210,6 +211,8 @@ class WebhookService
 
     /**
      * Handle transfer.created event.
+     * NOTE: NOT USED - Transfers are handled via cronjob (verify:pending-transfers) only.
+     * This method is kept for potential future use but is not called from webhook handler.
      */
     public function handleTransferCreated(array $eventData): void
     {
@@ -225,24 +228,56 @@ class WebhookService
                 'stripe_data' => $transfer,
             ]);
 
-            // Update payment hold status
-            $transferRecord->hold->update([
-                'status' => 'transferred',
-                'transferred_at' => now(),
-            ]);
+            // Update payment hold with remaining_amount calculation
+            $hold = $transferRecord->hold;
+            if ($hold) {
+                // Calculate remaining amount
+                $currentRemaining = $hold->remaining_amount ?? $hold->amount;
+                $newRemainingAmount = max(0, $currentRemaining - $transferRecord->amount);
+
+                // Update hold status and remaining_amount
+                $hold->update([
+                    'remaining_amount' => $newRemainingAmount,
+                    'status' => $newRemainingAmount <= 0 ? 'transferred' : 'partial_transferred',
+                    'transferred_at' => $newRemainingAmount <= 0 ? now() : $hold->transferred_at,
+                ]);
+            }
+
+            // Check for other recently completed transfers for the same user (within last 2 minutes)
+            // This batches transfers from the same withdrawal request
+            $recentTransfers = Transfer::where('user_id', $transferRecord->user_id)
+                ->where('status', 'completed')
+                ->where('transferred_at', '>=', now()->subMinutes(2))
+                ->where('transferred_at', '<=', now())
+                ->with(['hold.payment', 'user'])
+                ->orderBy('transferred_at', 'asc')
+                ->get();
 
             // Send email notification (check both transaction_alert and email_alert)
             $userSettings = UserNotificationSetting::where('user_id', $transferRecord->user_id)->first();
             $shouldSendEmail = ! $userSettings || ($userSettings->transaction_alert && $userSettings->email_alert);
 
             if ($shouldSendEmail) {
-                SendTransferCompletedNotification::dispatch($transferRecord);
+                // If multiple transfers completed recently, send summary email
+                if ($recentTransfers->count() > 1) {
+                    $totalAmount = $recentTransfers->sum('amount');
+                    \App\Jobs\SendTransferCompletedSummaryNotification::dispatch(
+                        $transferRecord->user,
+                        $recentTransfers,
+                        $totalAmount
+                    );
+                } else {
+                    // Single transfer, send individual email
+                    SendTransferCompletedNotification::dispatch($transferRecord);
+                }
             }
         }
     }
 
     /**
      * Handle transfer.failed event.
+     * NOTE: NOT USED - Transfers are handled via cronjob (verify:pending-transfers) only.
+     * This method is kept for potential future use but is not called from webhook handler.
      */
     public function handleTransferFailed(array $eventData): void
     {
@@ -308,6 +343,8 @@ class WebhookService
 
     /**
      * Handle transfer.canceled event (when transfer is canceled mid-process).
+     * NOTE: NOT USED - Transfers are handled via cronjob (verify:pending-transfers) only.
+     * This method is kept for potential future use but is not called from webhook handler.
      */
     public function handleTransferCanceled(array $eventData): void
     {

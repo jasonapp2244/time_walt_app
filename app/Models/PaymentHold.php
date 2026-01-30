@@ -15,6 +15,7 @@ class PaymentHold extends Model
         'payment_id',
         'user_id',
         'amount',
+        'remaining_amount',
         'hold_start_at',
         'hold_end_at',
         'hold_days',
@@ -28,6 +29,7 @@ class PaymentHold extends Model
     {
         return [
             'amount' => 'decimal:2',
+            'remaining_amount' => 'decimal:2',
             'hold_start_at' => 'datetime',
             'hold_end_at' => 'datetime',
             'hold_days' => 'integer',

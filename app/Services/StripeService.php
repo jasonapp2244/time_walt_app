@@ -281,9 +281,12 @@ class StripeService
             // In test mode, we need to ensure the platform has sufficient balance
             // For production, make sure payments are captured to platform account first
 
+            // Use remaining_amount if available, otherwise use amount
+            $transferAmount = $hold->remaining_amount ?? $hold->amount;
+
             // Create transfer in Stripe (real API call - no simulation)
             $transfer = \Stripe\Transfer::create([
-                'amount' => (int) ($hold->amount * 100), // Convert to cents
+                'amount' => (int) ($transferAmount * 100), // Convert to cents
                 'currency' => $currency,
                 'destination' => $connectAccount->connect_account_id,
                 'description' => "Transfer for hold #{$hold->id}",
@@ -306,7 +309,7 @@ class StripeService
                 'user_id' => $hold->user_id,
                 'stripe_transfer_id' => $transfer->id,
                 'stripe_connect_account_id' => $connectAccount->connect_account_id,
-                'amount' => $hold->amount,
+                'amount' => $transferAmount,
                 'currency' => $currency,
                 'status' => 'pending',
                 'transfer_type' => $type,
@@ -314,10 +317,15 @@ class StripeService
                 'stripe_data' => $transfer->toArray(),
             ]);
 
-            // Update hold status to transferred
+            // Calculate new remaining amount
+            $currentRemaining = $hold->remaining_amount ?? $hold->amount;
+            $newRemainingAmount = max(0, $currentRemaining - $transferAmount);
+
+            // Update hold with remaining_amount and appropriate status
             $hold->update([
-                'status' => 'transferred',
-                'transferred_at' => now(),
+                'remaining_amount' => $newRemainingAmount,
+                'status' => $newRemainingAmount <= 0 ? 'transferred' : 'partial_transferred',
+                'transferred_at' => $newRemainingAmount <= 0 ? now() : $hold->transferred_at,
             ]);
 
             return $transferRecord;
