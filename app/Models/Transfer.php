@@ -23,6 +23,7 @@ class Transfer extends Model
         'stripe_data',
         'admin_id',
         'transfer_type',
+        'abandoned_at',
     ];
 
     protected function casts(): array
@@ -31,6 +32,7 @@ class Transfer extends Model
             'amount' => 'decimal:2',
             'status' => 'string',
             'transferred_at' => 'datetime',
+            'abandoned_at' => 'datetime',
             'stripe_data' => 'array',
         ];
     }
@@ -57,5 +59,37 @@ class Transfer extends Model
     public function admin(): BelongsTo
     {
         return $this->belongsTo(User::class, 'admin_id');
+    }
+
+    /**
+     * Scope a query to only include abandoned transfers.
+     */
+    public function scopeAbandoned($query)
+    {
+        return $query->whereNotNull('abandoned_at');
+    }
+
+    /**
+     * Scope a query to only include non-abandoned transfers.
+     */
+    public function scopeNotAbandoned($query)
+    {
+        return $query->whereNull('abandoned_at');
+    }
+
+    /**
+     * Scope a query to only include forfeited transfers (account deletion).
+     */
+    public function scopeForfeited($query)
+    {
+        return $query->where('transfer_type', 'account_deletion_forfeited');
+    }
+
+    /**
+     * Check if the transfer is abandoned.
+     */
+    public function getIsAbandonedAttribute(): bool
+    {
+        return !is_null($this->abandoned_at);
     }
 }

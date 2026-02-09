@@ -31,6 +31,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     // Authentication
     Route::prefix('auth')->name('auth.')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+        Route::post('/delete-account', [AuthController::class, 'deleteAccount'])->name('delete-account');
     });
 
     // Profile Routes

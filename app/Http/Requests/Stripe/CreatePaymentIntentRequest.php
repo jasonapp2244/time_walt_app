@@ -41,16 +41,19 @@ class CreatePaymentIntentRequest extends FormRequest
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {
-            // Validate minimum 30 days hold period
+            // No minimum hold period restriction - users can set any duration
+            // Just validate that dates are valid and end is after start
             if ($this->hold_start_at && $this->hold_end_at) {
                 try {
                     $startDate = \Carbon\Carbon::parse($this->hold_start_at)->startOfDay();
                     $endDate = \Carbon\Carbon::parse($this->hold_end_at)->startOfDay();
                     $days = $startDate->diffInDays($endDate);
 
-                    if ($days < 30) {
-                        $validator->errors()->add('hold_end_at', 'Hold period must be at least 30 days. Current period: '.$days.' days.');
-                    }
+                    // Optional: Add minimum 1 day validation if needed
+                    // Uncomment the line below if you want to enforce at least 1 day
+                    // if ($days < 1) {
+                    //     $validator->errors()->add('hold_end_at', 'Hold period must be at least 1 day. Current period: '.$days.' days.');
+                    // }
                 } catch (\Exception $e) {
                     $validator->errors()->add('hold_start_at', 'Invalid date format.');
                 }

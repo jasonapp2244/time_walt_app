@@ -23,6 +23,7 @@ class PaymentHold extends Model
         'status',
         'ready_at',
         'transferred_at',
+        'abandoned_at',
     ];
 
     protected function casts(): array
@@ -36,6 +37,7 @@ class PaymentHold extends Model
             'status' => 'string',
             'ready_at' => 'datetime',
             'transferred_at' => 'datetime',
+            'abandoned_at' => 'datetime',
         ];
     }
 
@@ -61,5 +63,29 @@ class PaymentHold extends Model
     public function transfer(): HasOne
     {
         return $this->hasOne(Transfer::class, 'hold_id');
+    }
+
+    /**
+     * Scope a query to only include abandoned holds.
+     */
+    public function scopeAbandoned($query)
+    {
+        return $query->whereNotNull('abandoned_at');
+    }
+
+    /**
+     * Scope a query to only include non-abandoned holds.
+     */
+    public function scopeNotAbandoned($query)
+    {
+        return $query->whereNull('abandoned_at');
+    }
+
+    /**
+     * Check if the hold is abandoned.
+     */
+    public function getIsAbandonedAttribute(): bool
+    {
+        return !is_null($this->abandoned_at);
     }
 }

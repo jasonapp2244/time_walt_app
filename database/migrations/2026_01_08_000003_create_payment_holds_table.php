@@ -22,7 +22,7 @@ return new class extends Migration
             $table->decimal('amount', 10, 2)->comment('Held amount');
             $table->timestamp('hold_start_at')->nullable()->comment('When hold period started (user custom or payment time)');
             $table->timestamp('hold_end_at')->nullable()->comment('When hold period ends (user custom)');
-            $table->integer('hold_days')->nullable()->comment('Hold period in days (user custom, minimum 30 days)');
+            $table->integer('hold_days')->nullable()->comment('Hold period in days (user custom, no minimum restriction)');
             $table->string('hold_period_type')->nullable()->comment('User selected: 1_month, 2_months, 6_months, 1_year, custom');
             $table->enum('status', ['holding', 'ready_for_transfer', 'transferred'])->default('holding');
             $table->timestamp('ready_at')->nullable()->comment('When hold became ready for transfer');

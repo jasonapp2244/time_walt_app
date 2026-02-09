@@ -40,6 +40,7 @@ class User extends Authenticatable
         'token',
         'expires_at',
         'last_active_at',
+        'deleted_at',
     ];
 
     /**
@@ -66,6 +67,7 @@ class User extends Authenticatable
             'otp_expires_at' => 'datetime',
             'expires_at' => 'datetime',
             'last_active_at' => 'datetime',
+            'deleted_at' => 'datetime',
             'password' => 'hashed',
             'is_verified' => 'boolean',
             'two_factor_enabled' => 'boolean',
@@ -78,5 +80,21 @@ class User extends Authenticatable
     public function notificationSettings()
     {
         return $this->hasOne(UserNotificationSetting::class);
+    }
+
+    /**
+     * Get the payment holds for the user.
+     */
+    public function paymentHolds()
+    {
+        return $this->hasMany(PaymentHold::class);
+    }
+
+    /**
+     * Get the transfers for the user.
+     */
+    public function transfers()
+    {
+        return $this->hasMany(Transfer::class);
     }
 }

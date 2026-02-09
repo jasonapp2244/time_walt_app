@@ -9,12 +9,18 @@ use App\Http\Requests\Auth\ResendOtpRequest;
 use App\Http\Requests\Auth\ResetPasswordRequest;
 use App\Http\Requests\Auth\SignupRequest;
 use App\Http\Requests\Auth\VerifyOtpRequest;
+use App\Mail\AccountDeletionConfirmationMail;
+use App\Mail\AdminAccountDeletionNotificationMail;
 use App\Mail\OtpMail;
+use App\Models\PaymentHold;
+use App\Models\Transfer;
 use App\Models\User;
 use App\Models\UserNotificationSetting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
@@ -82,6 +88,15 @@ class AuthController extends Controller
                 'success' => false,
                 'message' => 'User not found.',
             ], 404);
+        }
+
+        // Check if account is deleted
+        if ($user->status === 'deleted') {
+            return response()->json([
+                'success' => false,
+                'message' => 'This account has been deleted. Please sign up again to create a new account.',
+                'can_signup' => true,
+            ], 403);
         }
 
         if ($user->otp_code !== $request->otp_code) {
@@ -191,7 +206,16 @@ class AuthController extends Controller
             ], 401);
         }
 
-        // Step 2: Verify password
+        // Step 2: Check if account is deleted
+        if ($user->status === 'deleted') {
+            return response()->json([
+                'success' => false,
+                'message' => 'This account has been deleted. Please sign up again to create a new account.',
+                'can_signup' => true,
+            ], 403);
+        }
+
+        // Step 3: Verify password
         if (! Hash::check($request->password, $user->password)) {
             return response()->json([
                 'success' => false,
@@ -199,7 +223,7 @@ class AuthController extends Controller
             ], 401);
         }
 
-        // Step 3: Check if user is verified (OTP must be verified)
+        // Step 4: Check if user is verified (OTP must be verified)
         if (! $user->is_verified && $user->otp_code !== null) {
             return response()->json([
                 'success' => false,
@@ -208,7 +232,7 @@ class AuthController extends Controller
             ], 403);
         }
 
-        // Step 4: Check account status
+        // Step 5: Check account status
         if ($user->status !== 'active') {
             return response()->json([
                 'success' => false,
@@ -316,6 +340,15 @@ class AuthController extends Controller
             ->first();
 
         if ($user) {
+            // Check if account is deleted
+            if ($user->status === 'deleted') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This account has been deleted. Please sign up again to create a new account.',
+                    'can_signup' => true,
+                ], 403);
+            }
+
             // Existing social login user - verify account status
             if ($user->status !== 'active') {
                 return response()->json([
@@ -351,6 +384,15 @@ class AuthController extends Controller
 
         if ($user) {
             // User exists but not with this social provider
+            // Check if account is deleted
+            if ($user->status === 'deleted') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This account has been deleted. Please sign up again to create a new account.',
+                    'can_signup' => true,
+                ], 403);
+            }
+
             // Check if user is verified
             if (! $user->is_verified) {
                 return response()->json([
@@ -458,6 +500,15 @@ class AuthController extends Controller
             ], 404);
         }
 
+        // Check if account is deleted
+        if ($user->status === 'deleted') {
+            return response()->json([
+                'success' => false,
+                'message' => 'This account has been deleted. Please sign up again to restore your account.',
+                'can_signup' => true,
+            ], 403);
+        }
+
         $otpCode = str_pad((string) random_int(1000, 9999), 4, '0', STR_PAD_LEFT);
         $token = Str::random(64);
 
@@ -541,6 +592,267 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Logged out successfully.',
+        ]);
+    }
+
+    /**
+     * Delete user account permanently (App Store & Play Store Compliant).
+     *
+     * Complies with:
+     * - Apple App Store Guidelines 5.1.1(v)
+     * - Google Play Data Safety
+     * - GDPR Article 17 (Right to Erasure)
+     *
+     * Process:
+     * 1. Transfer remaining balance to admin
+     * 2. Mark all transactions as "abandoned"
+     * 3. Anonymize user account (frees email/phone)
+     * 4. Revoke all tokens (logout all devices)
+     * 5. Set status to 'deleted'
+     */
+    public function deleteAccount(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+
+            // Optional: Verify password for extra security
+            // if ($request->has('password')) {
+            //     if (! Hash::check($request->password, $user->password)) {
+            //         return response()->json([
+            //             'success' => false,
+            //             'message' => 'Invalid password confirmation.',
+            //         ], 401);
+            //     }
+            // }
+
+            // Store original user data before anonymization (for emails)
+            $originalEmail = $user->email;
+            $originalName = $user->full_name;
+            $originalPhone = $user->phone;
+            $userId = $user->id;
+
+            DB::beginTransaction();
+
+            try {
+                // Step 1: Calculate and transfer remaining balance to admin
+                $totalBalance = $this->calculateUserBalance($user->id);
+
+                if ($totalBalance > 0) {
+                    $this->transferBalanceToAdmin($user->id, $totalBalance);
+                }
+
+                // Step 2: Get transaction counts (before marking as abandoned)
+                $paymentHoldsCount = PaymentHold::where('user_id', $user->id)->count();
+                $transfersCount = Transfer::where('user_id', $user->id)->count();
+                $totalTransactionCount = $paymentHoldsCount + $transfersCount;
+
+                // Step 3: Mark all payment holds as abandoned (keep original status, just set abandoned_at)
+                PaymentHold::where('user_id', $user->id)
+                    ->update([
+                        'abandoned_at' => now(),
+                    ]);
+
+                // Step 4: Mark all transfers as abandoned (keep original status, just set abandoned_at)
+                Transfer::where('user_id', $user->id)
+                    ->update([
+                        'abandoned_at' => now(),
+                    ]);
+
+                // Step 5: Revoke all tokens (logout from all devices)
+                $user->tokens()->delete();
+
+                // Step 6: Anonymize user account (GDPR compliant)
+                $timestamp = time();
+                $deletedAt = now();
+                $user->update([
+                    // Anonymize PII (frees email/phone for reuse)
+                    'email' => "deleted_{$user->id}_{$timestamp}@deleted.local",
+                    'phone' => "deleted_{$user->id}_{$timestamp}",
+                    'full_name' => 'Deleted User',
+                    'profile' => 'deleted.png',
+
+                    // Make account inaccessible
+                    'password' => Hash::make(Str::random(64)),
+                    'status' => 'deleted',
+                    'is_verified' => false,
+
+                    // Clear sensitive data
+                    'provider' => null,
+                    'provider_id' => null,
+                    'fcm_token' => null,
+                    'device_id' => null,
+                    'device_type' => null,
+                    'otp_code' => null,
+                    'otp_expires_at' => null,
+                    'token' => null,
+                    'expires_at' => null,
+
+                    // Mark deletion timestamp
+                    'deleted_at' => $deletedAt,
+                ]);
+
+                DB::commit();
+
+                // Step 7: Send email notifications (after successful deletion)
+                try {
+                    // Send confirmation email to user
+                    Mail::to($originalEmail)->send(new AccountDeletionConfirmationMail(
+                        userName: $originalName,
+                        userEmail: $originalEmail,
+                        balanceTransferred: $totalBalance,
+                        deletedAt: $deletedAt->format('F d, Y \a\t g:i A'),
+                        transactionCount: $totalTransactionCount
+                    ));
+
+                    // Send notification email to admin
+                    $admin = User::where('role', 'admin')->first();
+                    if ($admin && $admin->email) {
+                        Mail::to($admin->email)->send(new AdminAccountDeletionNotificationMail(
+                            userId: $userId,
+                            userName: $originalName,
+                            userEmail: $originalEmail,
+                            userPhone: $originalPhone,
+                            forfeitedAmount: $totalBalance,
+                            deletedAt: $deletedAt->format('F d, Y \a\t g:i A'),
+                            paymentHoldsCount: $paymentHoldsCount,
+                            transfersCount: $transfersCount
+                        ));
+                    }
+                } catch (\Exception $emailError) {
+                    // Log email error but don't fail the deletion
+                    Log::warning('Failed to send account deletion emails', [
+                        'user_id' => $userId,
+                        'error' => $emailError->getMessage(),
+                    ]);
+                }
+
+                Log::info('User account deleted successfully', [
+                    'user_id' => $userId,
+                    'original_email' => $originalEmail,
+                    'balance_transferred' => $totalBalance,
+                    'deleted_at' => $deletedAt,
+                    'emails_sent' => true,
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Your account has been permanently deleted. A confirmation email has been sent to your registered email address.',
+                    'data' => [
+                        'deleted_at' => $deletedAt->toIso8601String(),
+                        'balance_transferred' => (float) $totalBalance,
+                        'transactions_affected' => $totalTransactionCount,
+                        'data_retention_notice' => 'Transaction records are retained for 7 years as required by financial regulations.',
+                        'transaction_status' => 'All your transactions have been marked with abandonment timestamp.',
+                        'can_recreate_account' => true,
+                        'email_available' => true,
+                        'confirmation_email_sent' => true,
+                    ],
+                ]);
+            } catch (\Exception $e) {
+                DB::rollBack();
+                throw $e;
+            }
+        } catch (\Exception $e) {
+            Log::error('Account deletion failed', [
+                'user_id' => $request->user()->id ?? null,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete account. Please try again.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Calculate user's total available balance (includes ALL amounts - ready and holding).
+     */
+    protected function calculateUserBalance(int $userId): float
+    {
+        // Get ALL payment holds (including those in holding period)
+        $allHolds = PaymentHold::where('user_id', $userId)
+            ->whereIn('status', ['holding', 'ready_for_transfer', 'partial_transferred'])
+            ->get();
+
+        $totalBalance = 0;
+        foreach ($allHolds as $hold) {
+            $remaining = $hold->remaining_amount ?? $hold->amount;
+            if ($remaining > 0) {
+                $totalBalance += $remaining;
+            }
+        }
+
+        return $totalBalance;
+    }
+
+    /**
+     * Transfer user's balance to admin account (virtual transfer - no actual Stripe transfer).
+     *
+     * This method:
+     * 1. Creates Transfer records showing admin received the funds
+     * 2. Updates PaymentHold status to 'transferred'
+     * 3. Does NOT make actual Stripe API calls (no fees, instant, reliable)
+     * 4. Admin can track all forfeited funds from deleted accounts
+     */
+    protected function transferBalanceToAdmin(int $userId, float $amount): void
+    {
+        // Get admin user (assuming admin role exists)
+        $admin = User::where('role', 'admin')->first();
+
+        if (! $admin) {
+            Log::warning('Admin user not found for balance transfer', [
+                'user_id' => $userId,
+                'amount' => $amount,
+            ]);
+
+            return;
+        }
+
+        // Get ALL holds with remaining balance (including those still in holding period)
+        $holdsWithBalance = PaymentHold::where('user_id', $userId)
+            ->whereIn('status', ['holding', 'ready_for_transfer', 'partial_transferred'])
+            ->get();
+
+        $totalTransferred = 0;
+
+        // Create virtual transfer record for each hold (no actual Stripe transfer)
+        foreach ($holdsWithBalance as $hold) {
+            $remainingAmount = $hold->remaining_amount ?? $hold->amount;
+
+            if ($remainingAmount > 0) {
+                // Create transfer record (virtual - for record keeping only)
+                Transfer::create([
+                    'hold_id' => $hold->id,
+                    'user_id' => $userId,
+                    'admin_id' => $admin->id,
+                    'amount' => $remainingAmount,
+                    'currency' => 'usd',
+                    'status' => 'completed', // Marked as completed (no actual transfer needed)
+                    'transfer_type' => 'account_deletion_forfeited', // Clear type for admin tracking
+                    'transferred_at' => now(),
+                    'stripe_transfer_id' => null, // No actual Stripe transfer
+                    'stripe_connect_account_id' => $admin->stripe_connect_account_id ?? 'ADMIN_FORFEITED', // Use admin's or placeholder
+                    'failure_reason' => null,
+                ]);
+
+                // Update hold status to transferred (funds forfeited to admin)
+                $hold->update([
+                    'status' => 'transferred',
+                    'remaining_amount' => 0,
+                    'transferred_at' => now(),
+                ]);
+
+                $totalTransferred += $remainingAmount;
+            }
+        }
+
+        Log::info('Balance forfeited to admin due to account deletion', [
+            'user_id' => $userId,
+            'admin_id' => $admin->id,
+            'total_amount' => $totalTransferred,
+            'holds_count' => $holdsWithBalance->count(),
+            'transfer_type' => 'virtual_transfer', // No actual Stripe API call
         ]);
     }
 

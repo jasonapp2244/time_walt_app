@@ -509,7 +509,7 @@ Content-Type: application/json
 - Use format: `YYYY-MM-DD` (e.g., "2026-01-15")
 - `hold_start_at` must be today or a future date
 - `hold_end_at` must be after `hold_start_at`
-- Minimum hold period: 30 days
+- No minimum hold period restriction - users can set any duration
 
 **Expected Response (200):**
 ```json
@@ -532,7 +532,7 @@ Content-Type: application/json
 - Minimum amount: $1.00
 - Supported currencies: USD, EUR, GBP (check config)
 - Hold period types: `1_month`, `2_months`, `6_months`, `1_year`, `custom`
-- Custom hold period requires `hold_start_at` and `hold_end_at` (minimum 30 days)
+- Custom hold period requires `hold_start_at` and `hold_end_at` (no minimum restriction)
 - If hold period is provided, data is stored in both `payments` and `payment_holds` tables
 - If no hold period, only `payments` table is used
 
