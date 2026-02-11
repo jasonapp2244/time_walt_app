@@ -1,4 +1,4 @@
-<?php
+gt<?php
 
 use App\Http\Controllers\Api\Admin\TransferController;
 use App\Http\Controllers\Api\AuthController;
@@ -31,6 +31,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     // Authentication
     Route::prefix('auth')->name('auth.')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+        Route::post('/delete-account', [AuthController::class, 'deleteAccount'])->name('delete-account')->middleware('throttle:3,1');
     });
 
     // Profile Routes
