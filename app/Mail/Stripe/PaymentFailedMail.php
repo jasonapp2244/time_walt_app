@@ -19,8 +19,7 @@ class PaymentFailedMail extends Mailable
     public function __construct(
         public Payment $payment,
         public string $reason
-    ) {
-    }
+    ) {}
 
     /**
      * Get the message envelope.

@@ -56,7 +56,7 @@ class ProfileController extends Controller
         // Handle profile image upload
         if ($request->hasFile('profile_image')) {
             $file = $request->file('profile_image');
-            
+
             if ($file->isValid()) {
                 // Delete old profile image if exists
                 if ($user->profile) {
@@ -140,7 +140,7 @@ class ProfileController extends Controller
         $profileUrl = null;
         if ($user->profile) {
             // Generate full URL for profile image
-            $profileUrl = asset('storage/' . $user->profile);
+            $profileUrl = asset('storage/'.$user->profile);
         }
 
         return [
@@ -184,4 +184,3 @@ class ProfileController extends Controller
         ];
     }
 }
-

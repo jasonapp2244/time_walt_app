@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
             // Add deleted_at column as timestamp (nullable)
-            if (!Schema::hasColumn('users', 'deleted_at')) {
+            if (! Schema::hasColumn('users', 'deleted_at')) {
                 $table->timestamp('deleted_at')->nullable()->after('last_active_at');
             }
         });

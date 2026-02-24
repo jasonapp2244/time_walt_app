@@ -21,8 +21,7 @@ class SendTransferFailedNotification implements ShouldQueue
     public function __construct(
         public Transfer $transfer,
         public string $reason
-    ) {
-    }
+    ) {}
 
     /**
      * Execute the job.

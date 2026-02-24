@@ -165,6 +165,11 @@ class StripeController extends Controller
                 ];
             }
 
+            // Add title if provided
+            if ($request->title) {
+                $holdPeriodData['title'] = $request->title;
+            }
+
             // Create Checkout Session (NO webhook - use verify-payment endpoint after payment)
             $checkoutSession = $this->stripeService->createPaymentIntent([
                 'user_id' => $request->user()->id,
@@ -298,12 +303,14 @@ class StripeController extends Controller
                     'hold_start_at' => $paymentIntent->metadata->hold_start_at ?? null,
                     'hold_end_at' => $paymentIntent->metadata->hold_end_at ?? null,
                     'hold_days' => $paymentIntent->metadata->hold_days ?? null,
+                    'title' => $paymentIntent->metadata->title ?? null,
                 ];
 
                 $hold = $this->paymentHoldService->createFromPayment($payment, $holdPeriodData);
 
                 Log::info('✅ PaymentHold record created via verify-payment', [
                     'hold_id' => $hold->id,
+                    'title' => $hold->title ?? 'No title',
                 ]);
             }
 

@@ -461,16 +461,9 @@ class PaymentHoldController extends Controller
                         break;
                     }
 
-                    // Use remaining_amount - it should be set by the map function above
-                    // If somehow still null, calculate it on the fly
-                    if ($hold->remaining_amount === null) {
-                        $transferredAmount = \App\Models\Transfer::where('hold_id', $hold->id)
-                            ->whereIn('status', ['completed', 'pending'])
-                            ->sum('amount');
-                        $hold->remaining_amount = max(0, $hold->amount - $transferredAmount);
-                    }
-
-                    $availableInHold = (float) $hold->remaining_amount;
+                    // Use remaining_amount - it should already be set by the map function above (lines 364-376)
+                    // Get available amount directly without recalculating
+                    $availableInHold = (float) ($hold->remaining_amount ?? $hold->amount);
 
                     // Skip if no amount available in this hold
                     if ($availableInHold <= 0) {

@@ -20,9 +20,19 @@
 
             <!-- Payment Amount -->
             <div style="background-color: #f2cf7a; padding: 25px; border-radius: 8px; margin: 30px 0; text-align: center; border-left: 4px solid #935510;">
+                @if($hold && $hold->title)
+                <p style="color: #935510; font-size: 14px; margin: 0 0 10px 0; font-weight: bold;">
+                    {{ $hold->title }}
+                </p>
+                @endif
                 <p style="color: #000000; font-size: 20px; font-weight: bold; margin: 0;">
                     ${{ number_format($payment->amount, 2) }} {{ strtoupper($payment->currency) }}
                 </p>
+                @if($hold)
+                <p style="color: #666666; font-size: 12px; margin: 10px 0 0 0;">
+                    Hold ID: #{{ $hold->id }}
+                </p>
+                @endif
             </div>
 
             <p style="color: #000000; font-size: 16px; line-height: 1.8;">Thank you for your payment!</p>

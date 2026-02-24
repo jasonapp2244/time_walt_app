@@ -18,8 +18,7 @@ class PaymentSuccessMail extends Mailable
      */
     public function __construct(
         public Payment $payment
-    ) {
-    }
+    ) {}
 
     /**
      * Get the message envelope.

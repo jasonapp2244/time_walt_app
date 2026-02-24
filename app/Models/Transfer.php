@@ -90,6 +90,6 @@ class Transfer extends Model
      */
     public function getIsAbandonedAttribute(): bool
     {
-        return !is_null($this->abandoned_at);
+        return ! is_null($this->abandoned_at);
     }
 }

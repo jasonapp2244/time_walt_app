@@ -22,7 +22,7 @@ class SecurityHeaders
         $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
         $response->headers->set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
-        
+
         // Remove server information
         $response->headers->remove('X-Powered-By');
         $response->headers->remove('Server');
@@ -30,4 +30,3 @@ class SecurityHeaders
         return $response;
     }
 }
-

@@ -39,7 +39,7 @@
                     <p style="color: #666666; font-size: 12px; margin: 4px 0;">Completed: {{ $transfer->transferred_at->format('M d, Y h:i A') }}</p>
                     @endif
                     @if($transfer->hold)
-                    <p style="color: #666666; font-size: 12px; margin: 4px 0;">Hold ID: #{{ $transfer->hold->id }}</p>
+                    <p style="color: #666666; font-size: 12px; margin: 4px 0;">Hold ID: #{{ $transfer->hold->id }}@if($transfer->hold->title) - {{ $transfer->hold->title }}@endif</p>
                     @endif
                 </div>
                 @endforeach
@@ -53,7 +53,7 @@
                 <p style="color: #666666; font-size: 12px; margin: 4px 0;">Completed: {{ $transfer->transferred_at->format('M d, Y h:i A') }}</p>
                 @endif
                 @if($transfer->hold)
-                <p style="color: #666666; font-size: 12px; margin: 4px 0;">Hold ID: #{{ $transfer->hold->id }}</p>
+                <p style="color: #666666; font-size: 12px; margin: 4px 0;">Hold ID: #{{ $transfer->hold->id }}@if($transfer->hold->title) - {{ $transfer->hold->title }}@endif</p>
                 @endif
             </div>
             @endforeach

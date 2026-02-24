@@ -14,6 +14,7 @@ class PaymentHold extends Model
     protected $fillable = [
         'payment_id',
         'user_id',
+        'title',
         'amount',
         'remaining_amount',
         'hold_start_at',
@@ -86,6 +87,6 @@ class PaymentHold extends Model
      */
     public function getIsAbandonedAttribute(): bool
     {
-        return !is_null($this->abandoned_at);
+        return ! is_null($this->abandoned_at);
     }
 }

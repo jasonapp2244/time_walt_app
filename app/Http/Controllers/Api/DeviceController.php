@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Device\RegisterDeviceRequest;
 use App\Http\Requests\Device\UpdateDeviceTokenRequest;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 
 class DeviceController extends Controller
 {
@@ -107,4 +106,3 @@ class DeviceController extends Controller
         ];
     }
 }
-

@@ -24,8 +24,7 @@ class AdminAccountDeletionNotificationMail extends Mailable
         public string $deletedAt,
         public int $paymentHoldsCount,
         public int $transfersCount
-    ) {
-    }
+    ) {}
 
     /**
      * Get the message envelope.

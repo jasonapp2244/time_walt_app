@@ -1,4 +1,4 @@
-gt<?php
+<?php
 
 use App\Http\Controllers\Api\Admin\TransferController;
 use App\Http\Controllers\Api\AuthController;
@@ -10,13 +10,14 @@ use App\Http\Controllers\Api\TransactionHistoryController;
 use Illuminate\Support\Facades\Route;
 
 // Public Authentication Routes with Rate Limiting
-// Rate limits: Signup/Login/Verify/Reset = 5/min, Resend/Forgot = 3/min
+// Rate limits: Signup/Login/Verify/Reset = 5/min, Resend/Forgot = 3/min, Check Email = 10/min
 Route::prefix('auth')->name('auth.')->group(function () {
+    Route::post('/check-email', [AuthController::class, 'checkEmail'])->name('check-email')->middleware('throttle:10,1');
     Route::post('/signup', [AuthController::class, 'signup'])->name('signup')->middleware('throttle:5,1');
     Route::post('/verify-otp', [AuthController::class, 'verifyOtp'])->name('verify-otp')->middleware('throttle:5,1');
     Route::post('/resend-otp', [AuthController::class, 'resendOtp'])->name('resend-otp')->middleware('throttle:3,1');
     Route::post('/login', [AuthController::class, 'login'])->name('login')->middleware('throttle:5,1');
-    Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->name('forgot-password')->middleware('throttle:3,1');
+    Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->name('forgot-password')->middleware('throttle:5,1');
     Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('reset-password')->middleware('throttle:5,1');
 });
 

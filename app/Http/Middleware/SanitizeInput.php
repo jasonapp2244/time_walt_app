@@ -31,4 +31,3 @@ class SanitizeInput
         return $next($request);
     }
 }
-

@@ -20,8 +20,7 @@ class TransferCompletedMail extends Mailable
     public function __construct(
         public Transfer $transfer,
         public User $user
-    ) {
-    }
+    ) {}
 
     /**
      * Get the message envelope.

@@ -41,7 +41,7 @@
                     <p style="color: #000000; font-size: 14px; margin: 4px 0;"><strong>Amount:</strong> ${{ number_format($transfer->amount, 2) }} {{ strtoupper($transfer->currency) }}</p>
                     <p style="color: #000000; font-size: 14px; margin: 4px 0;"><strong>Status:</strong> {{ ucfirst($transfer->status) }}</p>
                     @if($transfer->hold)
-                    <p style="color: #666666; font-size: 12px; margin: 4px 0;">Hold ID: #{{ $transfer->hold->id }}</p>
+                    <p style="color: #666666; font-size: 12px; margin: 4px 0;">Hold ID: #{{ $transfer->hold->id }}@if($transfer->hold->title) - {{ $transfer->hold->title }}@endif</p>
                     @endif
                 </div>
                 @endforeach
@@ -52,7 +52,7 @@
                 <p style="color: #000000; font-size: 14px; margin: 4px 0;"><strong>Amount:</strong> ${{ number_format($transfer->amount, 2) }} {{ strtoupper($transfer->currency) }}</p>
                 <p style="color: #000000; font-size: 14px; margin: 4px 0;"><strong>Status:</strong> {{ ucfirst($transfer->status) }}</p>
                 @if($transfer->hold)
-                <p style="color: #666666; font-size: 12px; margin: 4px 0;">Hold ID: #{{ $transfer->hold->id }}</p>
+                <p style="color: #666666; font-size: 12px; margin: 4px 0;">Hold ID: #{{ $transfer->hold->id }}@if($transfer->hold->title) - {{ $transfer->hold->title }}@endif</p>
                 @endif
             </div>
             @endforeach

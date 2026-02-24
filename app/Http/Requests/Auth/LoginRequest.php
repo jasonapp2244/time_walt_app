@@ -28,20 +28,20 @@ class LoginRequest extends FormRequest
             // Email/phone required for all login types
             'email' => ['required_without:phone', 'string', 'email'],
             'phone' => ['required_without:email', 'string'],
-            
+
             // Password only required for regular login (not social login)
             'password' => [$isSocialLogin ? 'nullable' : 'required', 'string'],
-            
+
             // OTP for 2FA
             'otp_code' => ['nullable', 'string', 'size:4'],
-            
+
             // Device info
             'device_id' => ['nullable', 'string'],
             'device_type' => ['nullable', 'string', 'in:ios,android,web'],
             'fcm_token' => ['nullable', 'string'],
             'timezone' => ['nullable', 'string'],
             'language' => ['nullable', 'string'],
-            
+
             // Social login fields
             'provider' => ['nullable', 'string', 'in:google,apple,facebook'],
             'provider_token' => [
@@ -72,4 +72,3 @@ class LoginRequest extends FormRequest
         ];
     }
 }
-

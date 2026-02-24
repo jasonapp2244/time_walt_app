@@ -20,11 +20,19 @@
 
             <!-- Amount Box -->
             <div style="background-color: #f2cf7a; padding: 25px; border-radius: 8px; margin: 30px 0; text-align: center; border-left: 4px solid #935510;">
+                @if($hold->title)
+                <p style="color: #935510; font-size: 14px; margin: 0 0 10px 0; font-weight: bold;">
+                    {{ $hold->title }}
+                </p>
+                @endif
                 <p style="color: #000000; font-size: 20px; font-weight: bold; margin: 0;">
                     ${{ number_format($hold->amount, 2) }} USD
                 </p>
                 <p style="color: #666666; font-size: 14px; margin: 10px 0 0 0;">
                     Ready for payout
+                </p>
+                <p style="color: #666666; font-size: 12px; margin: 10px 0 0 0;">
+                    Hold ID: #{{ $hold->id }}
                 </p>
             </div>
 

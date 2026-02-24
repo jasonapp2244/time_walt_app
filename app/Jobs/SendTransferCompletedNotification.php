@@ -20,8 +20,7 @@ class SendTransferCompletedNotification implements ShouldQueue
      */
     public function __construct(
         public Transfer $transfer
-    ) {
-    }
+    ) {}
 
     /**
      * Execute the job.

@@ -24,7 +24,7 @@ class ResetPasswordRequest extends FormRequest
         return [
             'email' => ['required_without:phone', 'string', 'email'],
             'phone' => ['required_without:email', 'string'],
-            // 'otp_code' => ['required', 'string', 'size:4'],
+            'otp_code' => ['required', 'string', 'size:4'],
             'password' => [
                 'required',
                 'string',
@@ -56,4 +56,3 @@ class ResetPasswordRequest extends FormRequest
         ];
     }
 }
-

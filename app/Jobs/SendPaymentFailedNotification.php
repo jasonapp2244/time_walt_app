@@ -21,8 +21,7 @@ class SendPaymentFailedNotification implements ShouldQueue
     public function __construct(
         public Payment $payment,
         public string $reason
-    ) {
-    }
+    ) {}
 
     /**
      * Execute the job.

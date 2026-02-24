@@ -20,8 +20,7 @@ class SendPaymentSuccessNotification implements ShouldQueue
      */
     public function __construct(
         public Payment $payment
-    ) {
-    }
+    ) {}
 
     /**
      * Execute the job.

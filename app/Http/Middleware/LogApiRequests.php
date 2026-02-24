@@ -35,4 +35,3 @@ class LogApiRequests
         return $response;
     }
 }
-

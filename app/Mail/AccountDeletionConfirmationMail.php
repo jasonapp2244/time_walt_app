@@ -21,8 +21,7 @@ class AccountDeletionConfirmationMail extends Mailable
         public float $balanceTransferred,
         public string $deletedAt,
         public int $transactionCount
-    ) {
-    }
+    ) {}
 
     /**
      * Get the message envelope.

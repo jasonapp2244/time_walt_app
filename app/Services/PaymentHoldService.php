@@ -17,6 +17,7 @@ class PaymentHoldService
         $endDate = $holdPeriodData['hold_end_at'] ?? null;
         $holdDays = $holdPeriodData['hold_days'] ?? 30;
         $holdPeriodType = $holdPeriodData['hold_period_type'] ?? '1_month';
+        $title = $holdPeriodData['title'] ?? null;
 
         // If dates provided as strings, parse them
         if (is_string($startDate)) {
@@ -37,6 +38,7 @@ class PaymentHoldService
         return PaymentHold::create([
             'payment_id' => $payment->id,
             'user_id' => $payment->user_id,
+            'title' => $title,
             'amount' => $payment->amount,
             'remaining_amount' => $payment->amount, // Initialize remaining_amount = amount
             'hold_start_at' => $startDate,

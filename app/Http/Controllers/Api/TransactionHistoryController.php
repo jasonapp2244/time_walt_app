@@ -138,17 +138,21 @@ class TransactionHistoryController extends Controller
                 ->where('status', 'completed')
                 ->sum('amount');
 
+            // Calculate current balance (what's left in account = hold + ready)
+            $currentBalance = $holdAmountTotal + $readyTotal;
+
             return response()->json([
                 'success' => true,
                 'message' => 'All transactions retrieved successfully.',
                 'summary' => [
-                    'total_checkout_amount' => (float) $checkoutTotal,
-                    'total_withdraw_amount' => (float) $withdrawTotal,
-                    'total_hold_amount' => (float) $holdAmountTotal,
-                    'total_ready_amount' => (float) $readyTotal,
-                    'total_transferred_amount' => (float) $transferredTotal,
-                    'total_locked_amount' => (float) $holdAmountTotal,
-                    'available_balance' => (float) $readyTotal,
+                    'total_checkout_amount' => (float) $checkoutTotal, // Total received from all checkouts
+                    'total_withdraw_amount' => (float) $withdrawTotal, // Same as total_transferred_amount
+                    'total_hold_amount' => (float) $holdAmountTotal, // Locked (still in holding period)
+                    'total_ready_amount' => (float) $readyTotal, // Available for withdrawal
+                    'total_transferred_amount' => (float) $transferredTotal, // Already withdrawn
+                    'current_balance' => (float) $currentBalance, // hold + ready (what's left in account)
+                    'total_locked_amount' => (float) $holdAmountTotal, // Same as total_hold_amount
+                    'available_balance' => (float) $readyTotal, // Same as total_ready_amount
                     'currency' => 'USD',
                 ],
                 'data' => [

@@ -18,3 +18,8 @@ Schedule::command('check:payment-holds')
 Schedule::command('verify:pending-transfers')
     ->everyThirtyMinutes()
     ->description('Verify pending transfers with Stripe and send payout success emails');
+
+// Cron 3: Cleanup old unverified accounts
+Schedule::command('users:cleanup-unverified')
+    ->daily()
+    ->description('Delete unverified accounts older than 24 hours to keep database clean');

@@ -19,8 +19,7 @@ class TransferFailedMail extends Mailable
     public function __construct(
         public Transfer $transfer,
         public string $reason
-    ) {
-    }
+    ) {}
 
     /**
      * Get the message envelope.

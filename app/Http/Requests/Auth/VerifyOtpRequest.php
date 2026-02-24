@@ -43,4 +43,3 @@ class VerifyOtpRequest extends FormRequest
         ];
     }
 }
-

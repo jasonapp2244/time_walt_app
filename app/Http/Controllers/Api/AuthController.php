@@ -27,12 +27,134 @@ use Illuminate\Support\Str;
 class AuthController extends Controller
 {
     /**
+     * Check if email exists and return account status.
+     * Helps frontend guide users before signup attempt.
+     */
+    public function checkEmail(Request $request): JsonResponse
+    {
+        $request->validate([
+            'email' => 'required|email|max:255',
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        // Email doesn't exist - available for registration
+        if (! $user) {
+            return response()->json([
+                'success' => true,
+                'exists' => false,
+                'message' => 'Email is available for registration.',
+                'action' => 'signup',
+            ]);
+        }
+
+        // Email exists but account was deleted - available for reuse
+        if ($user->status === 'deleted') {
+            return response()->json([
+                'success' => true,
+                'exists' => false,
+                'message' => 'Email is available for registration.',
+                'action' => 'signup',
+                'note' => 'Previous account was deleted and can be reused.',
+            ]);
+        }
+
+        // Email exists but not verified - can re-signup or resend OTP
+        if (! $user->is_verified) {
+            return response()->json([
+                'success' => false,
+                'exists' => true,
+                'verified' => false,
+                'message' => 'Email is registered but not verified yet.',
+                'actions' => ['resend_otp', 'signup_again'],
+                'can_login' => false,
+                'suggestion' => 'You can sign up again to get a new OTP, or use the resend OTP option.',
+            ]);
+        }
+
+        // Email exists and is verified - user should login
+        return response()->json([
+            'success' => false,
+            'exists' => true,
+            'verified' => true,
+            'message' => 'Email is already registered and verified.',
+            'action' => 'login',
+            'can_login' => true,
+            'suggestion' => 'Please login with your password. If you forgot your password, use the forgot password option.',
+        ]);
+    }
+
+    /**
      * User signup with OTP generation.
+     * Smart signup: Updates existing unverified account if found.
      */
     public function signup(SignupRequest $request): JsonResponse
     {
         $otpCode = str_pad((string) random_int(1000, 9999), 4, '0', STR_PAD_LEFT);
 
+        // Check if unverified account exists by email OR phone (includes deleted accounts that can be reused)
+        $existingUser = User::where(function ($query) use ($request) {
+            $query->where('email', $request->email);
+            if ($request->phone) {
+                $query->orWhere('phone', $request->phone);
+            }
+        })
+            ->where(function ($query) {
+                $query->where('is_verified', false)
+                    ->orWhere('status', 'deleted');
+            })
+            ->first();
+
+        if ($existingUser) {
+            // UPDATE existing unverified/deleted account instead of creating new one
+            $existingUser->update([
+                'full_name' => $request->full_name,
+                'email' => $request->email, // Update email in case phone matched
+                'phone' => $request->phone, // Update phone in case email matched
+                'password' => Hash::make($request->password),
+                'otp_code' => $otpCode,
+                'otp_expires_at' => now()->addMinutes(5),
+                'status' => 'pending',
+                'is_verified' => false,
+                'deleted_at' => null, // Clear deleted status if exists
+                'provider' => $request->provider,
+                'provider_id' => $request->provider_id,
+            ]);
+
+            Mail::to($existingUser->email)->send(new OtpMail($otpCode, 'verification'));
+
+            // Ensure notification settings exist
+            UserNotificationSetting::firstOrCreate(
+                ['user_id' => $existingUser->id],
+                [
+                    'password_alert' => true,
+                    'transaction_alert' => true,
+                    'push_notification_alert' => true,
+                    'email_alert' => true,
+                    'lock_alert' => true,
+                    'unlock_alert' => true,
+                ]
+            );
+
+            Log::info('Existing unverified account updated and OTP resent', [
+                'user_id' => $existingUser->id,
+                'email' => $existingUser->email,
+                'phone' => $existingUser->phone,
+                'matched_by' => $request->email === $existingUser->email ? 'email' : 'phone',
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Account found. A new OTP has been sent to your email.',
+                'data' => [
+                    'user' => $this->formatUser($existingUser),
+                    'otp_sent' => true,
+                    'is_resend' => true,
+                ],
+            ], 200);
+        }
+
+        // Create new user (original logic)
         $user = User::create([
             'full_name' => $request->full_name,
             'email' => $request->email,
@@ -134,7 +256,7 @@ class AuthController extends Controller
     }
 
     /**
-     * Resend OTP code.
+     * Resend OTP code with improved error messages and guidance.
      */
     public function resendOtp(ResendOtpRequest $request): JsonResponse
     {
@@ -146,36 +268,60 @@ class AuthController extends Controller
             }
         })->first();
 
+        // User not found - guide to signup
         if (! $user) {
             return response()->json([
                 'success' => false,
-                'message' => 'User not found.',
+                'message' => 'No account found with this email. Please sign up first.',
+                'action' => 'signup',
+                'suggestion' => 'Create a new account to get started.',
             ], 404);
         }
 
-        // Only allow resend OTP for unverified users
+        // Handle deleted accounts - guide to re-signup
+        if ($user->status === 'deleted') {
+            return response()->json([
+                'success' => false,
+                'message' => 'This account was deleted. Please sign up again to create a new account.',
+                'action' => 'signup',
+                'can_signup' => true,
+                'suggestion' => 'Your email is available for registration.',
+            ], 403);
+        }
+
+        // Already verified - guide to login
         if ($user->is_verified) {
             return response()->json([
                 'success' => false,
-                'message' => 'Your account is already verified.',
+                'message' => 'Your account is already verified. Please login.',
+                'action' => 'login',
+                'can_login' => true,
+                'suggestion' => 'Use your email and password to login. If you forgot your password, use the forgot password option.',
             ], 400);
         }
 
+        // Generate and send new OTP
         $otpCode = str_pad((string) random_int(1000, 9999), 4, '0', STR_PAD_LEFT);
 
         $user->update([
             'otp_code' => $otpCode,
-            'is_verified' => false,
             'otp_expires_at' => now()->addMinutes(5),
         ]);
 
         Mail::to($user->email)->send(new OtpMail($otpCode, 'verification'));
 
+        Log::info('OTP resent successfully', [
+            'user_id' => $user->id,
+            'email' => $user->email,
+        ]);
+
         return response()->json([
             'success' => true,
-            'message' => 'OTP code has been resent.',
+            'message' => 'OTP code has been resent to your email.',
             'data' => [
                 'otp_sent' => true,
+                'otp_expires_in' => 5, // minutes
+                'email' => $user->email,
             ],
         ]);
     }
@@ -278,6 +424,21 @@ class AuthController extends Controller
                 'otp_code' => null,
                 'otp_expires_at' => null,
             ]);
+        } else {
+            // Clear any pending forgot password OTP when user logs in successfully
+            // This invalidates forgot password request if user remembered their password
+            if ($user->otp_code && $user->token) {
+                $user->update([
+                    'otp_code' => null,
+                    'otp_expires_at' => null,
+                    'token' => null,
+                    'expires_at' => null,
+                ]);
+
+                Log::info('Pending password reset OTP cleared on successful login', [
+                    'user_id' => $user->id,
+                ]);
+            }
         }
 
         // Update device info and last active (store device info on every login)
@@ -474,7 +635,7 @@ class AuthController extends Controller
     protected function generateUniquePhone(): string
     {
         do {
-            $phone = '1' . str_pad((string) random_int(0, 9999999999), 10, '0', STR_PAD_LEFT);
+            $phone = '1'.str_pad((string) random_int(0, 9999999999), 10, '0', STR_PAD_LEFT);
         } while (User::where('phone', $phone)->exists());
 
         return $phone;
@@ -516,8 +677,8 @@ class AuthController extends Controller
             'otp_code' => $otpCode,
             'otp_expires_at' => now()->addMinutes(5),
             'token' => $token,
-            'is_verified' => false,
-            'status' => 'pending',
+            // 'is_verified' => false,
+            // 'status' => 'pending',
             'expires_at' => now()->addHours(1),
         ]);
 
@@ -552,20 +713,40 @@ class AuthController extends Controller
             ], 404);
         }
 
-        if ($user->otp_code !== null) {
+        // Check if account is deleted
+        if ($user->status === 'deleted') {
             return response()->json([
                 'success' => false,
-                'message' => 'please first otp verify your account',
+                'message' => 'This account has been deleted. Please sign up again.',
+                'can_signup' => true,
+            ], 403);
+        }
+
+        // SECURITY: Verify OTP code matches
+        if ($user->otp_code !== $request->otp_code) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid OTP code.',
             ], 400);
         }
 
+        // Check if OTP has expired
         if ($user->otp_expires_at && $user->otp_expires_at->isPast()) {
             return response()->json([
                 'success' => false,
-                'message' => 'OTP code has expired.',
+                'message' => 'OTP code has expired. Please request a new one.',
             ], 400);
         }
 
+        // Check if OTP was cleared (user logged in after requesting reset)
+        if (! $user->otp_code) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Password reset request has been cancelled or already used. Please request a new one if needed.',
+            ], 400);
+        }
+
+        // Update password and clear OTP
         $user->update([
             'password' => Hash::make($request->password),
             'otp_code' => null,
@@ -576,9 +757,17 @@ class AuthController extends Controller
             'is_verified' => true,
         ]);
 
+        // Revoke all existing tokens for security
+        $user->tokens()->delete();
+
+        Log::info('Password reset successful', [
+            'user_id' => $user->id,
+            'email' => $user->email,
+        ]);
+
         return response()->json([
             'success' => true,
-            'message' => 'Password has been reset successfully.',
+            'message' => 'Password has been reset successfully. Please login with your new password.',
         ]);
     }
 
@@ -882,4 +1071,3 @@ class AuthController extends Controller
         ];
     }
 }
-

@@ -20,14 +20,14 @@ return new class extends Migration
             $table->string('phone')->unique();
             $table->string('password');
             $table->string('profile')->default('default.png');
-            
+
             $table->string('otp_code', 4)->nullable();
             $table->timestamp('otp_expires_at')->nullable();
 
             $table->boolean('is_verified')->default(false);
             $table->string('status')->default('active');
             $table->boolean('two_factor_enabled')->default(false);
-         
+
             $table->timestamp('email_verified_at')->nullable();
 
             $table->string('provider')->nullable();
@@ -39,7 +39,7 @@ return new class extends Migration
             $table->string('fcm_token')->nullable();
             $table->string('device_id')->nullable();
             $table->string('device_type')->nullable();
-            //reset password
+            // reset password
             $table->string('token')->nullable();
             $table->timestamp('expires_at')->nullable();
 

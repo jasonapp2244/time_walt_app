@@ -20,8 +20,7 @@ class SendHoldPeriodEndedNotification implements ShouldQueue
      */
     public function __construct(
         public PaymentHold $hold
-    ) {
-    }
+    ) {}
 
     /**
      * Execute the job.

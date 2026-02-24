@@ -141,6 +141,11 @@ class StripeService
                 $metadata['hold_days'] = (string) ($data['hold_days'] ?? 30);
             }
 
+            // Add title if provided
+            if (isset($data['title'])) {
+                $metadata['title'] = $data['title'];
+            }
+
             // Create Checkout Session with payment capture (funds go to platform account)
             // Note: For destination charges (direct to connected account), you would need to:
             // 1. Get user's connected account ID

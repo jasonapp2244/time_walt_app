@@ -25,13 +25,12 @@ class UpdateProfileRequest extends FormRequest
 
         return [
             'full_name' => ['nullable', 'sometimes', 'string', 'max:255'],
-            'phone' => ['nullable', 'sometimes', 'string', 'max:20', 'unique:users,phone,' . $userId],
+            'phone' => ['nullable', 'sometimes', 'string', 'max:20', 'unique:users,phone,'.$userId],
             'profile_image' => ['nullable', 'sometimes', 'file', 'image', 'mimes:jpeg,jpg,png,gif', 'max:2048'],
             'timezone' => ['nullable', 'sometimes', 'string', 'max:100'],
             'language' => ['nullable', 'sometimes', 'string', 'max:10'],
         ];
     }
-
 
     /**
      * Get custom messages for validator errors.
@@ -49,4 +48,3 @@ class UpdateProfileRequest extends FormRequest
         ];
     }
 }
-

@@ -18,8 +18,7 @@ class OtpMail extends Mailable
     public function __construct(
         public string $otpCode,
         public string $type = 'verification'
-    ) {
-    }
+    ) {}
 
     /**
      * Get the message envelope.
@@ -62,4 +61,3 @@ class OtpMail extends Mailable
         return [];
     }
 }
-

@@ -28,6 +28,7 @@ class CreatePaymentIntentRequest extends FormRequest
         return [
             'amount' => ['required', 'numeric', 'min:1'], // amount in dollars (minimum $1.00)
             'currency' => ['required', 'string', 'size:3', Rule::in($supportedCurrencies)],
+            'title' => ['nullable', 'string', 'max:255'], // Optional title/description for the payment hold
             'hold_period_type' => ['required', 'string', Rule::in(['custom'])], // Only custom hold period allowed
             'hold_start_at' => ['required', 'date', 'after_or_equal:today'], // Required for custom period
             'hold_end_at' => ['required', 'date', 'after:hold_start_at'], // Required for custom period
@@ -77,6 +78,8 @@ class CreatePaymentIntentRequest extends FormRequest
             'amount.numeric' => 'Amount must be a valid number.',
             'currency.required' => 'Currency is required.',
             'currency.in' => "Currency must be one of: {$currencyList}.",
+            'title.string' => 'Title must be a valid text.',
+            'title.max' => 'Title must not exceed 255 characters.',
             'return_url.url' => 'Return URL must be a valid URL.',
             'hold_period_type.required' => 'Hold period type is required.',
             'hold_period_type.in' => 'Hold period type must be "custom".',

@@ -20,8 +20,7 @@ class HoldPeriodEndedMail extends Mailable
     public function __construct(
         public PaymentHold $hold,
         public User $user
-    ) {
-    }
+    ) {}
 
     /**
      * Get the message envelope.

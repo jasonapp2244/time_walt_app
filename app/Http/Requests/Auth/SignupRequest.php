@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Auth;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class SignupRequest extends FormRequest
 {
@@ -23,8 +24,27 @@ class SignupRequest extends FormRequest
     {
         return [
             'full_name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
-            'phone' => ['required', 'string', 'max:20', 'unique:users'],
+            'email' => [
+                'required',
+                'string',
+                'email',
+                'max:255',
+                // Only unique if verified OR not deleted
+                Rule::unique('users')->where(function ($query) {
+                    return $query->where('is_verified', true)
+                        ->where('status', '!=', 'deleted');
+                }),
+            ],
+            'phone' => [
+                'nullable',
+                'string',
+                'max:20',
+                // Only unique if verified OR not deleted (same logic as email)
+                Rule::unique('users')->where(function ($query) {
+                    return $query->where('is_verified', true)
+                        ->where('status', '!=', 'deleted');
+                }),
+            ],
             'password' => [
                 'required',
                 'string',
@@ -60,4 +80,3 @@ class SignupRequest extends FormRequest
         ];
     }
 }
-

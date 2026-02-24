@@ -39,4 +39,3 @@ class UpdateTimezoneRequest extends FormRequest
         ];
     }
 }
-

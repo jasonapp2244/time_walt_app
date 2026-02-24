@@ -13,8 +13,7 @@ class TransferController extends Controller
 {
     public function __construct(
         protected StripeService $stripeService
-    ) {
-    }
+    ) {}
 
     /**
      * Manually trigger transfer for a payment hold.

@@ -39,4 +39,3 @@ class UpdateLanguageRequest extends FormRequest
         ];
     }
 }
-

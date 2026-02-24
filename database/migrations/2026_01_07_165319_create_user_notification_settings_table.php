@@ -12,10 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('user_notification_settings', function (Blueprint $table) {
-                    $table->id();
+            $table->id();
             $table->foreignId('user_id')->nullable()
-                  ->constrained()
-                  ->onDelete('cascade');
+                ->constrained()
+                ->onDelete('cascade');
             $table->boolean('password_alert')->default(true);
             $table->boolean('transaction_alert')->default(true);
             $table->boolean('push_notification_alert')->default(true);
