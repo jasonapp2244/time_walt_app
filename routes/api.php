@@ -8,7 +8,7 @@ use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\StripeController;
 use App\Http\Controllers\Api\TransactionHistoryController;
 use Illuminate\Support\Facades\Route;
-
+//test comment
 // Public Authentication Routes with Rate Limiting
 // Rate limits: Signup/Login/Verify/Reset = 5/min, Resend/Forgot = 3/min, Check Email = 10/min
 Route::prefix('auth')->name('auth.')->group(function () {
