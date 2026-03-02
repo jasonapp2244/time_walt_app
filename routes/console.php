@@ -16,7 +16,7 @@ Schedule::command('check:payment-holds')
 
 // Cron 2: Verify pending transfers with Stripe and send success emails
 Schedule::command('verify:pending-transfers')
-    ->everyThirtyMinutes()
+    ->everyMinute()
     ->description('Verify pending transfers with Stripe and send payout success emails');
 
 // Cron 3: Cleanup old unverified accounts

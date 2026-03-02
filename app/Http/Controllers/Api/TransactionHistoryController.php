@@ -146,13 +146,13 @@ class TransactionHistoryController extends Controller
                 'message' => 'All transactions retrieved successfully.',
                 'summary' => [
                     'total_checkout_amount' => (float) $checkoutTotal, // Total received from all checkouts
-                    'total_withdraw_amount' => (float) $withdrawTotal, // Same as total_transferred_amount
-                    'total_hold_amount' => (float) $holdAmountTotal, // Locked (still in holding period)
-                    'total_ready_amount' => (float) $readyTotal, // Available for withdrawal
-                    'total_transferred_amount' => (float) $transferredTotal, // Already withdrawn
                     'current_balance' => (float) $currentBalance, // hold + ready (what's left in account)
                     'total_locked_amount' => (float) $holdAmountTotal, // Same as total_hold_amount
                     'available_balance' => (float) $readyTotal, // Same as total_ready_amount
+                    // 'total_withdraw_amount' => (float) $withdrawTotal, // Same as total_transferred_amount
+                    'total_hold_amount' => (float) $holdAmountTotal, // Locked (still in holding period)
+                    'total_ready_amount' => (float) $readyTotal, // Available for withdrawal
+                    // 'total_transferred_amount' => (float) $transferredTotal, // Already withdrawn
                     'currency' => 'USD',
                 ],
                 'data' => [
@@ -537,6 +537,7 @@ class TransactionHistoryController extends Controller
             'transaction_type' => 'checkout',
             'transaction_id' => "CHK-{$hold->id}",
             'hold_id' => $hold->id,
+            'title' => $hold->title ?? 'Payment Received',
             'amount' => (float) $hold->amount,
             'currency' => $hold->payment ? strtoupper($hold->payment->currency) : 'USD',
             'status' => $hold->payment ? $hold->payment->status : 'unknown',
@@ -560,6 +561,7 @@ class TransactionHistoryController extends Controller
             'transaction_type' => 'withdraw',
             'transaction_id' => "WDR-{$hold->transfer->id}",
             'hold_id' => $hold->id,
+            'title' => $hold->title ?? 'Withdrawal Request',
             'amount' => (float) $hold->transfer->amount,
             'currency' => strtoupper($hold->transfer->currency),
             'status' => $hold->transfer->status,
@@ -585,6 +587,7 @@ class TransactionHistoryController extends Controller
             'transaction_type' => 'withdraw',
             'transaction_id' => "WDR-{$transfer->id}",
             'hold_id' => $hold?->id,
+            'title' => $hold?->title ?? 'Withdrawal Request',
             'amount' => (float) $transfer->amount,
             'currency' => strtoupper($transfer->currency),
             'status' => $transfer->status,
@@ -635,6 +638,9 @@ class TransactionHistoryController extends Controller
             $overallStatus = 'failed';
         }
 
+        // Get title from first transfer's hold
+        $firstHoldTitle = $firstTransfer->hold?->title ?? 'Withdrawal Request';
+
         $transferDetails = [];
         foreach ($transfers as $index => $transfer) {
             $hold = $transfer->hold;
@@ -660,7 +666,8 @@ class TransactionHistoryController extends Controller
         return [
             'transaction_type' => 'withdraw',
             'transaction_id' => "WDR-GROUP-{$firstTransfer->id}",
-            'withdrawal_request_id' => $firstTransfer->id, // Use first transfer ID as request ID
+            'withdrawal_request_id' => $firstTransfer->id,
+            'title' => $firstHoldTitle,
             'total_amount' => (float) $totalAmount,
             'currency' => strtoupper($firstTransfer->currency),
             'status' => $overallStatus,
@@ -683,9 +690,10 @@ class TransactionHistoryController extends Controller
 
         return [
             'hold_id' => $hold->id,
+            'title' => $hold->title ?? 'Amount on Hold',
             'original_amount' => (float) $hold->amount,
             'remaining_amount' => (float) $remainingAmount,
-            'amount' => (float) $remainingAmount, // For backward compatibility
+            'amount' => (float) $remainingAmount,
             'currency' => $hold->payment ? strtoupper($hold->payment->currency) : 'USD',
             'status' => $hold->status,
             'hold_period' => [
@@ -717,10 +725,11 @@ class TransactionHistoryController extends Controller
 
         return [
             'hold_id' => $hold->id,
+            'title' => $hold->title ?? 'Ready for Withdrawal',
             'original_amount' => (float) $originalAmount,
             'remaining_amount' => (float) $remainingAmount,
             'already_withdrawn' => (float) $alreadyWithdrawn,
-            'amount' => (float) $remainingAmount, // For backward compatibility
+            'amount' => (float) $remainingAmount,
             'currency' => $hold->payment ? strtoupper($hold->payment->currency) : 'USD',
             'status' => $hold->status,
             'can_withdraw' => true,
@@ -750,6 +759,7 @@ class TransactionHistoryController extends Controller
         return [
             'transfer_id' => $transfer->id,
             'hold_id' => $hold->id,
+            'title' => $hold->title ?? 'Transfer Completed',
             'amount' => (float) $transfer->amount,
             'currency' => strtoupper($transfer->currency),
             'status' => $transfer->status,

@@ -500,6 +500,18 @@ class PaymentHoldController extends Controller
                         ],
                     ]);
 
+                    // Determine transfer status - Stripe transfers are usually instant
+                    $transferStatus = 'pending';
+                    $transferredAt = null;
+
+                    // Check if transfer succeeded immediately (most Stripe transfers are instant)
+                    if (isset($transfer->id) && ! isset($transfer->failure_message)) {
+                        $transferStatus = 'completed';
+                        $transferredAt = now();
+                    } elseif (isset($transfer->failure_message)) {
+                        $transferStatus = 'failed';
+                    }
+
                     // Create transfer record
                     $transferRecord = Transfer::create([
                         'hold_id' => $hold->id,
@@ -508,26 +520,37 @@ class PaymentHoldController extends Controller
                         'stripe_connect_account_id' => $connectAccount->connect_account_id,
                         'amount' => $amountFromThisHold,
                         'currency' => $currency,
-                        'status' => 'pending',
+                        'status' => $transferStatus,
+                        'transferred_at' => $transferredAt,
                         'transfer_type' => $amountFromThisHold < $availableInHold ? 'user_requested_partial' : 'user_requested',
                         'admin_id' => null,
                         'stripe_data' => $transfer->toArray(),
+                        'failure_reason' => $transfer->failure_message ?? null,
                     ]);
 
                     // Calculate new remaining amount
                     $newRemainingAmount = $availableInHold - $amountFromThisHold;
 
                     // Update hold with remaining_amount and appropriate status
-                    $hold->update([
-                        'remaining_amount' => $newRemainingAmount,
-                        'status' => $newRemainingAmount <= 0 ? 'transferred' : 'partial_transferred',
-                        'transferred_at' => $newRemainingAmount <= 0 ? now() : $hold->transferred_at,
-                    ]);
+                    // Only update if transfer is completed, otherwise leave status as is
+                    if ($transferStatus === 'completed') {
+                        $hold->update([
+                            'remaining_amount' => $newRemainingAmount,
+                            'status' => $newRemainingAmount <= 0 ? 'transferred' : 'partial_transferred',
+                            'transferred_at' => $newRemainingAmount <= 0 ? now() : $hold->transferred_at,
+                        ]);
+                    } else {
+                        // Transfer is pending or failed - just update remaining_amount
+                        $hold->update([
+                            'remaining_amount' => $newRemainingAmount,
+                        ]);
+                    }
 
                     $processedHolds[] = [
                         'hold_id' => $hold->id,
                         'amount' => (float) $amountFromThisHold,
                         'transfer_id' => $transferRecord->id,
+                        'status' => $transferStatus,
                     ];
 
                     $remainingAmount -= $amountFromThisHold;
@@ -560,7 +583,7 @@ class PaymentHoldController extends Controller
 
                 DB::commit();
 
-                // Send ONE email notification with all transfers (check both transaction_alert and email_alert)
+                // Send email notifications based on transfer status
                 $userSettings = UserNotificationSetting::where('user_id', $user->id)->first();
                 $shouldSendEmail = ! $userSettings || ($userSettings->transaction_alert && $userSettings->email_alert);
 
@@ -571,8 +594,21 @@ class PaymentHoldController extends Controller
                         ->with(['hold.payment', 'user'])
                         ->get();
 
-                    // Send single email with all transfer details
-                    \App\Jobs\SendWithdrawalSummaryNotification::dispatch($user, $transfers, $requestedAmount, $totalProcessed);
+                    // Check if all transfers are completed immediately
+                    $completedTransfers = $transfers->where('status', 'completed');
+                    $pendingTransfers = $transfers->where('status', 'pending');
+
+                    if ($completedTransfers->count() === $transfers->count()) {
+                        // All transfers completed - send success email
+                        if ($transfers->count() > 1) {
+                            \App\Jobs\SendTransferCompletedSummaryNotification::dispatch($user, $transfers, $totalProcessed);
+                        } else {
+                            \App\Jobs\SendTransferCompletedNotification::dispatch($transfers->first());
+                        }
+                    } elseif ($pendingTransfers->count() > 0) {
+                        // Some or all transfers are pending - send withdrawal request email
+                        \App\Jobs\SendWithdrawalSummaryNotification::dispatch($user, $transfers, $requestedAmount, $totalProcessed);
+                    }
                 }
 
                 Log::info('Withdrawal completed', [
@@ -582,8 +618,17 @@ class PaymentHoldController extends Controller
                     'processed_holds' => count($processedHolds),
                 ]);
 
+                // Mark transfers as email pending (will be updated by job)
+                if ($shouldSendEmail && ! empty($processedHolds)) {
+                    $transferIds = collect($processedHolds)->pluck('transfer_id')->toArray();
+                    Transfer::whereIn('id', $transferIds)->update(['email_status' => 'pending']);
+                }
+
                 // Get transfer details for response
                 $transferDetails = [];
+                $allCompleted = true;
+                $anyFailed = false;
+
                 foreach ($processedHolds as $processedHold) {
                     $transfer = Transfer::find($processedHold['transfer_id']);
                     if ($transfer) {
@@ -594,20 +639,37 @@ class PaymentHoldController extends Controller
                             'amount' => (float) $transfer->amount,
                             'currency' => strtoupper($transfer->currency),
                             'status' => $transfer->status,
+                            'transferred_at' => $transfer->transferred_at?->toIso8601String(),
+                            'email_status' => $transfer->email_status ?? 'pending',
+                            'email_sent_at' => $transfer->email_sent_at?->toIso8601String(),
                         ];
+
+                        if ($transfer->status !== 'completed') {
+                            $allCompleted = false;
+                        }
+                        if ($transfer->status === 'failed') {
+                            $anyFailed = true;
+                        }
                     }
                 }
 
+                // Determine overall status and message
+                $overallStatus = $allCompleted ? 'completed' : ($anyFailed ? 'partial_failed' : 'pending');
+                $message = $allCompleted
+                    ? "Withdrawal of \${$totalProcessed} completed successfully."
+                    : "Withdrawal request for \${$requestedAmount} submitted successfully. Transfers are being processed.";
+
                 return response()->json([
                     'success' => true,
-                    'message' => "Withdrawal request for \${$requestedAmount} submitted successfully.",
+                    'message' => $message,
                     'data' => [
                         'requested_amount' => (float) $requestedAmount,
                         'processed_amount' => (float) $totalProcessed,
                         'total_transfers' => count($processedHolds),
                         'holds_processed' => $processedHolds,
                         'transfers' => $transferDetails,
-                        'status' => 'pending',
+                        'status' => $overallStatus,
+                        'all_completed' => $allCompleted,
                         'summary' => [
                             'requested' => (float) $requestedAmount,
                             'processed' => (float) $totalProcessed,

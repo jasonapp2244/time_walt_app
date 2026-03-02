@@ -24,6 +24,9 @@ class Transfer extends Model
         'admin_id',
         'transfer_type',
         'abandoned_at',
+        'email_sent_at',
+        'email_status',
+        'email_failure_reason',
     ];
 
     protected function casts(): array
@@ -33,6 +36,7 @@ class Transfer extends Model
             'status' => 'string',
             'transferred_at' => 'datetime',
             'abandoned_at' => 'datetime',
+            'email_sent_at' => 'datetime',
             'stripe_data' => 'array',
         ];
     }
