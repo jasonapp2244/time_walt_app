@@ -20,6 +20,11 @@
 
             <!-- Transfer Amount -->
             <div style="background-color: #f2cf7a; padding: 25px; border-radius: 8px; margin: 30px 0; text-align: center; border-left: 4px solid #935510;">
+                @if($transfer->hold && $transfer->hold->title)
+                <p style="color: #935510; font-size: 14px; font-weight: bold; margin: 0 0 10px 0;">
+                    {{ $transfer->hold->title }}
+                </p>
+                @endif
                 <p style="color: #000000; font-size: 20px; font-weight: bold; margin: 0;">
                     ${{ number_format($transfer->amount, 2) }} {{ strtoupper($transfer->currency) }}
                 </p>

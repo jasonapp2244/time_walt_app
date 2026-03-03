@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\Admin\TransferController;
+use App\Http\Controllers\Api\AppConfigController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PrivacyPolicyController;
@@ -8,7 +9,8 @@ use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\StripeController;
 use App\Http\Controllers\Api\TransactionHistoryController;
 use Illuminate\Support\Facades\Route;
-//test comment
+
+// test comment
 // Public Authentication Routes with Rate Limiting
 // Rate limits: Signup/Login/Verify/Reset = 5/min, Resend/Forgot = 3/min, Check Email = 10/min
 Route::prefix('auth')->name('auth.')->group(function () {
@@ -19,6 +21,7 @@ Route::prefix('auth')->name('auth.')->group(function () {
     Route::post('/login', [AuthController::class, 'login'])->name('login')->middleware('throttle:5,1');
     Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->name('forgot-password')->middleware('throttle:5,1');
     Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('reset-password')->middleware('throttle:5,1');
+
 });
 
 // Public Privacy Policy Routes (Mobile View - Read-Only)
@@ -40,6 +43,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::get('/', [ProfileController::class, 'show'])->name('show');
         // Use POST for update to support file uploads properly
         Route::post('/update', [ProfileController::class, 'update'])->name('update');
+        Route::post('/change-password', [AuthController::class, 'changePassword'])->name('change-password')->middleware('throttle:5,1');
         Route::post('/language', [ProfileController::class, 'updateLanguage'])->name('language');
         Route::post('/timezone', [ProfileController::class, 'updateTimezone'])->name('timezone');
     });
@@ -49,6 +53,9 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::get('/', [NotificationController::class, 'show'])->name('show');
         Route::post('/update', [NotificationController::class, 'update'])->name('update');
     });
+
+    // App Config Routes
+    Route::get('/refer-friend-url', [AppConfigController::class, 'getReferFriendUrl'])->name('refer-friend-url');
 
     // Stripe Connect Routes
     Route::prefix('stripe')->name('stripe.')->group(function () {

@@ -38,10 +38,13 @@
                 @foreach($transfers as $transfer)
                 <div style="border-bottom: 1px solid #e0e0e0; padding: 15px 0; {{ !$loop->last ? '' : 'border-bottom: none;' }}">
                     <p style="color: #000000; font-size: 16px; font-weight: bold; margin: 0 0 8px 0;">Transfer #{{ $loop->iteration }}</p>
+                    @if($transfer->hold && $transfer->hold->title)
+                    <p style="color: #935510; font-size: 14px; margin: 4px 0;"><strong>Title:</strong> {{ $transfer->hold->title }}</p>
+                    @endif
                     <p style="color: #000000; font-size: 14px; margin: 4px 0;"><strong>Amount:</strong> ${{ number_format($transfer->amount, 2) }} {{ strtoupper($transfer->currency) }}</p>
                     <p style="color: #000000; font-size: 14px; margin: 4px 0;"><strong>Status:</strong> {{ ucfirst($transfer->status) }}</p>
                     @if($transfer->hold)
-                    <p style="color: #666666; font-size: 12px; margin: 4px 0;">Hold ID: #{{ $transfer->hold->id }}@if($transfer->hold->title) - {{ $transfer->hold->title }}@endif</p>
+                    <p style="color: #666666; font-size: 12px; margin: 4px 0;">Hold ID: #{{ $transfer->hold->id }}</p>
                     @endif
                 </div>
                 @endforeach
@@ -49,10 +52,13 @@
             @else
             @foreach($transfers as $transfer)
             <div style="background-color: #f9f9f9; padding: 20px; border-radius: 8px; margin: 30px 0;">
+                @if($transfer->hold && $transfer->hold->title)
+                <p style="color: #935510; font-size: 14px; margin: 4px 0 10px 0;"><strong>Title:</strong> {{ $transfer->hold->title }}</p>
+                @endif
                 <p style="color: #000000; font-size: 14px; margin: 4px 0;"><strong>Amount:</strong> ${{ number_format($transfer->amount, 2) }} {{ strtoupper($transfer->currency) }}</p>
                 <p style="color: #000000; font-size: 14px; margin: 4px 0;"><strong>Status:</strong> {{ ucfirst($transfer->status) }}</p>
                 @if($transfer->hold)
-                <p style="color: #666666; font-size: 12px; margin: 4px 0;">Hold ID: #{{ $transfer->hold->id }}@if($transfer->hold->title) - {{ $transfer->hold->title }}@endif</p>
+                <p style="color: #666666; font-size: 12px; margin: 4px 0;">Hold ID: #{{ $transfer->hold->id }}</p>
                 @endif
             </div>
             @endforeach

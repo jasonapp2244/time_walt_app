@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Auth\ChangePasswordRequest;
 use App\Http\Requests\Auth\ForgotPasswordRequest;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\ResendOtpRequest;
@@ -1043,6 +1044,54 @@ class AuthController extends Controller
             'holds_count' => $holdsWithBalance->count(),
             'transfer_type' => 'virtual_transfer', // No actual Stripe API call
         ]);
+    }
+
+    /**
+     * Change password for authenticated user.
+     */
+    public function changePassword(ChangePasswordRequest $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+
+            if (! Hash::check($request->current_password, $user->password)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Current password is incorrect.',
+                ], 422);
+            }
+
+            if (Hash::check($request->new_password, $user->password)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'New password must be different from current password.',
+                ], 422);
+            }
+
+            $user->update([
+                'password' => Hash::make($request->new_password),
+            ]);
+
+            Log::info('Password changed successfully', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Password changed successfully.',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Change Password Failed', [
+                'user_id' => $request->user()->id ?? null,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to change password.',
+            ], 500);
+        }
     }
 
     /**

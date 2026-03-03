@@ -65,7 +65,32 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => env('APP_TIMEZONE', 'UTC'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Refer Friend URL
+    |--------------------------------------------------------------------------
+    |
+    | This URL is used for the "Refer a Friend" feature in the application.
+    | Users can share this link to invite friends to the platform.
+    |
+    */
+
+    'refer_friend_url' => env('REFER_FRIEND_URL', 'https://timevaultapp.com/refer'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Mobile App Store URLs
+    |--------------------------------------------------------------------------
+    |
+    | These URLs point to the app's pages on the Google Play Store and
+    | Apple App Store, used for app downloads and sharing.
+    |
+    */
+
+    'android_app_url' => env('ANDROID_APP_URL', 'https://play.google.com/store/apps/details?id=com.timevault'),
+    'ios_app_url' => env('IOS_APP_URL', 'https://apps.apple.com/app/timevault/id123456789'),
 
     /*
     |--------------------------------------------------------------------------

@@ -28,8 +28,9 @@ class SendTransferCompletedNotification implements ShouldQueue
     public function handle(): void
     {
         try {
-            // Refresh the transfer to get latest data
+            // Refresh the transfer to get latest data with relationships
             $this->transfer->refresh();
+            $this->transfer->load(['user', 'hold']);
 
             // Send to user
             Mail::to($this->transfer->user->email)

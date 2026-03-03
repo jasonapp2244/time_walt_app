@@ -28,6 +28,13 @@ class TransferCompletedMail extends Mailable
     public function envelope(): Envelope
     {
         $amount = number_format($this->transfer->amount, 2);
+        $title = $this->transfer->hold?->title;
+
+        if ($title) {
+            return new Envelope(
+                subject: "Transfer Completed - {$title} \${$amount}",
+            );
+        }
 
         return new Envelope(
             subject: "Transfer Completed - \${$amount} Transferred",
