@@ -13,31 +13,22 @@ class WithdrawalSummaryMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    /**
-     * Create a new message instance.
-     */
     public function __construct(
         public User $user,
         public $transfers,
         public float $requestedAmount,
-        public float $processedAmount
+        public float $processedAmount,
+        public bool $isAdmin = false
     ) {}
 
-    /**
-     * Get the message envelope.
-     */
     public function envelope(): Envelope
     {
         $amount = number_format($this->processedAmount, 2);
+        $prefix = $this->isAdmin ? '[Admin] ' : '';
 
-        return new Envelope(
-            subject: "Withdrawal Request - \${$amount}",
-        );
+        return new Envelope(subject: "{$prefix}Withdrawal Request - \${$amount}");
     }
 
-    /**
-     * Get the message content definition.
-     */
     public function content(): Content
     {
         return new Content(
@@ -48,15 +39,11 @@ class WithdrawalSummaryMail extends Mailable
                 'requestedAmount' => $this->requestedAmount,
                 'processedAmount' => $this->processedAmount,
                 'totalTransfers' => $this->transfers->count(),
+                'isAdmin' => $this->isAdmin,
             ],
         );
     }
 
-    /**
-     * Get the attachments for the message.
-     *
-     * @return array<int, \Illuminate\Mail\Mailables\Attachment>
-     */
     public function attachments(): array
     {
         return [];

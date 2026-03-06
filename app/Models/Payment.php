@@ -14,6 +14,7 @@ class Payment extends Model
     protected $fillable = [
         'user_id',
         'payment_intent_id',
+        'payment_intent_id_index',
         'amount',
         'currency',
         'status',
@@ -22,14 +23,39 @@ class Payment extends Model
         'failure_reason',
     ];
 
+    protected $hidden = [
+        'payment_intent_id_index',
+    ];
+
     protected function casts(): array
     {
         return [
             'amount' => 'decimal:2',
             'status' => 'string',
             'paid_at' => 'datetime',
-            'stripe_data' => 'array',
+            'stripe_data' => 'encrypted:array',
+            'payment_intent_id' => 'encrypted',
         ];
+    }
+
+    /**
+     * Automatically keep the blind-index column in sync when payment_intent_id changes.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (self $payment) {
+            if ($payment->isDirty('payment_intent_id') && $payment->payment_intent_id !== null) {
+                $payment->payment_intent_id_index = static::blindIndex($payment->payment_intent_id);
+            }
+        });
+    }
+
+    /**
+     * Compute a deterministic HMAC-SHA256 blind index for database lookups.
+     */
+    public static function blindIndex(string $value): string
+    {
+        return hash_hmac('sha256', $value, config('app.key'));
     }
 
     /**

@@ -14,36 +14,25 @@ class TransferCompletedMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    /**
-     * Create a new message instance.
-     */
     public function __construct(
         public Transfer $transfer,
-        public User $user
+        public User $user,
+        public bool $isAdmin = false
     ) {}
 
-    /**
-     * Get the message envelope.
-     */
     public function envelope(): Envelope
     {
         $amount = number_format($this->transfer->amount, 2);
         $title = $this->transfer->hold?->title;
+        $prefix = $this->isAdmin ? '[Admin] ' : '';
 
         if ($title) {
-            return new Envelope(
-                subject: "Transfer Completed - {$title} \${$amount}",
-            );
+            return new Envelope(subject: "{$prefix}Transfer Completed - {$title} \${$amount}");
         }
 
-        return new Envelope(
-            subject: "Transfer Completed - \${$amount} Transferred",
-        );
+        return new Envelope(subject: "{$prefix}Transfer Completed - \${$amount} Transferred");
     }
 
-    /**
-     * Get the message content definition.
-     */
     public function content(): Content
     {
         return new Content(
@@ -51,15 +40,11 @@ class TransferCompletedMail extends Mailable
             with: [
                 'transfer' => $this->transfer,
                 'user' => $this->user,
+                'isAdmin' => $this->isAdmin,
             ],
         );
     }
 
-    /**
-     * Get the attachments for the message.
-     *
-     * @return array<int, \Illuminate\Mail\Mailables\Attachment>
-     */
     public function attachments(): array
     {
         return [];

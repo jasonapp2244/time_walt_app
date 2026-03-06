@@ -13,28 +13,21 @@ class PaymentSuccessMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    /**
-     * Create a new message instance.
-     */
     public function __construct(
-        public Payment $payment
+        public Payment $payment,
+        public bool $isAdmin = false
     ) {}
 
-    /**
-     * Get the message envelope.
-     */
     public function envelope(): Envelope
     {
         $amount = number_format($this->payment->amount, 2);
+        $prefix = $this->isAdmin ? '[Admin] ' : '';
 
         return new Envelope(
-            subject: "Payment Successful - \${$amount} Received",
+            subject: "{$prefix}Payment Successful - \${$amount} Received",
         );
     }
 
-    /**
-     * Get the message content definition.
-     */
     public function content(): Content
     {
         return new Content(
@@ -43,15 +36,11 @@ class PaymentSuccessMail extends Mailable
                 'payment' => $this->payment,
                 'user' => $this->payment->user,
                 'hold' => $this->payment->hold,
+                'isAdmin' => $this->isAdmin,
             ],
         );
     }
 
-    /**
-     * Get the attachments for the message.
-     *
-     * @return array<int, \Illuminate\Mail\Mailables\Attachment>
-     */
     public function attachments(): array
     {
         return [];

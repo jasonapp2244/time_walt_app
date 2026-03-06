@@ -3,7 +3,6 @@
 namespace App\Http\Requests\Auth;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class SignupRequest extends FormRequest
 {
@@ -29,21 +28,14 @@ class SignupRequest extends FormRequest
                 'string',
                 'email',
                 'max:255',
-                // Only unique if verified OR not deleted
-                Rule::unique('users')->where(function ($query) {
-                    return $query->where('is_verified', true)
-                        ->where('status', '!=', 'deleted');
-                }),
+                // Uniqueness is enforced in AuthController using the blind index
+                // (Rule::unique cannot be used on encrypted columns)
             ],
             'phone' => [
                 'nullable',
                 'string',
                 'max:20',
-                // Only unique if verified OR not deleted (same logic as email)
-                Rule::unique('users')->where(function ($query) {
-                    return $query->where('is_verified', true)
-                        ->where('status', '!=', 'deleted');
-                }),
+                // Uniqueness is enforced in AuthController using the blind index
             ],
             'password' => [
                 'required',

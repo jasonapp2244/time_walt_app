@@ -35,13 +35,38 @@ class StripeController extends Controller
             $existingAccount = StripeConnectAccount::where('user_id', $user->id)->first();
 
             if ($existingAccount) {
+                // Always re-check Stripe for the latest verification status
+                // so the response reflects reality even if the callback never fired.
+                if ($existingAccount->status !== 'verified') {
+                    try {
+                        \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
+                        $stripeAccount = \Stripe\Account::retrieve($existingAccount->connect_account_id);
+
+                        if ($stripeAccount->details_submitted) {
+                            $existingAccount->update([
+                                'status' => 'verified',
+                                'payouts_enabled' => $stripeAccount->payouts_enabled ?? false,
+                                'verified_at' => now(),
+                                'stripe_data' => $stripeAccount->toArray(),
+                            ]);
+                        }
+                    } catch (\Exception $e) {
+                        Log::warning('Could not refresh Connect account status from Stripe: '.$e->getMessage());
+                    }
+                }
+
+                $isVerified = $existingAccount->status === 'verified';
+
                 return response()->json([
                     'success' => true,
-                    'message' => 'Stripe Connect account already exists.',
+                    'message' => $isVerified
+                        ? 'Stripe Connect account verified.'
+                        : 'Stripe Connect account already exists. Please complete onboarding.',
                     'data' => [
                         'connect_account_id' => $existingAccount->connect_account_id,
                         'status' => $existingAccount->status,
-                        'onboarding_url' => $existingAccount->onboarding_url,
+                        'onboarding_url' => $isVerified ? null : $existingAccount->onboarding_url,
+                        'verified' => $isVerified,
                     ],
                 ]);
             }
@@ -114,7 +139,7 @@ class StripeController extends Controller
                 ], 400);
             }
 
-            $connectAccount = StripeConnectAccount::where('connect_account_id', $accountId)->first();
+            $connectAccount = StripeConnectAccount::where('connect_account_id_index', StripeConnectAccount::blindIndex($accountId))->first();
 
             if (! $connectAccount) {
                 return response()->json([
@@ -265,7 +290,7 @@ class StripeController extends Controller
             }
 
             // ✅ PAYMENT SUCCEEDED - Create database records
-            $payment = Payment::where('payment_intent_id', $paymentIntentId)->first();
+            $payment = Payment::where('payment_intent_id_index', Payment::blindIndex($paymentIntentId))->first();
 
             if ($payment) {
                 return response()->json([
@@ -462,7 +487,7 @@ class StripeController extends Controller
             $currency = $session->currency ?? 'usd';
 
             // Check if payment already exists
-            $payment = Payment::where('payment_intent_id', $paymentIntentId)->first();
+            $payment = Payment::where('payment_intent_id_index', Payment::blindIndex($paymentIntentId))->first();
 
             // Handle based on payment status
             if ($status === 'success' && $paymentIntent->status === 'succeeded') {

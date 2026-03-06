@@ -56,7 +56,7 @@ class VerifyPendingTransfers extends Command
 
                 Log::info('Stripe transfer status checked', [
                     'transfer_id' => $transfer->id,
-                    'stripe_transfer_id' => $transfer->stripe_transfer_id,
+                    'stripe_id_suffix' => substr($transfer->stripe_transfer_id, -6),
                     'stripe_status' => $stripeTransfer->status ?? 'unknown',
                 ]);
 

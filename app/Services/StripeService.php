@@ -75,13 +75,10 @@ class StripeService
                 now()->addHours(24)
             );
 
-            // Log the return URL being used
             Log::info('Creating Stripe AccountLink', [
-                'account_id' => $connectAccount->connect_account_id,
                 'user_id' => $connectAccount->user_id,
+                'account_id_suffix' => substr($connectAccount->connect_account_id, -6),
                 'base_return_url' => $baseReturnUrl,
-                'return_url_with_account' => $returnUrl,
-                'refresh_url_with_account' => $refreshUrl,
             ]);
 
             $accountLink = \Stripe\AccountLink::create([
@@ -97,9 +94,8 @@ class StripeService
             ]);
 
             Log::info('Stripe AccountLink created successfully', [
-                'account_id' => $connectAccount->connect_account_id,
-                'account_link_url' => $accountLink->url,
-                'return_url' => $returnUrl,
+                'user_id' => $connectAccount->user_id,
+                'account_id_suffix' => substr($connectAccount->connect_account_id, -6),
                 'stripe_account_link_id' => $accountLink->id ?? null,
             ]);
 

@@ -15,9 +15,6 @@ class SendWithdrawalSummaryNotification implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    /**
-     * Create a new job instance.
-     */
     public function __construct(
         public User $user,
         public $transfers,
@@ -25,29 +22,14 @@ class SendWithdrawalSummaryNotification implements ShouldQueue
         public float $processedAmount
     ) {}
 
-    /**
-     * Execute the job.
-     */
     public function handle(): void
     {
-        // Send to user
         Mail::to($this->user->email)
-            ->send(new WithdrawalSummaryMail(
-                $this->user,
-                $this->transfers,
-                $this->requestedAmount,
-                $this->processedAmount
-            ));
+            ->send(new WithdrawalSummaryMail($this->user, $this->transfers, $this->requestedAmount, $this->processedAmount));
 
-        // Send to admin
         if ($adminEmail = config('mail.admin_email')) {
             Mail::to($adminEmail)
-                ->send(new WithdrawalSummaryMail(
-                    $this->user,
-                    $this->transfers,
-                    $this->requestedAmount,
-                    $this->processedAmount
-                ));
+                ->send(new WithdrawalSummaryMail($this->user, $this->transfers, $this->requestedAmount, $this->processedAmount, isAdmin: true));
         }
     }
 }

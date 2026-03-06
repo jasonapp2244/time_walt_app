@@ -37,7 +37,7 @@ class AuthController extends Controller
             'email' => 'required|email|max:255',
         ]);
 
-        $user = User::where('email', $request->email)->first();
+        $user = User::where('email_index', User::blindIndex(strtolower($request->email)))->first();
 
         // Email doesn't exist - available for registration
         if (! $user) {
@@ -93,11 +93,41 @@ class AuthController extends Controller
     {
         $otpCode = str_pad((string) random_int(1000, 9999), 4, '0', STR_PAD_LEFT);
 
+        // Reject if a verified+active account already owns this email
+        $verifiedEmail = User::where('email_index', User::blindIndex(strtolower($request->email)))
+            ->where('is_verified', true)
+            ->where('status', '!=', 'deleted')
+            ->first();
+
+        if ($verifiedEmail) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This email is already registered.',
+                'errors' => ['email' => ['This email is already registered.']],
+            ], 422);
+        }
+
+        // Reject if a verified+active account already owns this phone
+        if ($request->phone) {
+            $verifiedPhone = User::where('phone_index', User::blindIndex(strtolower($request->phone)))
+                ->where('is_verified', true)
+                ->where('status', '!=', 'deleted')
+                ->first();
+
+            if ($verifiedPhone) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This phone number is already registered.',
+                    'errors' => ['phone' => ['This phone number is already registered.']],
+                ], 422);
+            }
+        }
+
         // Check if unverified account exists by email OR phone (includes deleted accounts that can be reused)
         $existingUser = User::where(function ($query) use ($request) {
-            $query->where('email', $request->email);
+            $query->where('email_index', User::blindIndex(strtolower($request->email)));
             if ($request->phone) {
-                $query->orWhere('phone', $request->phone);
+                $query->orWhere('phone_index', User::blindIndex(strtolower($request->phone)));
             }
         })
             ->where(function ($query) {
@@ -200,9 +230,9 @@ class AuthController extends Controller
     {
         $user = User::where(function ($query) use ($request) {
             if ($request->email) {
-                $query->where('email', $request->email);
+                $query->where('email_index', User::blindIndex(strtolower($request->email)));
             } else {
-                $query->where('phone', $request->phone);
+                $query->where('phone_index', User::blindIndex(strtolower($request->phone)));
             }
         })->first();
 
@@ -263,9 +293,9 @@ class AuthController extends Controller
     {
         $user = User::where(function ($query) use ($request) {
             if ($request->email) {
-                $query->where('email', $request->email);
+                $query->where('email_index', User::blindIndex(strtolower($request->email)));
             } else {
-                $query->where('phone', $request->phone);
+                $query->where('phone_index', User::blindIndex(strtolower($request->phone)));
             }
         })->first();
 
@@ -340,9 +370,9 @@ class AuthController extends Controller
         // Step 1: Check if user exists
         $user = User::where(function ($query) use ($request) {
             if ($request->email) {
-                $query->where('email', $request->email);
+                $query->where('email_index', User::blindIndex(strtolower($request->email)));
             } else {
-                $query->where('phone', $request->phone);
+                $query->where('phone_index', User::blindIndex(strtolower($request->phone)));
             }
         })->first();
 
@@ -498,7 +528,7 @@ class AuthController extends Controller
 
         // Step 1: Check if user exists with this social provider
         $user = User::where('provider', $request->provider)
-            ->where('provider_id', $request->provider_id)
+            ->where('provider_id_index', User::blindIndex($request->provider_id))
             ->first();
 
         if ($user) {
@@ -542,7 +572,7 @@ class AuthController extends Controller
         }
 
         // Step 2: Check if user exists by email (link social account)
-        $user = User::where('email', $request->email)->first();
+        $user = User::where('email_index', User::blindIndex(strtolower($request->email)))->first();
 
         if ($user) {
             // User exists but not with this social provider
@@ -637,7 +667,7 @@ class AuthController extends Controller
     {
         do {
             $phone = '1'.str_pad((string) random_int(0, 9999999999), 10, '0', STR_PAD_LEFT);
-        } while (User::where('phone', $phone)->exists());
+        } while (User::where('phone_index', User::blindIndex(strtolower($phone)))->exists());
 
         return $phone;
     }
@@ -649,9 +679,9 @@ class AuthController extends Controller
     {
         $user = User::where(function ($query) use ($request) {
             if ($request->email) {
-                $query->where('email', $request->email);
+                $query->where('email_index', User::blindIndex(strtolower($request->email)));
             } else {
-                $query->where('phone', $request->phone);
+                $query->where('phone_index', User::blindIndex(strtolower($request->phone)));
             }
         })->first();
 
@@ -701,9 +731,9 @@ class AuthController extends Controller
     {
         $user = User::where(function ($query) use ($request) {
             if ($request->email) {
-                $query->where('email', $request->email);
+                $query->where('email_index', User::blindIndex(strtolower($request->email)));
             } else {
-                $query->where('phone', $request->phone);
+                $query->where('phone_index', User::blindIndex(strtolower($request->phone)));
             }
         })->first();
 

@@ -57,7 +57,7 @@ class WebhookService
         $currency = $session['currency'] ?? 'usd';
 
         // Check if payment already exists
-        $payment = Payment::where('payment_intent_id', $paymentIntentId)->first();
+        $payment = Payment::where('payment_intent_id_index', Payment::blindIndex($paymentIntentId))->first();
 
         if (! $payment) {
             // Create payment record
@@ -124,10 +124,10 @@ class WebhookService
         $paymentIntentId = $paymentIntent['id'];
 
         // Find payment record
-        $payment = Payment::where('payment_intent_id', $paymentIntentId)->first();
+        $payment = Payment::where('payment_intent_id_index', Payment::blindIndex($paymentIntentId))->first();
 
         if (! $payment) {
-            Log::warning('Payment not found for payment intent: '.$paymentIntentId);
+            Log::warning('Payment not found for payment intent: '.substr($paymentIntentId, -6));
 
             return;
         }
@@ -165,7 +165,7 @@ class WebhookService
         $paymentIntentId = $paymentIntent['id'];
         $failureReason = $paymentIntent['last_payment_error']['message'] ?? 'Payment failed';
 
-        $payment = Payment::where('payment_intent_id', $paymentIntentId)->first();
+        $payment = Payment::where('payment_intent_id_index', Payment::blindIndex($paymentIntentId))->first();
 
         if ($payment) {
             $payment->update([
@@ -190,7 +190,7 @@ class WebhookService
         $account = $eventData['data']['object'];
         $accountId = $account['id'];
 
-        $connectAccount = StripeConnectAccount::where('connect_account_id', $accountId)->first();
+        $connectAccount = StripeConnectAccount::where('connect_account_id_index', StripeConnectAccount::blindIndex($accountId))->first();
 
         if ($connectAccount) {
             $status = 'pending';
@@ -219,7 +219,7 @@ class WebhookService
         $transfer = $eventData['data']['object'];
         $transferId = $transfer['id'];
 
-        $transferRecord = Transfer::where('stripe_transfer_id', $transferId)->first();
+        $transferRecord = Transfer::where('stripe_transfer_id_index', Transfer::blindIndex($transferId))->first();
 
         if ($transferRecord) {
             $transferRecord->update([
@@ -285,7 +285,7 @@ class WebhookService
         $transferId = $transfer['id'];
         $failureReason = $transfer['failure_message'] ?? 'Transfer failed';
 
-        $transferRecord = Transfer::where('stripe_transfer_id', $transferId)->first();
+        $transferRecord = Transfer::where('stripe_transfer_id_index', Transfer::blindIndex($transferId))->first();
 
         if ($transferRecord) {
             $transferRecord->update([
@@ -311,10 +311,10 @@ class WebhookService
         $paymentIntentId = $paymentIntent['id'];
         $cancelReason = $paymentIntent['cancellation_reason'] ?? 'Payment canceled by user';
 
-        $payment = Payment::where('payment_intent_id', $paymentIntentId)->first();
+        $payment = Payment::where('payment_intent_id_index', Payment::blindIndex($paymentIntentId))->first();
 
         if (! $payment) {
-            Log::warning('Payment not found for payment intent: '.$paymentIntentId);
+            Log::warning('Payment not found for payment intent suffix: '.substr($paymentIntentId, -6));
 
             return;
         }
@@ -352,7 +352,7 @@ class WebhookService
         $transferId = $transfer['id'];
         $cancelReason = $transfer['failure_message'] ?? 'Transfer canceled';
 
-        $transferRecord = Transfer::where('stripe_transfer_id', $transferId)->first();
+        $transferRecord = Transfer::where('stripe_transfer_id_index', Transfer::blindIndex($transferId))->first();
 
         if ($transferRecord) {
             $transferRecord->update([

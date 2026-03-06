@@ -21,7 +21,9 @@ class User extends Authenticatable
         'role',
         'full_name',
         'email',
+        'email_index',
         'phone',
+        'phone_index',
         'password',
         'profile',
         'otp_code',
@@ -32,6 +34,7 @@ class User extends Authenticatable
         'email_verified_at',
         'provider',
         'provider_id',
+        'provider_id_index',
         'timezone',
         'language',
         'fcm_token',
@@ -53,6 +56,9 @@ class User extends Authenticatable
         'remember_token',
         'otp_code',
         'token',
+        'email_index',
+        'phone_index',
+        'provider_id_index',
     ];
 
     /**
@@ -71,7 +77,49 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_verified' => 'boolean',
             'two_factor_enabled' => 'boolean',
+            // Encrypted PII fields
+            'email' => 'encrypted',
+            'phone' => 'encrypted',
+            'full_name' => 'encrypted',
+            'provider_id' => 'encrypted',
+            'fcm_token' => 'encrypted',
+            'device_id' => 'encrypted',
+            'otp_code' => 'encrypted',
+            'token' => 'encrypted',
         ];
+    }
+
+    /**
+     * Automatically keep blind-index columns in sync when searchable fields change.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (self $user) {
+            if ($user->isDirty('email') && $user->email !== null) {
+                $user->email_index = static::blindIndex(strtolower($user->email));
+            }
+
+            if ($user->isDirty('phone')) {
+                $user->phone_index = $user->phone !== null
+                    ? static::blindIndex(strtolower($user->phone))
+                    : null;
+            }
+
+            if ($user->isDirty('provider_id')) {
+                $user->provider_id_index = $user->provider_id !== null
+                    ? static::blindIndex($user->provider_id)
+                    : null;
+            }
+        });
+    }
+
+    /**
+     * Compute a deterministic HMAC-SHA256 blind index for database lookups.
+     * Uses APP_KEY so the index is useless without the application secret.
+     */
+    public static function blindIndex(string $value): string
+    {
+        return hash_hmac('sha256', $value, config('app.key'));
     }
 
     /**

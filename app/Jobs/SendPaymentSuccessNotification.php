@@ -15,26 +15,18 @@ class SendPaymentSuccessNotification implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    /**
-     * Create a new job instance.
-     */
     public function __construct(
         public Payment $payment
     ) {}
 
-    /**
-     * Execute the job.
-     */
     public function handle(): void
     {
-        // Send to user
         Mail::to($this->payment->user->email)
             ->send(new PaymentSuccessMail($this->payment));
 
-        // Send to admin
         if ($adminEmail = config('mail.admin_email')) {
             Mail::to($adminEmail)
-                ->send(new PaymentSuccessMail($this->payment));
+                ->send(new PaymentSuccessMail($this->payment, isAdmin: true));
         }
     }
 }

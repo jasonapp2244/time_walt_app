@@ -14,6 +14,7 @@ class Transfer extends Model
         'hold_id',
         'user_id',
         'stripe_transfer_id',
+        'stripe_transfer_id_index',
         'stripe_connect_account_id',
         'amount',
         'currency',
@@ -29,6 +30,10 @@ class Transfer extends Model
         'email_failure_reason',
     ];
 
+    protected $hidden = [
+        'stripe_transfer_id_index',
+    ];
+
     protected function casts(): array
     {
         return [
@@ -37,8 +42,32 @@ class Transfer extends Model
             'transferred_at' => 'datetime',
             'abandoned_at' => 'datetime',
             'email_sent_at' => 'datetime',
-            'stripe_data' => 'array',
+            'stripe_data' => 'encrypted:array',
+            'stripe_transfer_id' => 'encrypted',
+            'stripe_connect_account_id' => 'encrypted',
         ];
+    }
+
+    /**
+     * Automatically keep the blind-index column in sync when stripe_transfer_id changes.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (self $transfer) {
+            if ($transfer->isDirty('stripe_transfer_id')) {
+                $transfer->stripe_transfer_id_index = $transfer->stripe_transfer_id !== null
+                    ? static::blindIndex($transfer->stripe_transfer_id)
+                    : null;
+            }
+        });
+    }
+
+    /**
+     * Compute a deterministic HMAC-SHA256 blind index for database lookups.
+     */
+    public static function blindIndex(string $value): string
+    {
+        return hash_hmac('sha256', $value, config('app.key'));
     }
 
     /**

@@ -14,29 +14,22 @@ class HoldPeriodEndedMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    /**
-     * Create a new message instance.
-     */
     public function __construct(
         public PaymentHold $hold,
-        public User $user
+        public User $user,
+        public bool $isAdmin = false
     ) {}
 
-    /**
-     * Get the message envelope.
-     */
     public function envelope(): Envelope
     {
         $amount = number_format($this->hold->amount, 2);
+        $prefix = $this->isAdmin ? '[Admin] ' : '';
 
         return new Envelope(
-            subject: "Hold Period Ended - \${$amount} Ready for Transfer",
+            subject: "{$prefix}Hold Period Ended - \${$amount} Ready for Transfer",
         );
     }
 
-    /**
-     * Get the message content definition.
-     */
     public function content(): Content
     {
         return new Content(
@@ -44,15 +37,11 @@ class HoldPeriodEndedMail extends Mailable
             with: [
                 'hold' => $this->hold,
                 'user' => $this->user,
+                'isAdmin' => $this->isAdmin,
             ],
         );
     }
 
-    /**
-     * Get the attachments for the message.
-     *
-     * @return array<int, \Illuminate\Mail\Mailables\Attachment>
-     */
     public function attachments(): array
     {
         return [];

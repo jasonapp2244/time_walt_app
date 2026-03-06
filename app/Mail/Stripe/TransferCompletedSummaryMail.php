@@ -13,30 +13,21 @@ class TransferCompletedSummaryMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    /**
-     * Create a new message instance.
-     */
     public function __construct(
         public User $user,
         public $transfers,
-        public float $totalAmount
+        public float $totalAmount,
+        public bool $isAdmin = false
     ) {}
 
-    /**
-     * Get the message envelope.
-     */
     public function envelope(): Envelope
     {
         $amount = number_format($this->totalAmount, 2);
+        $prefix = $this->isAdmin ? '[Admin] ' : '';
 
-        return new Envelope(
-            subject: "Transfer Completed - \${$amount} Transferred",
-        );
+        return new Envelope(subject: "{$prefix}Transfer Completed - \${$amount} Transferred");
     }
 
-    /**
-     * Get the message content definition.
-     */
     public function content(): Content
     {
         return new Content(
@@ -46,15 +37,11 @@ class TransferCompletedSummaryMail extends Mailable
                 'transfers' => $this->transfers,
                 'totalAmount' => $this->totalAmount,
                 'totalTransfers' => $this->transfers->count(),
+                'isAdmin' => $this->isAdmin,
             ],
         );
     }
 
-    /**
-     * Get the attachments for the message.
-     *
-     * @return array<int, \Illuminate\Mail\Mailables\Attachment>
-     */
     public function attachments(): array
     {
         return [];
