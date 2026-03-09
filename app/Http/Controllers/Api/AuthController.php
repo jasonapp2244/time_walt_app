@@ -152,7 +152,7 @@ class AuthController extends Controller
                 'provider_id' => $request->provider_id,
             ]);
 
-            Mail::to($existingUser->email)->send(new OtpMail($otpCode, 'verification'));
+            Mail::to($existingUser->email)->send(new OtpMail($otpCode, 'verification', $existingUser->full_name));
 
             // Ensure notification settings exist
             UserNotificationSetting::firstOrCreate(
@@ -197,10 +197,12 @@ class AuthController extends Controller
             'status' => 'pending',
             'provider' => $request->provider,
             'provider_id' => $request->provider_id,
+            'timezone' => config('app.timezone'),
+            'language' => 'en',
         ]);
 
         // Send OTP via email
-        Mail::to($user->email)->send(new OtpMail($otpCode, 'verification'));
+        Mail::to($user->email)->send(new OtpMail($otpCode, 'verification', $user->full_name));
 
         // Create default notification settings
         UserNotificationSetting::create([
@@ -339,7 +341,7 @@ class AuthController extends Controller
             'otp_expires_at' => now()->addMinutes(5),
         ]);
 
-        Mail::to($user->email)->send(new OtpMail($otpCode, 'verification'));
+        Mail::to($user->email)->send(new OtpMail($otpCode, 'verification', $user->full_name));
 
         Log::info('OTP resent successfully', [
             'user_id' => $user->id,
@@ -427,7 +429,7 @@ class AuthController extends Controller
                     'otp_expires_at' => now()->addMinutes(5),
                 ]);
 
-                Mail::to($user->email)->send(new OtpMail($otpCode, 'login'));
+                Mail::to($user->email)->send(new OtpMail($otpCode, 'login', $user->full_name));
 
                 return response()->json([
                     'success' => false,
@@ -554,8 +556,8 @@ class AuthController extends Controller
                 'device_id' => $request->device_id ?? $user->device_id,
                 'device_type' => $request->device_type ?? $user->device_type,
                 'fcm_token' => $request->fcm_token ?? $user->fcm_token,
-                'timezone' => $request->timezone ?? $user->timezone,
-                'language' => $request->language ?? $user->language,
+                'timezone' => config('app.timezone'),
+                'language' => $request->language ?? $user->language ?? 'en',
                 'last_active_at' => now(),
             ]);
 
@@ -601,8 +603,8 @@ class AuthController extends Controller
                 'device_id' => $request->device_id ?? $user->device_id,
                 'device_type' => $request->device_type ?? $user->device_type,
                 'fcm_token' => $request->fcm_token ?? $user->fcm_token,
-                'timezone' => $request->timezone ?? $user->timezone,
-                'language' => $request->language ?? $user->language,
+                'timezone' => config('app.timezone'),
+                'language' => $request->language ?? $user->language ?? 'en',
                 'last_active_at' => now(),
             ]);
 
@@ -632,7 +634,7 @@ class AuthController extends Controller
             'device_id' => $request->device_id,
             'device_type' => $request->device_type,
             'fcm_token' => $request->fcm_token,
-            'timezone' => $request->timezone ?? 'UTC',
+            'timezone' => config('app.timezone'),
             'language' => $request->language ?? 'en',
             'last_active_at' => now(),
         ]);
@@ -713,7 +715,7 @@ class AuthController extends Controller
             'expires_at' => now()->addHours(1),
         ]);
 
-        Mail::to($user->email)->send(new OtpMail($otpCode, 'password_reset'));
+        Mail::to($user->email)->send(new OtpMail($otpCode, 'password_reset', $user->full_name));
 
         return response()->json([
             'success' => true,
@@ -1129,6 +1131,8 @@ class AuthController extends Controller
      */
     protected function formatUser(User $user): array
     {
+        $tz = config('app.timezone');
+
         return [
             'id' => $user->id,
             'role' => $user->role,
@@ -1139,14 +1143,14 @@ class AuthController extends Controller
             'is_verified' => $user->is_verified,
             'status' => $user->status,
             'two_factor_enabled' => $user->two_factor_enabled,
-            'timezone' => $user->timezone,
+            'timezone' => $tz,
             'language' => $user->language,
             'device_id' => $user->device_id,
             'device_type' => $user->device_type,
-            'email_verified_at' => $user->email_verified_at,
-            'last_active_at' => $user->last_active_at,
-            'created_at' => $user->created_at,
-            'updated_at' => $user->updated_at,
+            'email_verified_at' => $user->email_verified_at?->setTimezone($tz)->toIso8601String(),
+            'last_active_at' => $user->last_active_at?->setTimezone($tz)->toIso8601String(),
+            'created_at' => $user->created_at?->setTimezone($tz)->toIso8601String(),
+            'updated_at' => $user->updated_at?->setTimezone($tz)->toIso8601String(),
         ];
     }
 }

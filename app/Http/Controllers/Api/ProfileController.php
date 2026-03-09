@@ -69,10 +69,7 @@ class ProfileController extends Controller
             }
         }
 
-        // Update timezone and language if provided
-        if ($request->filled('timezone')) {
-            $updateData['timezone'] = $request->input('timezone');
-        }
+        // Timezone is locked to app timezone — ignore any user-provided value
 
         if ($request->filled('language')) {
             $updateData['language'] = $request->input('language');
@@ -137,9 +134,10 @@ class ProfileController extends Controller
      */
     protected function formatUser($user): array
     {
+        $tz = config('app.timezone');
+
         $profileUrl = null;
         if ($user->profile) {
-            // Generate full URL for profile image
             $profileUrl = asset('storage/'.$user->profile);
         }
 
@@ -154,14 +152,14 @@ class ProfileController extends Controller
             'is_verified' => $user->is_verified,
             'status' => $user->status,
             'two_factor_enabled' => $user->two_factor_enabled,
-            'timezone' => $user->timezone,
+            'timezone' => $tz,
             'language' => $user->language,
             'device_id' => $user->device_id,
             'device_type' => $user->device_type,
-            'email_verified_at' => $user->email_verified_at,
-            'last_active_at' => $user->last_active_at,
-            'created_at' => $user->created_at,
-            'updated_at' => $user->updated_at,
+            'email_verified_at' => $user->email_verified_at?->setTimezone($tz)->toIso8601String(),
+            'last_active_at' => $user->last_active_at?->setTimezone($tz)->toIso8601String(),
+            'created_at' => $user->created_at?->setTimezone($tz)->toIso8601String(),
+            'updated_at' => $user->updated_at?->setTimezone($tz)->toIso8601String(),
         ];
     }
 

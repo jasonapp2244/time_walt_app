@@ -13,7 +13,7 @@ return new class extends Migration
             $table->dropUnique(['payment_intent_id']);
             $table->dropIndex(['payment_intent_id']);
 
-            // Widen to TEXT so encrypted ciphertext fits
+            // Widen to TEXT so encrypted ciphertext (~360 chars) fits
             $table->text('payment_intent_id')->change();
 
             // Blind-index preserves the uniqueness guarantee on the searchable hash

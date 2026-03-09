@@ -17,7 +17,8 @@ class OtpMail extends Mailable
      */
     public function __construct(
         public string $otpCode,
-        public string $type = 'verification'
+        public string $type = 'verification',
+        public string $userName = ''
     ) {}
 
     /**
@@ -25,15 +26,18 @@ class OtpMail extends Mailable
      */
     public function envelope(): Envelope
     {
+        $appName = config('app.name');
+
         $subject = match ($this->type) {
-            'verification' => 'Verify Your Account - OTP Code',
-            'password_reset' => 'Reset Your Password - OTP Code',
-            'login' => 'Login Verification - OTP Code',
-            default => 'Your OTP Code',
+            'verification' => "Your {$appName} sign-up code",
+            'password_reset' => "Your {$appName} password reset code",
+            'login' => "Your {$appName} sign-in code",
+            default => "Your {$appName} security code",
         };
 
         return new Envelope(
             subject: $subject,
+            replyTo: [config('mail.from.address')],
         );
     }
 
@@ -47,6 +51,7 @@ class OtpMail extends Mailable
             with: [
                 'otpCode' => $this->otpCode,
                 'type' => $this->type,
+                'userName' => $this->userName,
             ],
         );
     }
