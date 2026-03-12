@@ -12,6 +12,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->alias([
+            'admin' => \App\Http\Middleware\AdminMiddleware::class,
+        ]);
+
         // Security middleware disabled for now - enable later when app is complete
         // Uncomment below when ready for production:
 
@@ -28,5 +32,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // $middleware->trustProxies(at: '*');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // Redirect any 404 (unknown URL) to the admin login page
+        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\NotFoundHttpException $e, \Illuminate\Http\Request $request) {
+            if (! $request->expectsJson()) {
+                return redirect()->route('admin.login');
+            }
+        });
     })->create();

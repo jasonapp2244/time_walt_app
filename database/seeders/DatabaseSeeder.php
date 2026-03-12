@@ -18,12 +18,16 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         // Create first test user for testing
+        // email_index and phone_index must be set explicitly because WithoutModelEvents
+        // disables the saving observer that normally auto-computes them.
         $user = User::create([
             'role' => 'user',
             'full_name' => 'Test User',
             'email' => 'test@example.com',
+            'email_index' => User::blindIndex('test@example.com'),
             'phone' => '1234567890',
-            'password' => Hash::make('Test@123'), // Strong password matching app requirements
+            'phone_index' => User::blindIndex('1234567890'),
+            'password' => Hash::make('Test@123'),
             'profile' => 'default.png',
             'is_verified' => true,
             'status' => 'active',
@@ -47,5 +51,8 @@ class DatabaseSeeder extends Seeder
 
         // Seed Privacy Policy
         $this->call(PrivacyPolicySeeder::class);
+
+        // Seed Admin user
+        $this->call(AdminSeeder::class);
     }
 }
