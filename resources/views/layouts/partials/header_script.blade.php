@@ -14,6 +14,11 @@
     <!-- Loader -->
     <link href="{{ asset('admin/css/pace.min.css') }}" rel="stylesheet" />
     <script src="{{ asset('admin/js/pace.min.js') }}"></script>
+    <style>
+        .pace .pace-progress { background: #bd7e2e !important; }
+        .pace .pace-progress-inner { box-shadow: 0 0 10px #bd7e2e, 0 0 5px #bd7e2e !important; }
+        .pace .pace-activity { border-top-color: #bd7e2e !important; border-left-color: #bd7e2e !important; }
+    </style>
 
     <!-- Bootstrap & App CSS -->
     <link href="{{ asset('admin/css/bootstrap.min.css') }}" rel="stylesheet">
