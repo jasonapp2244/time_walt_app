@@ -62,12 +62,12 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('/payment-holds/stats', [PaymentHoldController::class, 'stats'])->name('payment-holds.stats');
 
         // Payments
-        // Route::get('/payments', [PaymentController::class, 'index'])->name('payments.index');
-        // Route::get('/payments/stats', [PaymentController::class, 'stats'])->name('payments.stats');
+        Route::get('/payments', [PaymentController::class, 'index'])->name('payments.index');
+        Route::get('/payments/stats', [PaymentController::class, 'stats'])->name('payments.stats');
 
         // Transfers
-        // Route::get('/transfers', [TransferController::class, 'index'])->name('transfers.index');
-        // Route::get('/transfers/stats', [TransferController::class, 'stats'])->name('transfers.stats');
+        Route::get('/transfers', [TransferController::class, 'index'])->name('transfers.index');
+        Route::get('/transfers/stats', [TransferController::class, 'stats'])->name('transfers.stats');
         Route::post('/transfers/{hold}/execute', [TransferController::class, 'execute'])->name('transfers.execute');
 
         // Privacy Policy
