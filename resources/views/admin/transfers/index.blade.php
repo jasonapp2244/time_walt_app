@@ -11,9 +11,12 @@
                 <h4 class="section-heading">Transfers</h4>
                 <p class="section-sub">All Stripe transfers to user accounts</p>
             </div>
-            <div class="ms-auto">
+            <div class="ms-auto d-flex align-items-center gap-3">
+                <span id="transfers-refresh-alert" style="display:none; font-size:12px; color:#c87000; font-weight:600; cursor:pointer; background:rgba(255,152,0,0.1); border:1px solid rgba(255,152,0,0.3); border-radius:6px; padding:4px 10px;" onclick="window.location.reload()">
+                    <i class='bx bx-refresh me-1'></i>Status updated — click to reload
+                </span>
                 <div style="text-align:right;">
-                    <div style="font-size:20px; font-weight:700; color:#1e8c3a;">${{ number_format($totalTransferred, 2) }}</div>
+                    <div style="font-size:20px; font-weight:700; color:#1e8c3a;" data-stat="total_transferred">${{ number_format($totalTransferred, 2) }}</div>
                     <div style="font-size:11px; color:#374151; font-weight:600; text-transform:uppercase; letter-spacing:0.8px;">Total Transferred</div>
                 </div>
             </div>
@@ -32,7 +35,7 @@
                 <a href="{{ route('admin.transfers.index', ['status' => 'completed']) }}" style="text-decoration:none;">
                     <div class="stat-card">
                         <div class="stat-icon green mb-2"><i class='bx bxs-check-circle'></i></div>
-                        <div class="stat-value">{{ $statusCounts['completed'] }}</div>
+                        <div class="stat-value" data-stat="count_completed">{{ $statusCounts['completed'] }}</div>
                         <div class="stat-label">Completed</div>
                     </div>
                 </a>
@@ -41,7 +44,7 @@
                 <a href="{{ route('admin.transfers.index', ['status' => 'pending']) }}" style="text-decoration:none;">
                     <div class="stat-card">
                         <div class="stat-icon orange mb-2"><i class='bx bx-time'></i></div>
-                        <div class="stat-value">{{ $statusCounts['pending'] }}</div>
+                        <div class="stat-value" data-stat="count_pending">{{ $statusCounts['pending'] }}</div>
                         <div class="stat-label">Pending</div>
                     </div>
                 </a>
@@ -50,7 +53,7 @@
                 <a href="{{ route('admin.transfers.index', ['status' => 'failed']) }}" style="text-decoration:none;">
                     <div class="stat-card">
                         <div class="stat-icon red mb-2"><i class='bx bx-x-circle'></i></div>
-                        <div class="stat-value">{{ $statusCounts['failed'] }}</div>
+                        <div class="stat-value" data-stat="count_failed">{{ $statusCounts['failed'] }}</div>
                         <div class="stat-label">Failed</div>
                     </div>
                 </a>
@@ -159,3 +162,75 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    const POLL_INTERVAL = 1 * 60 * 1000; // 1 minute — testing (change back to 5 * 60 * 1000 in production)
+    const STATS_URL = '{{ route("admin.transfers.stats") }}';
+
+    function fmt(n) { return new Intl.NumberFormat('en-US').format(n); }
+    function fmtMoney(n) { return '$' + new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n); }
+
+    function flash(el, val) {
+        if (el && el.textContent.trim() !== val) {
+            el.style.transition = 'opacity 0.3s';
+            el.style.opacity = '0.3';
+            setTimeout(() => { el.textContent = val; el.style.opacity = '1'; }, 300);
+        }
+    }
+
+    const initialCounts = {
+        pending: {{ $statusCounts['pending'] }},
+        total:   {{ $statusCounts['pending'] + $statusCounts['completed'] + $statusCounts['failed'] }},
+    };
+    let reloading = false;
+
+    function autoReload(bannerId, message) {
+        if (reloading) { return; }
+        reloading = true;
+
+        const banner = document.getElementById(bannerId);
+        let secs = 5;
+
+        if (banner) {
+            banner.style.display = 'inline-flex';
+            banner.onclick = () => window.location.reload();
+            banner.innerHTML = `<i class='bx bx-refresh me-1'></i>${message} — reloading in <span id="tv-cd">${secs}</span>s`;
+        }
+
+        const timer = setInterval(() => {
+            secs--;
+            const cd = document.getElementById('tv-cd');
+            if (cd) { cd.textContent = secs; }
+            if (secs <= 0) { clearInterval(timer); window.location.reload(); }
+        }, 1000);
+    }
+
+    function pollStats() {
+        fetch(STATS_URL, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+            credentials: 'same-origin',
+        })
+        .then(r => { if (!r.ok) { throw new Error('HTTP ' + r.status); } return r.json(); })
+        .then(data => {
+            flash(document.querySelector('[data-stat="total_transferred"]'), fmtMoney(data.totalTransferred));
+            flash(document.querySelector('[data-stat="count_completed"]'),   fmt(data.statusCounts.completed));
+            flash(document.querySelector('[data-stat="count_pending"]'),     fmt(data.statusCounts.pending));
+            flash(document.querySelector('[data-stat="count_failed"]'),      fmt(data.statusCounts.failed));
+
+            const changed = data.statusCounts.pending !== initialCounts.pending
+                         || data.totalRecords         !== initialCounts.total;
+
+            if (changed) {
+                autoReload('transfers-refresh-alert', 'Transfer status updated');
+            }
+        })
+        .catch(err => console.warn('[Transfers] Poll failed:', err));
+    }
+
+    setTimeout(pollStats, 5000);           // first check after 5 seconds
+    setInterval(pollStats, POLL_INTERVAL); // then every minute
+})();
+</script>
+@endpush

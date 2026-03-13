@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -34,9 +35,27 @@ class UserController extends Controller
             }
         }
 
-        $users = $query->latest()->paginate(20)->withQueryString();
+        $users = $query->latest()->paginate(10)->withQueryString();
 
         return view('admin.users.index', compact('users'));
+    }
+
+    /**
+     * Return live user status breakdown as JSON for AJAX polling.
+     * Tracks total, verified, and per-status counts so any status
+     * change (e.g. pending → active after OTP verification) is detected.
+     */
+    public function stats(): JsonResponse
+    {
+        $base = User::where('role', 'user')->where('status', '!=', 'deleted');
+
+        return response()->json([
+            'total' => (clone $base)->count(),
+            'active' => (clone $base)->where('status', 'active')->count(),
+            'inactive' => (clone $base)->where('status', 'inactive')->count(),
+            'pending' => (clone $base)->where('status', 'pending')->count(),
+            'verified' => (clone $base)->where('is_verified', true)->count(),
+        ]);
     }
 
     /**
@@ -46,9 +65,8 @@ class UserController extends Controller
     {
         $user->load([
             'notificationSettings',
-            'paymentHolds.payment',
-            'paymentHolds.transfer',
-            'transfers.hold',
+            'paymentHolds' => fn ($q) => $q->with(['payment', 'transfer'])->latest(),
+            'transfers' => fn ($q) => $q->with('hold')->latest(),
         ]);
 
         $userAmounts = [

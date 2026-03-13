@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\PaymentHold;
 use App\Models\Transfer;
 use App\Services\StripeService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -24,17 +25,37 @@ class TransferController extends Controller
             $query->where('status', $request->status);
         }
 
-        $transfers = $query->latest()->paginate(20)->withQueryString();
+        $transfers = $query->latest()->paginate(10)->withQueryString();
 
+        ['statusCounts' => $statusCounts, 'totalTransferred' => $totalTransferred] = $this->buildSummary();
+
+        return view('admin.transfers.index', compact('transfers', 'statusCounts', 'totalTransferred'));
+    }
+
+    /**
+     * Return live transfer stats as JSON for AJAX polling.
+     */
+    public function stats(): JsonResponse
+    {
+        return response()->json($this->buildSummary());
+    }
+
+    /**
+     * @return array{statusCounts: array<string, int>, totalTransferred: float, totalRecords: int}
+     */
+    private function buildSummary(): array
+    {
         $statusCounts = [
             'pending' => Transfer::where('status', 'pending')->whereNull('abandoned_at')->count(),
             'completed' => Transfer::where('status', 'completed')->whereNull('abandoned_at')->count(),
             'failed' => Transfer::where('status', 'failed')->whereNull('abandoned_at')->count(),
         ];
 
-        $totalTransferred = Transfer::where('status', 'completed')->sum('amount');
-
-        return view('admin.transfers.index', compact('transfers', 'statusCounts', 'totalTransferred'));
+        return [
+            'statusCounts' => $statusCounts,
+            'totalTransferred' => (float) Transfer::where('status', 'completed')->sum('amount'),
+            'totalRecords' => array_sum($statusCounts),
+        ];
     }
 
     /**

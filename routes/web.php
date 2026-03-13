@@ -50,19 +50,24 @@ Route::prefix('admin')->name('admin.')->group(function () {
     // ─── Protected Admin Routes ───────────────────────────────────────────────
     Route::middleware('admin')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+        Route::get('/dashboard/stats', [DashboardController::class, 'stats'])->name('dashboard.stats');
 
         // Users
         Route::get('/users', [UserController::class, 'index'])->name('users.index');
+        Route::get('/users/stats', [UserController::class, 'stats'])->name('users.stats');
         Route::get('/users/{user}', [UserController::class, 'show'])->name('users.show');
 
         // Payment Holds
         Route::get('/payment-holds', [PaymentHoldController::class, 'index'])->name('payment-holds.index');
+        Route::get('/payment-holds/stats', [PaymentHoldController::class, 'stats'])->name('payment-holds.stats');
 
         // Payments
-        Route::get('/payments', [PaymentController::class, 'index'])->name('payments.index');
+        // Route::get('/payments', [PaymentController::class, 'index'])->name('payments.index');
+        // Route::get('/payments/stats', [PaymentController::class, 'stats'])->name('payments.stats');
 
         // Transfers
-        Route::get('/transfers', [TransferController::class, 'index'])->name('transfers.index');
+        // Route::get('/transfers', [TransferController::class, 'index'])->name('transfers.index');
+        // Route::get('/transfers/stats', [TransferController::class, 'stats'])->name('transfers.stats');
         Route::post('/transfers/{hold}/execute', [TransferController::class, 'execute'])->name('transfers.execute');
 
         // Privacy Policy

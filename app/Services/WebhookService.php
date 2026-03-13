@@ -84,9 +84,10 @@ class WebhookService
         if (isset($paymentIntent->metadata->hold_period_type)) {
             $holdPeriodData = [
                 'hold_period_type' => $paymentIntent->metadata->hold_period_type,
-                'hold_start_at' => $paymentIntent->metadata->hold_start_at ?? null,
-                'hold_end_at' => $paymentIntent->metadata->hold_end_at ?? null,
-                'hold_days' => $paymentIntent->metadata->hold_days ?? null,
+                'hold_start_at'    => $paymentIntent->metadata->hold_start_at ?? null,
+                'hold_end_at'      => $paymentIntent->metadata->hold_end_at ?? null,
+                'hold_days'        => $paymentIntent->metadata->hold_days ?? null,
+                'title'            => $paymentIntent->metadata->title ?? null,
             ];
         } else {
             // Try to get from cache (fallback if metadata not set)
@@ -94,9 +95,10 @@ class WebhookService
             if ($cachedHoldData) {
                 $holdPeriodData = [
                     'hold_period_type' => $cachedHoldData['hold_period_type'] ?? null,
-                    'hold_start_at' => $cachedHoldData['hold_start_at'] ?? null,
-                    'hold_end_at' => $cachedHoldData['hold_end_at'] ?? null,
-                    'hold_days' => $cachedHoldData['hold_days'] ?? null,
+                    'hold_start_at'    => $cachedHoldData['hold_start_at'] ?? null,
+                    'hold_end_at'      => $cachedHoldData['hold_end_at'] ?? null,
+                    'hold_days'        => $cachedHoldData['hold_days'] ?? null,
+                    'title'            => $cachedHoldData['title'] ?? null,
                 ];
             }
         }

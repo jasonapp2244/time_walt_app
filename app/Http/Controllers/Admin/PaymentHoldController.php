@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\PaymentHold;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -21,8 +22,32 @@ class PaymentHoldController extends Controller
             $query->where('status', $request->status);
         }
 
-        $holds = $query->latest()->paginate(20)->withQueryString();
+        $holds = $query->latest()->paginate(10)->withQueryString();
 
+        ['statusCounts' => $statusCounts, 'amountTotals' => $amountTotals] = $this->buildSummary();
+
+        return view('admin.payment-holds.index', compact('holds', 'statusCounts', 'amountTotals'));
+    }
+
+    /**
+     * Return live hold summary counts and amounts as JSON for AJAX polling.
+     */
+    public function stats(): JsonResponse
+    {
+        ['statusCounts' => $statusCounts, 'amountTotals' => $amountTotals, 'totalRecords' => $totalRecords] = $this->buildSummary();
+
+        return response()->json([
+            'status_counts' => $statusCounts,
+            'amount_totals' => $amountTotals,
+            'total_records' => $totalRecords,
+        ]);
+    }
+
+    /**
+     * @return array{statusCounts: array<string, int>, amountTotals: array<string, float>, totalRecords: int}
+     */
+    private function buildSummary(): array
+    {
         $statusCounts = [
             'holding' => PaymentHold::where('status', 'holding')->whereNull('abandoned_at')->count(),
             'ready_for_transfer' => PaymentHold::where('status', 'ready_for_transfer')->whereNull('abandoned_at')->count(),
@@ -31,11 +56,13 @@ class PaymentHoldController extends Controller
         ];
 
         $amountTotals = [
-            'holding' => PaymentHold::where('status', 'holding')->whereNull('abandoned_at')->sum('amount'),
-            'ready' => PaymentHold::where('status', 'ready_for_transfer')->whereNull('abandoned_at')->sum('amount'),
-            'withdrawn' => PaymentHold::whereIn('status', ['transferred', 'partial_transferred'])->whereNull('abandoned_at')->sum('amount'),
+            'holding' => (float) PaymentHold::where('status', 'holding')->whereNull('abandoned_at')->sum('amount'),
+            'ready' => (float) PaymentHold::where('status', 'ready_for_transfer')->whereNull('abandoned_at')->sum('amount'),
+            'withdrawn' => (float) PaymentHold::whereIn('status', ['transferred', 'partial_transferred'])->whereNull('abandoned_at')->sum('amount'),
         ];
 
-        return view('admin.payment-holds.index', compact('holds', 'statusCounts', 'amountTotals'));
+        $totalRecords = array_sum($statusCounts);
+
+        return compact('statusCounts', 'amountTotals', 'totalRecords');
     }
 }

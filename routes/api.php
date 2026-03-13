@@ -30,12 +30,15 @@ Route::get('/privacy-policy', [PrivacyPolicyController::class, 'active'])
     ->middleware('throttle:60,1');
 
 // Protected Routes (Require Authentication)
-// Rate limit: 60 requests per minute for authenticated users
-Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
+// Rate limit: 1000 requests per 1 minute per user
+Route::middleware(['auth:sanctum', 'throttle:1000,1'])->group(function () {
+    
     // Authentication
     Route::prefix('auth')->name('auth.')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
-        Route::post('/delete-account', [AuthController::class, 'deleteAccount'])->name('delete-account')->middleware('throttle:3,1');
+        Route::post('/delete-account', [AuthController::class, 'deleteAccount'])
+            ->name('delete-account')
+            ->middleware('throttle:5,60'); // 5 attempts per hour (sensitive)
     });
 
     // Profile Routes

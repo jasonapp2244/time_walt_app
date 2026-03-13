@@ -529,6 +529,7 @@ class StripeController extends Controller
                         'hold_start_at' => $paymentIntent->metadata->hold_start_at ?? null,
                         'hold_end_at' => $paymentIntent->metadata->hold_end_at ?? null,
                         'hold_days' => $paymentIntent->metadata->hold_days ?? null,
+                        'title' => $paymentIntent->metadata->title ?? null,
                     ];
 
                     $this->paymentHoldService->createFromPayment($payment, $holdPeriodData);

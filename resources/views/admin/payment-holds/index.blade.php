@@ -11,8 +11,11 @@
                 <h4 class="section-heading">Payment Holds</h4>
                 <p class="section-sub">All vaulted funds and their status</p>
             </div>
-            <div class="ms-auto">
-                <span style="font-size:13px; color:#92621a; font-weight:700;">{{ $holds->total() }} records</span>
+            <div class="ms-auto d-flex align-items-center gap-3">
+                <span id="holds-refresh-alert" style="display:none; font-size:12px; color:#c87000; font-weight:600; cursor:pointer; background:rgba(255,152,0,0.1); border:1px solid rgba(255,152,0,0.3); border-radius:6px; padding:4px 10px;" onclick="window.location.reload()">
+                    <i class='bx bx-refresh me-1'></i>New updates — click to reload
+                </span>
+                <span style="font-size:13px; color:#92621a; font-weight:700;" data-stat="total_records">{{ $holds->total() }} records</span>
             </div>
         </div>
 
@@ -24,7 +27,7 @@
                         <i class='bx bxs-lock-alt'></i>
                     </div>
                     <div>
-                        <div style="font-size:17px; font-weight:700; color:#c87000;">${{ number_format($amountTotals['holding'], 2) }}</div>
+                        <div style="font-size:17px; font-weight:700; color:#c87000;" data-stat="amount_holding">${{ number_format($amountTotals['holding'], 2) }}</div>
                         <div style="font-size:11px; color:#374151; font-weight:600; text-transform:uppercase; letter-spacing:0.6px;">Total Holding</div>
                     </div>
                 </div>
@@ -35,7 +38,7 @@
                         <i class='bx bxs-lock-open-alt'></i>
                     </div>
                     <div>
-                        <div style="font-size:17px; font-weight:700; color:#92621a;">${{ number_format($amountTotals['ready'], 2) }}</div>
+                        <div style="font-size:17px; font-weight:700; color:#92621a;" data-stat="amount_ready">${{ number_format($amountTotals['ready'], 2) }}</div>
                         <div style="font-size:11px; color:#374151; font-weight:600; text-transform:uppercase; letter-spacing:0.6px;">Total Ready</div>
                     </div>
                 </div>
@@ -46,7 +49,7 @@
                         <i class='bx bxs-send'></i>
                     </div>
                     <div>
-                        <div style="font-size:17px; font-weight:700; color:#1e8c3a;">${{ number_format($amountTotals['withdrawn'], 2) }}</div>
+                        <div style="font-size:17px; font-weight:700; color:#1e8c3a;" data-stat="amount_withdrawn">${{ number_format($amountTotals['withdrawn'], 2) }}</div>
                         <div style="font-size:11px; color:#374151; font-weight:600; text-transform:uppercase; letter-spacing:0.6px;">Total Withdrawn</div>
                     </div>
                 </div>
@@ -59,7 +62,7 @@
                 <a href="{{ route('admin.payment-holds.index', ['status' => 'holding']) }}" style="text-decoration:none;">
                     <div class="stat-card" style="{{ request('status') == 'holding' ? 'border-color:rgba(255,152,0,0.45);' : '' }}">
                         <div class="stat-icon orange mb-2"><i class='bx bxs-lock-alt'></i></div>
-                        <div class="stat-value">{{ $statusCounts['holding'] }}</div>
+                        <div class="stat-value" data-stat="count_holding">{{ $statusCounts['holding'] }}</div>
                         <div class="stat-label">Holding</div>
                     </div>
                 </a>
@@ -68,7 +71,7 @@
                 <a href="{{ route('admin.payment-holds.index', ['status' => 'ready_for_transfer']) }}" style="text-decoration:none;">
                     <div class="stat-card" style="{{ request('status') == 'ready_for_transfer' ? 'border-color:rgba(189,126,46,0.45);' : '' }}">
                         <div class="stat-icon cream mb-2"><i class='bx bxs-lock-open-alt'></i></div>
-                        <div class="stat-value">{{ $statusCounts['ready_for_transfer'] }}</div>
+                        <div class="stat-value" data-stat="count_ready">{{ $statusCounts['ready_for_transfer'] }}</div>
                         <div class="stat-label">Ready</div>
                     </div>
                 </a>
@@ -77,7 +80,7 @@
                 <a href="{{ route('admin.payment-holds.index', ['status' => 'transferred']) }}" style="text-decoration:none;">
                     <div class="stat-card" style="{{ request('status') == 'transferred' ? 'border-color:rgba(40,167,69,0.45);' : '' }}">
                         <div class="stat-icon green mb-2"><i class='bx bxs-check-circle'></i></div>
-                        <div class="stat-value">{{ $statusCounts['transferred'] }}</div>
+                        <div class="stat-value" data-stat="count_transferred">{{ $statusCounts['transferred'] }}</div>
                         <div class="stat-label">Transferred</div>
                     </div>
                 </a>
@@ -86,7 +89,7 @@
                 <a href="{{ route('admin.payment-holds.index', ['status' => 'partial_transferred']) }}" style="text-decoration:none;">
                     <div class="stat-card" style="{{ request('status') == 'partial_transferred' ? 'border-color:rgba(13,202,240,0.45);' : '' }}">
                         <div class="stat-icon blue mb-2"><i class='bx bx-transfer'></i></div>
-                        <div class="stat-value">{{ $statusCounts['partial_transferred'] }}</div>
+                        <div class="stat-value" data-stat="count_partial">{{ $statusCounts['partial_transferred'] }}</div>
                         <div class="stat-label">Partial</div>
                     </div>
                 </a>
@@ -192,3 +195,88 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    const POLL_INTERVAL = 1 * 60 * 1000; // 1 minute — testing (change back to 5 * 60 * 1000 in production)
+    const STATS_URL = '{{ route("admin.payment-holds.stats") }}';
+
+    function fmtMoney(n) {
+        return '$' + new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+    }
+
+    function fmt(n) {
+        return new Intl.NumberFormat('en-US').format(n);
+    }
+
+    function flash(el, newVal) {
+        if (el && el.textContent.trim() !== newVal) {
+            el.style.transition = 'opacity 0.3s';
+            el.style.opacity = '0.3';
+            setTimeout(() => { el.textContent = newVal; el.style.opacity = '1'; }, 300);
+        }
+    }
+
+    const initialCounts = {
+        holding: {{ $statusCounts['holding'] }},
+        ready:   {{ $statusCounts['ready_for_transfer'] }},
+        total:   {{ array_sum($statusCounts) }},
+    };
+    let reloading = false;
+
+    function autoReload(bannerId, message) {
+        if (reloading) { return; }
+        reloading = true;
+
+        const banner = document.getElementById(bannerId);
+        let secs = 5;
+
+        if (banner) {
+            banner.style.display = 'inline-flex';
+            banner.onclick = () => window.location.reload();
+            banner.innerHTML = `<i class='bx bx-refresh me-1'></i>${message} — reloading in <span id="tv-cd">${secs}</span>s`;
+        }
+
+        const timer = setInterval(() => {
+            secs--;
+            const cd = document.getElementById('tv-cd');
+            if (cd) { cd.textContent = secs; }
+            if (secs <= 0) { clearInterval(timer); window.location.reload(); }
+        }, 1000);
+    }
+
+    function pollStats() {
+        fetch(STATS_URL, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+            credentials: 'same-origin',
+        })
+        .then(r => { if (!r.ok) { throw new Error('HTTP ' + r.status); } return r.json(); })
+        .then(data => {
+            // Update amount banners and count cards in-place
+            flash(document.querySelector('[data-stat="amount_holding"]'),    fmtMoney(data.amount_totals.holding));
+            flash(document.querySelector('[data-stat="amount_ready"]'),      fmtMoney(data.amount_totals.ready));
+            flash(document.querySelector('[data-stat="amount_withdrawn"]'),  fmtMoney(data.amount_totals.withdrawn));
+            flash(document.querySelector('[data-stat="count_holding"]'),     fmt(data.status_counts.holding));
+            flash(document.querySelector('[data-stat="count_ready"]'),       fmt(data.status_counts.ready_for_transfer));
+            flash(document.querySelector('[data-stat="count_transferred"]'), fmt(data.status_counts.transferred));
+            flash(document.querySelector('[data-stat="count_partial"]'),     fmt(data.status_counts.partial_transferred));
+            flash(document.querySelector('[data-stat="total_records"]'),     fmt(data.total_records) + ' records');
+
+            // Auto-reload table when any record status changed
+            const changed = data.status_counts.holding            !== initialCounts.holding
+                         || data.status_counts.ready_for_transfer !== initialCounts.ready
+                         || data.total_records                    !== initialCounts.total;
+
+            if (changed) {
+                autoReload('holds-refresh-alert', 'Hold statuses updated');
+            }
+        })
+        .catch(err => console.warn('[PaymentHolds] Stats poll failed:', err));
+    }
+
+    setTimeout(pollStats, 5000);           // first check after 5 seconds
+    setInterval(pollStats, POLL_INTERVAL); // then every minute
+})();
+</script>
+@endpush

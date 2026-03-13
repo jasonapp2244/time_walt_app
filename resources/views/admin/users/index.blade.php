@@ -11,8 +11,12 @@
                 <h4 class="section-heading">Users</h4>
                 <p class="section-sub">All registered app users</p>
             </div>
-            <div class="ms-auto">
-                <span class="tv-badge badge-ready" style="font-size:13px; padding:5px 13px;">
+            <div class="ms-auto d-flex align-items-center gap-2">
+                <button id="users-refresh-btn" onclick="window.location.reload()"
+                    style="display:none; font-size:12px; color:#c87000; font-weight:600; cursor:pointer; background:rgba(255,152,0,0.1); border:1px solid rgba(255,152,0,0.3); border-radius:6px; padding:4px 10px;">
+                    <i class='bx bx-refresh me-1'></i>New users added — click to reload
+                </button>
+                <span class="tv-badge badge-ready" id="users-total-badge" style="font-size:13px; padding:5px 13px;">
                     {{ $users->total() }} Total Users
                 </span>
             </div>
@@ -124,3 +128,72 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    const POLL_INTERVAL = 1 * 60 * 1000; // 1 minute — testing (change back to 5 * 60 * 1000 in production)
+    const STATS_URL = '{{ route("admin.users.stats") }}';
+
+    // Snapshot on page load — tracks every dimension that can change
+    // without the total count changing (e.g. pending→active after OTP verify)
+    const snapshot = {
+        total:    {{ $users->total() }},
+        active:   {{ \App\Models\User::where('role','user')->where('status','active')->count() }},
+        inactive: {{ \App\Models\User::where('role','user')->where('status','inactive')->count() }},
+        pending:  {{ \App\Models\User::where('role','user')->where('status','pending')->count() }},
+        verified: {{ \App\Models\User::where('role','user')->where('is_verified',true)->count() }},
+    };
+    let reloading = false;
+
+    function autoReload(message) {
+        if (reloading) { return; }
+        reloading = true;
+
+        const banner = document.getElementById('users-refresh-btn');
+        let secs = 5;
+
+        if (banner) {
+            banner.style.display = 'inline-flex';
+            banner.onclick = () => window.location.reload();
+            banner.innerHTML = `<i class='bx bx-refresh me-1'></i>${message} — reloading in <span id="tv-cd">${secs}</span>s`;
+        }
+
+        const timer = setInterval(() => {
+            secs--;
+            const cd = document.getElementById('tv-cd');
+            if (cd) { cd.textContent = secs; }
+            if (secs <= 0) { clearInterval(timer); window.location.reload(); }
+        }, 1000);
+    }
+
+    function pollUsers() {
+        fetch(STATS_URL, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+            credentials: 'same-origin',
+        })
+        .then(r => { if (!r.ok) { throw new Error('HTTP ' + r.status); } return r.json(); })
+        .then(data => {
+            const changed = data.total    !== snapshot.total
+                         || data.active   !== snapshot.active
+                         || data.inactive !== snapshot.inactive
+                         || data.pending  !== snapshot.pending
+                         || data.verified !== snapshot.verified;
+
+            if (changed) {
+                // Pick a meaningful message based on what changed
+                let msg = 'User data updated';
+                if (data.verified !== snapshot.verified) { msg = 'User verified their account'; }
+                else if (data.active !== snapshot.active)  { msg = 'User status changed'; }
+                else if (data.total  !== snapshot.total)   { msg = 'New user registered'; }
+                autoReload(msg);
+            }
+        })
+        .catch(err => console.warn('[Users] Poll failed:', err));
+    }
+
+    setTimeout(pollUsers, 5000);           // first check after 5 seconds
+    setInterval(pollUsers, POLL_INTERVAL); // then every minute
+})();
+</script>
+@endpush
