@@ -41,7 +41,7 @@ Route::get('/stripe/reauth', function () {
     ]);
 })->name('stripe.reauth');
 
-// ─── Admin Auth ───────────────────────────────────────────────────────────────
+    // ─── Admin Auth ───────────────────────────────────────────────────────────────
 Route::prefix('admin')->name('admin.')->group(function () {
     Route::get('/login', [AdminLoginController::class, 'showLogin'])->name('login');
     Route::post('/login', [AdminLoginController::class, 'login'])->name('login.post');
@@ -69,7 +69,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('/transfers', [TransferController::class, 'index'])->name('transfers.index');
         Route::get('/transfers/stats', [TransferController::class, 'stats'])->name('transfers.stats');
         Route::post('/transfers/{hold}/execute', [TransferController::class, 'execute'])->name('transfers.execute');
-
+        
+        // 
         // Privacy Policy
         Route::get('/privacy-policy', [PrivacyPolicyController::class, 'index'])->name('privacy-policy.index');
         Route::post('/privacy-policy', [PrivacyPolicyController::class, 'store'])->name('privacy-policy.store');
