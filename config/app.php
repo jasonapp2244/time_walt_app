@@ -148,9 +148,9 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
-    'admin_email' => env('ADMIN_EMAIL', 'admin@timevault.com'),
-    'admin_password' => env('ADMIN_PASSWORD', 'Admin@123456'),
+    'admin_panel_email' => env('ADMIN_PANEL_EMAIL'),
+    'admin_panel_password' => env('ADMIN_PANEL_PASSWORD'),
 
-    'frontend_url' => env('FRONTEND_URL', 'http://localhost:3000'),
+    'frontend_url' => env('FRONTEND_URL', 'https://timevaultapp.devonlinetestserver.com'),
 
 ];

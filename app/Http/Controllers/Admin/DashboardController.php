@@ -61,7 +61,7 @@ class DashboardController extends Controller
                 ->where('status', '!=', 'deleted')
                 ->count(),
 
-            'total_revenue' => (float) Payment::where('status', 'completed')
+            'total_revenue' => (float) Payment::where('status', 'succeeded')
                 ->sum('amount'),
 
             'holds_holding' => PaymentHold::where('status', 'holding')
@@ -72,13 +72,13 @@ class DashboardController extends Controller
                 ->whereNull('abandoned_at')
                 ->sum('amount'),
 
-            'holds_ready' => PaymentHold::where('status', 'ready_for_transfer')
+            'holds_ready' => PaymentHold::whereIn('status', ['ready_for_transfer', 'partial_transferred'])
                 ->whereNull('abandoned_at')
                 ->count(),
 
-            'total_ready_amount' => (float) PaymentHold::where('status', 'ready_for_transfer')
+            'total_ready_amount' => (float) PaymentHold::whereIn('status', ['ready_for_transfer', 'partial_transferred'])
                 ->whereNull('abandoned_at')
-                ->sum('amount'),
+                ->sum('remaining_amount'),
 
             'holds_transferred' => PaymentHold::whereIn('status', ['transferred', 'partial_transferred'])
                 ->whereNull('abandoned_at')

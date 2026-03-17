@@ -44,7 +44,7 @@
                     </div>
                     <div class="stat-value" data-stat="total_revenue" data-format="money">${{ number_format($stats['total_revenue'], 2) }}</div>
                     <div class="stat-label">Total Revenue</div>
-                    <div class="stat-sub">Completed payments</div>
+                    <div class="stat-sub">Succeeded payments</div>
                 </div>
             </div>
 

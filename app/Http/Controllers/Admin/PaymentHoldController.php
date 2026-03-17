@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\PaymentHold;
+use App\Models\Transfer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -57,8 +58,8 @@ class PaymentHoldController extends Controller
 
         $amountTotals = [
             'holding' => (float) PaymentHold::where('status', 'holding')->whereNull('abandoned_at')->sum('amount'),
-            'ready' => (float) PaymentHold::where('status', 'ready_for_transfer')->whereNull('abandoned_at')->sum('amount'),
-            'withdrawn' => (float) PaymentHold::whereIn('status', ['transferred', 'partial_transferred'])->whereNull('abandoned_at')->sum('amount'),
+            'ready' => (float) PaymentHold::whereIn('status', ['ready_for_transfer', 'partial_transferred'])->whereNull('abandoned_at')->sum('remaining_amount'),
+            'withdrawn' => (float) Transfer::where('status', 'completed')->sum('amount'),
         ];
 
         $totalRecords = array_sum($statusCounts);

@@ -70,10 +70,10 @@ class UserController extends Controller
         ]);
 
         $userAmounts = [
-            'total_held' => $user->paymentHolds->sum('amount'),
+            'total_held' => $user->paymentHolds->where('status', 'holding')->sum('amount'),
             'total_ready' => $user->paymentHolds
-                ->where('status', 'ready_for_transfer')
-                ->sum('amount'),
+                ->whereIn('status', ['ready_for_transfer', 'partial_transferred'])
+                ->sum(fn ($hold) => (float) ($hold->remaining_amount ?? $hold->amount)),
             'total_withdrawn' => $user->transfers
                 ->where('status', 'completed')
                 ->sum('amount'),

@@ -13,7 +13,7 @@ class AdminSeeder extends Seeder
      */
     public function run(): void
     {
-        $adminEmail = config('app.admin_email', 'admin@timevault.com');
+        $adminEmail = config('app.admin_panel_email', 'admin@timevault.com');
 
         $emailIndex = User::blindIndex(strtolower($adminEmail));
 
@@ -30,7 +30,7 @@ class AdminSeeder extends Seeder
             'email_index' => $emailIndex,
             'phone' => '0000000000',
             'phone_index' => User::blindIndex('0000000000'),
-            'password' => Hash::make(config('app.admin_password', 'admin@timevault.com')),
+            'password' => Hash::make(config('app.admin_panel_password', 'admin@timevault.com')),
             'profile' => 'default.png',
             'is_verified' => true,
             'status' => 'active',
