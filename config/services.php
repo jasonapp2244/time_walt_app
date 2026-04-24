@@ -37,6 +37,7 @@ return [
 
     'stripe' => [
         'key' => env('STRIPE_KEY'),
+        'publishable_key' => env('STRIPE_PUBLISHABLE_KEY'),
         'secret' => env('STRIPE_SECRET'),
         'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
         'auto_transfer_enabled' => env('STRIPE_AUTO_TRANSFER', false),
@@ -57,6 +58,9 @@ return [
         // Frontend URLs (set in .env file)
         'payment_success_url' => env('STRIPE_PAYMENT_SUCCESS_URL', 'https://time-vault.devonlinetestserver.com/payment/success'),
         'payment_failed_url' => env('STRIPE_PAYMENT_FAILED_URL', 'https://time-vault.devonlinetestserver.com/payment/failed'),
+
+        // Platform URL for Stripe Custom Connect business_profile (must be https, not localhost)
+        'platform_url' => env('STRIPE_PLATFORM_URL', 'https://timevault.app'),
     ],
 
 ];

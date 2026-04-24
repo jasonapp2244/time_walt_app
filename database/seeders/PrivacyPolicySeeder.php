@@ -31,7 +31,7 @@ class PrivacyPolicySeeder extends Seeder
         return 'Last Updated: '.now()->format('F d, Y')."
 
 1. Introduction
-Welcome to Time Walt App. We respect your privacy and are committed to protecting your personal data. This privacy policy will inform you about how we handle your personal data when you use our mobile application.
+Welcome to Time Vault App. We respect your privacy and are committed to protecting your personal data. This privacy policy will inform you about how we handle your personal data when you use our mobile application.
 
 2. Information We Collect
 We collect and process the following information:
@@ -113,6 +113,6 @@ Our app integrates with third-party services:
 - Firebase Cloud Messaging for notifications
 - Social media platforms for authentication (Google, Apple, Facebook)
 
-By using Time Walt App, you acknowledge that you have read and understood this privacy policy.";
+By using Time Vault App, you acknowledge that you have read and understood this privacy policy.";
     }
 }

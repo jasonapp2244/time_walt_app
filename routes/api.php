@@ -3,9 +3,11 @@
 use App\Http\Controllers\Api\Admin\TransferController;
 use App\Http\Controllers\Api\AppConfigController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BankAccountController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PrivacyPolicyController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\PaymentSheetController;
 use App\Http\Controllers\Api\StripeController;
 use App\Http\Controllers\Api\TransactionHistoryController;
 use Illuminate\Support\Facades\Route;
@@ -60,12 +62,18 @@ Route::middleware(['auth:sanctum', 'throttle:1000,1'])->group(function () {
     // App Config Routes
     Route::get('/refer-friend-url', [AppConfigController::class, 'getReferFriendUrl'])->name('refer-friend-url');
 
-    // Stripe Connect Routes
+    // Stripe Payment Sheet Routes
     Route::prefix('stripe')->name('stripe.')->group(function () {
-        Route::post('/connect/create', [StripeController::class, 'createConnectAccount'])->name('connect.create');
-        Route::post('/connect/onboarding-link', [StripeController::class, 'getOnboardingLink'])->name('connect.onboarding-link');
-        Route::post('/payment-intent', [StripeController::class, 'createPaymentIntent'])->name('payment-intent');
-        Route::post('/verify-payment', [StripeController::class, 'verifyPayment'])->name('verify-payment');
+        Route::post('/create-payment-intent', [PaymentSheetController::class, 'createPaymentIntent'])->name('create-payment-intent');
+        Route::post('/confirm-payment', [PaymentSheetController::class, 'confirmPayment'])->name('confirm-payment');
+    });
+
+    // Bank Account Routes
+    Route::prefix('bank-account')->name('bank-account.')->group(function () {
+        Route::post('/', [BankAccountController::class, 'store'])->name('store');
+        Route::get('/', [BankAccountController::class, 'show'])->name('show');
+        Route::delete('/{id}', [BankAccountController::class, 'destroy'])->name('destroy');
+        Route::post('/{id}/set-primary', [BankAccountController::class, 'setPrimary'])->name('set-primary');
     });
 
     // Payment Holds Routes (User)
@@ -90,16 +98,6 @@ Route::middleware(['auth:sanctum', 'throttle:1000,1'])->group(function () {
         Route::post('/transfer/{hold_id}', [TransferController::class, 'transfer'])->name('transfer');
     });
 });
-
-// Stripe Connect OAuth Callback (NO AUTH - Stripe redirects here)
-Route::get('/stripe/connect/return', [StripeController::class, 'handleConnectCallback'])
-    ->name('stripe.connect.return')
-    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
-
-// Payment Intent Return URLs (NO AUTH - Stripe redirects here after payment)
-Route::get('/stripe/payment/return', [StripeController::class, 'handlePaymentReturn'])
-    ->name('stripe.payment.return')
-    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
 
 // Webhook Route (NO AUTH - Stripe calls this)
 Route::post('/stripe/webhook', [StripeController::class, 'handleWebhook'])

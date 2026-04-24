@@ -261,6 +261,7 @@
         .badge-failed       { background: rgba(220,53,69,0.11);   color: #c82333; border: 1px solid rgba(220,53,69,0.22); }
         .badge-pending      { background: rgba(108,117,125,0.11); color: #495057; border: 1px solid rgba(108,117,125,0.22); }
         .badge-completed    { background: rgba(40,167,69,0.11);   color: #1e9c42; border: 1px solid rgba(40,167,69,0.22); }
+        .badge-succeeded    { background: rgba(40,167,69,0.11);   color: #1e9c42; border: 1px solid rgba(40,167,69,0.22); }
         .badge-active       { background: rgba(40,167,69,0.11);   color: #1e9c42; border: 1px solid rgba(40,167,69,0.22); }
         .badge-deleted      { background: rgba(220,53,69,0.11);   color: #c82333; border: 1px solid rgba(220,53,69,0.22); }
         .badge-inactive     { background: rgba(108,117,125,0.11); color: #495057; border: 1px solid rgba(108,117,125,0.22); }

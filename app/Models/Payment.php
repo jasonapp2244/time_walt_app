@@ -21,6 +21,13 @@ class Payment extends Model
         'paid_at',
         'stripe_data',
         'failure_reason',
+        'card_brand',
+        'card_last4',
+        'card_exp_month',
+        'card_exp_year',
+        'card_funding',
+        'card_country',
+        'payment_method_type',
     ];
 
     protected $hidden = [
@@ -35,6 +42,8 @@ class Payment extends Model
             'paid_at' => 'datetime',
             'stripe_data' => 'encrypted:array',
             'payment_intent_id' => 'encrypted',
+            'card_exp_month' => 'integer',
+            'card_exp_year' => 'integer',
         ];
     }
 

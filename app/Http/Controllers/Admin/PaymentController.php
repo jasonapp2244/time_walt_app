@@ -42,14 +42,14 @@ class PaymentController extends Controller
     private function buildSummary(): array
     {
         $statusCounts = [
-            'completed' => Payment::where('status', 'completed')->count(),
+            'completed' => Payment::where('status', 'succeeded')->count(),
             'pending' => Payment::where('status', 'pending')->count(),
-            'failed' => Payment::where('status', 'failed')->count(),
+            'failed' => Payment::whereIn('status', ['failed', 'canceled'])->count(),
         ];
 
         return [
             'statusCounts' => $statusCounts,
-            'totalRevenue' => (float) Payment::where('status', 'completed')->sum('amount'),
+            'totalRevenue' => (float) Payment::where('status', 'succeeded')->sum('amount'),
             'totalRecords' => array_sum($statusCounts),
         ];
     }

@@ -22,7 +22,7 @@ class WithdrawPayoutRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'amount' => ['required', 'numeric', 'min:1'],
+            'amount' => ['required', 'numeric', 'min:0.50', 'max:999999.99'],
         ];
     }
 
@@ -36,7 +36,8 @@ class WithdrawPayoutRequest extends FormRequest
         return [
             'amount.required' => 'Withdrawal amount is required.',
             'amount.numeric' => 'Amount must be a valid number.',
-            'amount.min' => 'Minimum withdrawal amount is $1.00.',
+            'amount.min' => 'Minimum withdrawal amount is $0.50.',
+            'amount.max' => 'Maximum withdrawal amount is $999,999.99.',
         ];
     }
 }

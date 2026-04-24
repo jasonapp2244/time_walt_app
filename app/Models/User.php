@@ -145,4 +145,28 @@ class User extends Authenticatable
     {
         return $this->hasMany(Transfer::class);
     }
+
+    /**
+     * Get the Stripe customer for the user.
+     */
+    public function stripeCustomer()
+    {
+        return $this->hasOne(StripeCustomer::class);
+    }
+
+    /**
+     * Get all bank accounts for the user.
+     */
+    public function bankAccounts()
+    {
+        return $this->hasMany(UserBankAccount::class);
+    }
+
+    /**
+     * Get the primary bank account for the user.
+     */
+    public function primaryBankAccount()
+    {
+        return $this->hasOne(UserBankAccount::class)->where('is_primary', true);
+    }
 }

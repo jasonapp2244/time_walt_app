@@ -93,13 +93,13 @@ class DashboardController extends Controller
                 ->whereDate('created_at', today())
                 ->count(),
 
-            'total_holds_count' => PaymentHold::whereIn('status', ['holding', 'ready_for_transfer'])
+            'total_holds_count' => PaymentHold::whereIn('status', ['holding', 'ready_for_transfer', 'partial_transferred'])
                 ->whereNull('abandoned_at')
                 ->count(),
 
-            'total_holds_amount' => (float) PaymentHold::whereIn('status', ['holding', 'ready_for_transfer'])
+            'total_holds_amount' => (float) PaymentHold::whereIn('status', ['holding', 'ready_for_transfer', 'partial_transferred'])
                 ->whereNull('abandoned_at')
-                ->sum('amount'),
+                ->sum('remaining_amount'),
         ];
     }
 }

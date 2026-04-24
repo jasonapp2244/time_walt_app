@@ -173,6 +173,128 @@
                     </div>
                 </div>
 
+                <div class="card mb-3">
+                    <div class="card-header py-3 px-4">
+                        <h6 class="mb-0" style="color:#111827; font-weight:700;">
+                            <i class='bx bxs-bank me-2' style="color:var(--tv-gold);"></i>
+                            Bank Accounts ({{ $bankAccounts->count() }})
+                        </h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Bank Name</th>
+                                        <th>Account</th>
+                                        <th>Type</th>
+                                        <th>Country</th>
+                                        <th>Status</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse($bankAccounts as $bank)
+                                    <tr>
+                                        <td style="color:#1f2937; font-size:13px; font-weight:600;">{{ $bank->bank_name }}</td>
+                                        <td style="color:#374151; font-size:13px; font-weight:600; font-family:monospace;">{{ $bank->masked_account_number }}</td>
+                                        <td style="color:#374151; font-size:12px; font-weight:500;">{{ ucfirst($bank->account_type) }}</td>
+                                        <td style="color:#374151; font-size:12px; font-weight:500;">{{ strtoupper($bank->country) }} ({{ strtoupper($bank->currency) }})</td>
+                                        <td>
+                                            @if($bank->is_primary)
+                                                <span class="tv-badge badge-completed">Primary</span>
+                                            @else
+                                                <span class="tv-badge badge-holding" style="opacity:0.7;">Secondary</span>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            <button type="button" class="btn btn-sm"
+                                                style="background:rgba(189,126,46,0.1); color:#92621a; font-weight:600; font-size:11px; border:1px solid rgba(189,126,46,0.25); border-radius:6px; padding:4px 12px;"
+                                                data-bs-toggle="modal" data-bs-target="#bankModal{{ $bank->id }}">
+                                                <i class='bx bx-show me-1'></i>View
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    @empty
+                                    <tr>
+                                        <td colspan="6" class="text-center py-3" style="color:#6b7280;">No bank accounts</td>
+                                    </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Bank Account Detail Modals --}}
+                @foreach($bankAccounts as $bank)
+                <div class="modal fade" id="bankModal{{ $bank->id }}" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content" style="border:1px solid rgba(189,126,46,0.2); border-radius:12px; overflow:hidden;">
+                            <div class="modal-header" style="background:rgba(189,126,46,0.06); border-bottom:1px solid rgba(189,126,46,0.12); padding:16px 20px;">
+                                <h6 class="modal-title" style="font-weight:700; color:#111827;">
+                                    <i class='bx bxs-bank me-2' style="color:#92621a;"></i>{{ $bank->bank_name }}
+                                    @if($bank->is_primary)
+                                        <span class="tv-badge badge-completed ms-2" style="font-size:10px;">Primary</span>
+                                    @endif
+                                </h6>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body" style="padding:0;">
+                                <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 20px; border-bottom:1px solid rgba(0,0,0,0.05);">
+                                    <span style="font-size:11px; color:#374151; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Account Holder</span>
+                                    <span style="font-size:13px; color:#111827; font-weight:600;">{{ $bank->account_holder_name }}</span>
+                                </div>
+                                <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 20px; border-bottom:1px solid rgba(0,0,0,0.05);">
+                                    <span style="font-size:11px; color:#374151; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Account Number</span>
+                                    <span style="font-size:14px; color:#111827; font-weight:700; font-family:monospace; letter-spacing:1px;">{{ $bank->masked_account_number }}</span>
+                                </div>
+                                <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 20px; border-bottom:1px solid rgba(0,0,0,0.05);">
+                                    <span style="font-size:11px; color:#374151; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Bank Name</span>
+                                    <span style="font-size:13px; color:#111827; font-weight:600;">{{ $bank->bank_name }}</span>
+                                </div>
+                                <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 20px; border-bottom:1px solid rgba(0,0,0,0.05);">
+                                    <span style="font-size:11px; color:#374151; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Account Type</span>
+                                    <span style="font-size:13px; color:#111827; font-weight:600;">{{ ucfirst($bank->account_type) }}</span>
+                                </div>
+                                <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 20px; border-bottom:1px solid rgba(0,0,0,0.05);">
+                                    <span style="font-size:11px; color:#374151; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Country</span>
+                                    <span style="font-size:13px; color:#111827; font-weight:600;">{{ strtoupper($bank->country) }}</span>
+                                </div>
+                                <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 20px; border-bottom:1px solid rgba(0,0,0,0.05);">
+                                    <span style="font-size:11px; color:#374151; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Currency</span>
+                                    <span style="font-size:13px; color:#111827; font-weight:600;">{{ strtoupper($bank->currency) }}</span>
+                                </div>
+                                @if($bank->iban)
+                                <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 20px; border-bottom:1px solid rgba(0,0,0,0.05);">
+                                    <span style="font-size:11px; color:#374151; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">IBAN</span>
+                                    <span style="font-size:13px; color:#111827; font-weight:600;">{{ $bank->iban }}</span>
+                                </div>
+                                @endif
+                                @if($bank->swift_code)
+                                <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 20px; border-bottom:1px solid rgba(0,0,0,0.05);">
+                                    <span style="font-size:11px; color:#374151; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">SWIFT Code</span>
+                                    <span style="font-size:13px; color:#111827; font-weight:600;">{{ $bank->swift_code }}</span>
+                                </div>
+                                @endif
+                                <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 20px; border-bottom:1px solid rgba(0,0,0,0.05);">
+                                    <span style="font-size:11px; color:#374151; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Status</span>
+                                    @if($bank->is_primary)
+                                        <span class="tv-badge badge-completed">Primary</span>
+                                    @else
+                                        <span class="tv-badge badge-holding">Secondary</span>
+                                    @endif
+                                </div>
+                                <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 20px;">
+                                    <span style="font-size:11px; color:#374151; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Added On</span>
+                                    <span style="font-size:13px; color:#111827; font-weight:600;">{{ $bank->created_at->format('d M Y H:i') }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                @endforeach
+
                 <div class="card">
                     <div class="card-header py-3 px-4">
                         <h6 class="mb-0" style="color:#111827; font-weight:700;">

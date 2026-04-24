@@ -69,6 +69,11 @@ class UserController extends Controller
             'transfers' => fn ($q) => $q->with('hold')->latest(),
         ]);
 
+        $bankAccounts = \App\Models\UserBankAccount::where('user_id', $user->id)
+            ->orderByDesc('is_primary')
+            ->orderByDesc('created_at')
+            ->get();
+
         $userAmounts = [
             'total_held' => $user->paymentHolds->where('status', 'holding')->sum('amount'),
             'total_ready' => $user->paymentHolds
@@ -79,6 +84,6 @@ class UserController extends Controller
                 ->sum('amount'),
         ];
 
-        return view('admin.users.show', compact('user', 'userAmounts'));
+        return view('admin.users.show', compact('user', 'userAmounts', 'bankAccounts'));
     }
 }

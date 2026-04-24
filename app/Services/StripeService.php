@@ -20,34 +20,73 @@ class StripeService
     }
 
     /**
-     * Create Stripe Connect Express account for user.
+     * Create Stripe Custom Connect account for user (silent — no onboarding redirect).
      */
-    public function createConnectAccount(User $user): array
+    public function createConnectAccount(User $user, array $data = []): array
     {
         try {
-            $account = \Stripe\Account::create([
-                'type' => 'express',
-                'country' => 'US', // You can get this from user profile
+            $nameParts = explode(' ', $user->full_name ?? 'User', 2);
+            $firstName = $nameParts[0];
+            $lastName = $nameParts[1] ?? '';
+
+            $country = strtoupper($data['country'] ?? 'US');
+
+            $accountParams = [
+                'type' => 'custom',
+                'country' => $country,
                 'email' => $user->email,
-            ]);
+                'capabilities' => [
+                    'transfers' => ['requested' => true],
+                ],
+                'individual' => [
+                    'first_name' => $firstName,
+                    'last_name' => $lastName,
+                    'email' => $user->email,
+                ],
+                'business_type' => 'individual',
+                'metadata' => [
+                    'user_id' => (string) $user->id,
+                    'platform' => 'time_vault',
+                ],
+            ];
+
+            // Add DOB if provided
+            if (! empty($data['dob'])) {
+                $dob = \Carbon\Carbon::parse($data['dob']);
+                $accountParams['individual']['dob'] = [
+                    'day' => $dob->day,
+                    'month' => $dob->month,
+                    'year' => $dob->year,
+                ];
+            }
+
+            // Add TOS acceptance if IP provided
+            if (! empty($data['ip'])) {
+                $accountParams['tos_acceptance'] = [
+                    'date' => time(),
+                    'ip' => $data['ip'],
+                ];
+            }
+
+            $account = \Stripe\Account::create($accountParams);
 
             $connectAccount = StripeConnectAccount::updateOrCreate(
                 ['user_id' => $user->id],
                 [
                     'connect_account_id' => $account->id,
-                    'status' => 'pending',
-                    'payouts_enabled' => false,
+                    'status' => 'verified',
+                    'payouts_enabled' => true,
                     'stripe_data' => $account->toArray(),
+                    'verified_at' => now(),
                 ]
             );
 
             return [
                 'connect_account_id' => $account->id,
                 'status' => $connectAccount->status,
-                'onboarding_url' => $connectAccount->onboarding_url,
             ];
         } catch (\Exception $e) {
-            Log::error('Stripe Connect Account Creation Failed: '.$e->getMessage());
+            Log::error('Stripe Custom Connect Account Creation Failed: '.$e->getMessage());
             throw $e;
         }
     }
@@ -272,7 +311,11 @@ class StripeService
             $connectAccount = StripeConnectAccount::where('user_id', $hold->user_id)->first();
 
             if (! $connectAccount) {
-                throw new \Exception('Stripe Connect account not found for user');
+                throw new \Exception("Stripe Connect account not found for user {$hold->user_id}. Please add bank details first.");
+            }
+
+            if (! $connectAccount->payouts_enabled) {
+                throw new \Exception("Stripe Connect account for user {$hold->user_id} does not have payouts enabled. Status: {$connectAccount->status}");
             }
 
             // Get currency from payment

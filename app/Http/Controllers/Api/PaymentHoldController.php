@@ -445,13 +445,14 @@ class PaymentHoldController extends Controller
             if (! $connectAccount) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Stripe Connect account not found. Please complete account setup.',
+                    'message' => 'No bank account found. Please add your bank details first.',
                 ], 400);
             }
 
             DB::beginTransaction();
 
             try {
+                \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
                 $remainingAmount = $requestedAmount;
                 $processedHolds = [];
 
@@ -485,8 +486,6 @@ class PaymentHoldController extends Controller
                     $currency = strtolower($payment->currency);
 
                     // Create Stripe transfer for this amount
-                    \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
-
                     $transfer = \Stripe\Transfer::create([
                         'amount' => (int) ($amountFromThisHold * 100),
                         'currency' => $currency,

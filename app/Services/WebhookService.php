@@ -28,6 +28,12 @@ class WebhookService
     {
         \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
 
+        if (! isset($eventData['data']['object'])) {
+            Log::warning('Invalid webhook event structure: missing data.object', $eventData);
+
+            return;
+        }
+
         $session = $eventData['data']['object'];
         $sessionId = $session['id'] ?? null;
         $paymentIntentId = $session['payment_intent'] ?? null;

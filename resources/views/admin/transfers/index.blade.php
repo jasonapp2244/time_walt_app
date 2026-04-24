@@ -88,7 +88,6 @@
                                 <th>Status</th>
                                 <th>Failure Reason</th>
                                 <th>Date</th>
-                                <th style="text-align:center;">Action</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -123,23 +122,10 @@
                                 <td style="color:#4b5563; font-size:12px; font-weight:500;">
                                     {{ $transfer->transferred_at?->format('d M Y H:i') ?? $transfer->created_at->format('d M Y') }}
                                 </td>
-                                <td style="text-align:center;">
-                                    @if($transfer->hold && in_array($transfer->hold->status, ['ready_for_transfer', 'partial_transferred']))
-                                        <form method="POST" action="{{ route('admin.transfers.execute', $transfer->hold_id) }}"
-                                              onsubmit="return confirm('Execute manual transfer for this hold?')">
-                                            @csrf
-                                            <button type="submit" class="btn-tv-outline" style="font-size:11px; padding:3px 9px;">
-                                                <i class='bx bxs-send me-1'></i>Transfer
-                                            </button>
-                                        </form>
-                                    @else
-                                        <span style="color:#9ca3af; font-size:11px;">—</span>
-                                    @endif
-                                </td>
                             </tr>
                             @empty
                             <tr>
-                                <td colspan="9" class="text-center py-5" style="color:#6b7280;">
+                                <td colspan="8" class="text-center py-5" style="color:#6b7280;">
                                     <i class='bx bx-send d-block mb-2' style="font-size:28px; color:#d4963e;"></i>
                                     No transfers found
                                 </td>
