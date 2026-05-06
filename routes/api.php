@@ -101,6 +101,11 @@ Route::middleware(['auth:sanctum', 'throttle:1000,1'])->group(function () {
 
 // Serve storage files directly (fixes 403 Forbidden on symlink)
 Route::get('/storage/{path}', function (string $path) {
+    // Prevent path traversal attacks
+    if (str_contains($path, '..')) {
+        return response()->json(['message' => 'Invalid path.'], 400);
+    }
+
     $fullPath = storage_path('app/public/' . $path);
 
     if (! file_exists($fullPath)) {
