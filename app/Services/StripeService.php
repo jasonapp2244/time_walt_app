@@ -330,7 +330,7 @@ class StripeService
 
             // Create transfer in Stripe (real API call - no simulation)
             $transfer = \Stripe\Transfer::create([
-                'amount' => (int) ($transferAmount * 100), // Convert to cents
+                'amount' => (int) round($transferAmount * 100), // Convert to cents
                 'currency' => $currency,
                 'destination' => $connectAccount->connect_account_id,
                 'description' => "Transfer for hold #{$hold->id}",

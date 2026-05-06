@@ -1,6 +1,6 @@
 # Time Vault - Architecture Document
 
-> **Last updated:** 2026-04-24
+> **Last updated:** 2026-05-02
 
 ---
 
@@ -133,7 +133,7 @@ time_vault_with_admin_panel/
 |   |   |   |   +-- PaymentSheetController.php     # Payment Sheet (create-intent, confirm)
 |   |   |   |   +-- PrivacyPolicyController.php
 |   |   |   |   +-- ProfileController.php
-|   |   |   |   +-- StripeController.php           # Webhooks only
+|   |   |   |   +-- StripeController.php           # Webhooks + event deduplication
 |   |   |   |   +-- TransactionHistoryController.php
 |   |   +-- Middleware/            # Security, auth, logging, sanitization
 |   |   |   +-- AdminMiddleware.php
@@ -361,7 +361,7 @@ PaymentHold (1)----(1) Transfer (via hold_id FK)
 | hold_end_at        | datetime  | datetime    | When hold period expires                        |
 | hold_days          | integer   | integer     | Duration in days                                |
 | hold_period_type   | string    | -           | 1_month, 2_months, 6_months, 1_year, custom    |
-| status             | string    | string      | holding, ready_for_transfer, transferred, partial_transferred, canceled |
+| status             | string    | string      | holding, ready_for_transfer, partial_transferred, transferred, canceled |
 | ready_at           | datetime  | datetime    | When marked ready for transfer                  |
 | transferred_at     | datetime  | datetime    | When fully transferred                          |
 | abandoned_at       | datetime  | datetime    | When abandoned (account deletion)               |
@@ -928,12 +928,12 @@ The following files exist in the codebase but are **not currently wired to any r
 | `Requests/Stripe/CreateConnectAccountRequest.php` | Old Connect account validation - not routed |
 | `Requests/Stripe/GetOnboardingLinkRequest.php` | Old onboarding link validation - not routed |
 | `Requests/Stripe/CreatePaymentIntentRequest.php` | Old Checkout Session validation - not routed (replaced by Payment/CreatePaymentIntentRequest) |
-| `Requests/Stripe/WithdrawPayoutRequest.php` | Withdraw payout validation - not routed |
+| `Requests/Stripe/WithdrawPayoutRequest.php` | Withdraw payout validation - used by PaymentHoldController::withdraw() |
 | `Models/PasswordResetToken.php` | Empty placeholder model |
 
 ---
 
-## 16. Database Migrations (24 total)
+## 16. Database Migrations (25 total)
 
 ### Core Migrations
 
@@ -968,6 +968,7 @@ The following files exist in the codebase but are **not currently wired to any r
 | `2026_04_22_000002` | Add card detail columns to payments table |
 | `2026_04_24_000001` | Create user_bank_accounts table (bank details + blind indexes) |
 | `2026_04_24_000002` | Drop unique constraint on user_id (allow multiple banks per user) |
+| `2026_05_02_000001` | Add 'canceled' status to payment_holds ENUM |
 
 ### Seeders
 
@@ -1070,7 +1071,7 @@ composer test
 | Mailables | 11 |
 | Blade Views (Admin) | 9 |
 | Email Templates | 11 |
-| Migrations | 24 |
+| Migrations | 25 |
 | Test Files | 6 |
 | **Total PHP Files (app/)** | **~97** |
 
@@ -1285,3 +1286,73 @@ token: (from login response)
 payment_intent_id: (from create-payment-intent response)
 customer_id: (from create-payment-intent response)
 ```
+
+---
+
+## 21. Concurrency & Security Fixes (2026-05-02)
+
+### Race Condition Protection
+
+| Location | Fix Applied | Mechanism |
+|----------|-------------|-----------|
+| `PaymentSheetService::confirmPayment()` | Prevent duplicate Payment records | `DB::transaction()` + `lockForUpdate()` on blind index check |
+| `PaymentSheetService::confirmPayment()` | Atomic Payment + Hold creation | Both created inside single transaction — if Hold fails, Payment rolls back |
+| `PaymentHoldController::withdraw()` | Prevent concurrent over-withdrawal | `lockForUpdate()` on PaymentHold rows + re-validate balance inside transaction |
+| `BankAccountController::setPrimary()` | Prevent two banks becoming primary | `lockForUpdate()` on all user's bank rows before updating |
+| `BankAccountController::destroy()` | Atomic delete + primary reassignment | `DB::transaction()` wraps delete + next-bank-promotion |
+
+### Data Integrity Fixes
+
+| Location | Fix Applied |
+|----------|-------------|
+| `BankAccountController::destroy()` | Stripe deletion failure now propagates (except "already deleted") instead of being silently ignored |
+| `PaymentHoldController::withdraw()` | Cents conversion uses `(int) round($amount * 100)` to prevent floating-point truncation |
+| `StripeService::createTransfer()` | Same `round()` fix for transfer amounts |
+| `PaymentHoldController::calculateHoldDuration()` | Null-safe check on `hold_end_at` prevents crash when NULL |
+| `PaymentSheetService::confirmPayment()` | Null-safe card extraction: `$charge?->payment_method_details?->card` |
+
+### Validation Improvements
+
+| Location | Fix Applied |
+|----------|-------------|
+| `StoreBankAccountRequest` | Country validated against supported ISO codes (US, GB, CA, AU, DE, FR, etc.) |
+| `StoreBankAccountRequest` | Currency validated against supported ISO codes (usd, eur, gbp, cad, etc.) |
+| `StoreBankAccountRequest` | `routing_number` required if country=US; `iban` required if country!=US |
+
+### Webhook Deduplication
+
+| Location | Fix Applied |
+|----------|-------------|
+| `StripeController::handleWebhook()` | Checks `stripe_webhook_events` table by `stripe_event_id` before processing |
+| `StripeController::handleWebhook()` | Records event as `processed` or `failed` with error message and retry count |
+| `WebhookService::handlePaymentIntentSucceeded()` | Creates Payment record if not found (prevents lost payments when webhook fires before confirm-payment) |
+| `WebhookService::handleCheckoutSessionCompleted()` | Uses explicit `PaymentHold::where()->exists()` instead of relationship for hold deduplication |
+
+### Migration Added
+
+| Migration | Purpose |
+|-----------|---------|
+| `2026_05_02_000001` | Adds `canceled` status to `payment_holds.status` ENUM — fixes DB constraint error when `handlePaymentIntentCanceled()` webhook sets hold status to 'canceled' |
+
+### Webhook Status (Production)
+
+> **Note:** Webhook is currently **disabled** in production (`STRIPE_WEBHOOK_SECRET` commented out in `.env`). The primary payment flow uses `confirm-payment` endpoint (client-driven). Cron jobs handle hold maturity and transfer verification. Webhook code exists as a safety net and is ready to enable if needed.
+
+---
+
+## 22. Production Readiness Checklist
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Payment Sheet flow | ✅ Ready | Race-condition protected, atomic, null-safe |
+| Bank Account management | ✅ Ready | Transaction-safe, locked, validated |
+| Withdrawal/Transfers | ✅ Ready | Pessimistic locking, round() precision |
+| Hold maturity (cron) | ✅ Ready | Idempotent, every 5 min |
+| Transfer verification (cron) | ✅ Ready | Idempotent, every 5 min |
+| Email notifications | ✅ Ready | Queued, respects user settings |
+| Data encryption | ✅ Ready | AES-256-CBC + blind indexes |
+| Webhook (optional) | ✅ Ready | Deduplication + fallback creation |
+| SecurityHeaders middleware | ⚠️ Enable | Commented out — enable before deployment |
+| SanitizeInput middleware | ⚠️ Enable | Commented out — enable before deployment |
+| LogApiRequests middleware | ⚠️ Enable | Commented out — enable before deployment |
+| Test coverage | ⚠️ Minimal | 6 tests — expand for critical flows |

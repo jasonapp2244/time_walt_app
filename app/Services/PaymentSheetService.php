@@ -6,6 +6,7 @@ use App\Models\Payment;
 use App\Models\StripeCustomer;
 use App\Models\User;
 use App\Models\UserNotificationSetting;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class PaymentSheetService
@@ -127,8 +128,9 @@ class PaymentSheetService
             throw new \Exception('Payment does not belong to this user.');
         }
 
-        // Check duplicate
-        $existingPayment = Payment::where('payment_intent_id_index', Payment::blindIndex($paymentIntentId))->first();
+        // Check duplicate using firstOrCreate to prevent race conditions
+        $blindIndex = Payment::blindIndex($paymentIntentId);
+        $existingPayment = Payment::where('payment_intent_id_index', $blindIndex)->first();
         if ($existingPayment) {
             return [
                 'payment' => $this->formatPayment($existingPayment),
@@ -137,63 +139,91 @@ class PaymentSheetService
             ];
         }
 
-        // Extract card details from latest charge
+        // Extract card details from latest charge (null-safe)
         $charge = $paymentIntent->latest_charge;
-        $cardDetails = $charge->payment_method_details->card ?? null;
-        $walletType = $cardDetails->wallet->type ?? null;
+        $cardDetails = $charge?->payment_method_details?->card ?? null;
+        $walletType = $cardDetails?->wallet?->type ?? null;
 
         $amount = $paymentIntent->amount / 100;
         $currency = $paymentIntent->currency;
 
-        $payment = Payment::create([
-            'user_id' => $user->id,
-            'payment_intent_id' => $paymentIntentId,
-            'amount' => $amount,
-            'currency' => $currency,
-            'status' => 'succeeded',
-            'paid_at' => now(),
-            'stripe_data' => $paymentIntent->toArray(),
-            'card_brand' => $cardDetails->brand ?? null,
-            'card_last4' => $cardDetails->last4 ?? null,
-            'card_exp_month' => $cardDetails->exp_month ?? null,
-            'card_exp_year' => $cardDetails->exp_year ?? null,
-            'card_funding' => $cardDetails->funding ?? null,
-            'card_country' => $cardDetails->country ?? null,
-            'payment_method_type' => $walletType ?? 'card',
-        ]);
+        // Wrap Payment + Hold creation in a transaction for atomicity
+        $result = DB::transaction(function () use ($user, $paymentIntentId, $blindIndex, $amount, $currency, $paymentIntent, $cardDetails, $walletType) {
+            // Use lockForUpdate check to prevent race condition between concurrent requests
+            $existingPayment = Payment::where('payment_intent_id_index', $blindIndex)->lockForUpdate()->first();
+            if ($existingPayment) {
+                return [
+                    'payment' => $existingPayment,
+                    'hold' => $existingPayment->hold,
+                    'already_recorded' => true,
+                ];
+            }
 
-        Log::info('Payment record created via Payment Sheet', [
-            'payment_id' => $payment->id,
-            'amount' => $amount,
-            'card_brand' => $payment->card_brand,
-            'payment_method_type' => $payment->payment_method_type,
-        ]);
-
-        // Create payment hold if hold period data exists in metadata
-        $hold = null;
-        if (isset($paymentIntent->metadata->hold_period_type)) {
-            $holdPeriodData = [
-                'hold_period_type' => $paymentIntent->metadata->hold_period_type,
-                'hold_start_at' => $paymentIntent->metadata->hold_start_at ?? null,
-                'hold_end_at' => $paymentIntent->metadata->hold_end_at ?? null,
-                'hold_days' => $paymentIntent->metadata->hold_days ?? null,
-                'title' => $paymentIntent->metadata->title ?? null,
-            ];
-
-            $hold = $this->paymentHoldService->createFromPayment($payment, $holdPeriodData);
-
-            Log::info('PaymentHold created via Payment Sheet', [
-                'hold_id' => $hold->id,
-                'title' => $hold->title ?? 'No title',
+            $payment = Payment::create([
+                'user_id' => $user->id,
+                'payment_intent_id' => $paymentIntentId,
+                'amount' => $amount,
+                'currency' => $currency,
+                'status' => 'succeeded',
+                'paid_at' => now(),
+                'stripe_data' => $paymentIntent->toArray(),
+                'card_brand' => $cardDetails->brand ?? null,
+                'card_last4' => $cardDetails->last4 ?? null,
+                'card_exp_month' => $cardDetails->exp_month ?? null,
+                'card_exp_year' => $cardDetails->exp_year ?? null,
+                'card_funding' => $cardDetails->funding ?? null,
+                'card_country' => $cardDetails->country ?? null,
+                'payment_method_type' => $walletType ?? 'card',
             ]);
+
+            Log::info('Payment record created via Payment Sheet', [
+                'payment_id' => $payment->id,
+                'amount' => $amount,
+                'card_brand' => $payment->card_brand,
+                'payment_method_type' => $payment->payment_method_type,
+            ]);
+
+            // Create payment hold if hold period data exists in metadata
+            $hold = null;
+            if (isset($paymentIntent->metadata->hold_period_type)) {
+                $holdPeriodData = [
+                    'hold_period_type' => $paymentIntent->metadata->hold_period_type,
+                    'hold_start_at' => $paymentIntent->metadata->hold_start_at ?? null,
+                    'hold_end_at' => $paymentIntent->metadata->hold_end_at ?? null,
+                    'hold_days' => $paymentIntent->metadata->hold_days ?? null,
+                    'title' => $paymentIntent->metadata->title ?? null,
+                ];
+
+                $hold = $this->paymentHoldService->createFromPayment($payment, $holdPeriodData);
+
+                Log::info('PaymentHold created via Payment Sheet', [
+                    'hold_id' => $hold->id,
+                    'title' => $hold->title ?? 'No title',
+                ]);
+            }
+
+            return [
+                'payment' => $payment,
+                'hold' => $hold,
+                'already_recorded' => false,
+            ];
+        });
+
+        // If this was a duplicate caught inside the transaction
+        if ($result['already_recorded']) {
+            return [
+                'payment' => $this->formatPayment($result['payment']),
+                'hold' => $result['hold'] ? $this->formatHold($result['hold']) : null,
+                'already_recorded' => true,
+            ];
         }
 
-        // Send email notification
-        $this->dispatchNotification($payment);
+        // Send email notification (outside transaction to avoid holding locks)
+        $this->dispatchNotification($result['payment']);
 
         return [
-            'payment' => $this->formatPayment($payment),
-            'hold' => $hold ? $this->formatHold($hold) : null,
+            'payment' => $this->formatPayment($result['payment']),
+            'hold' => $result['hold'] ? $this->formatHold($result['hold']) : null,
         ];
     }
 

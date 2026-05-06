@@ -8,6 +8,7 @@ use App\Http\Requests\Stripe\CreatePaymentIntentRequest;
 use App\Http\Requests\Stripe\GetOnboardingLinkRequest;
 use App\Models\Payment;
 use App\Models\StripeConnectAccount;
+use App\Models\StripeWebhookEvent;
 use App\Services\PaymentHoldService;
 use App\Services\StripeService;
 use App\Services\WebhookService;
@@ -589,6 +590,24 @@ class StripeController extends Controller
                 $webhookSecret
             );
 
+            // Deduplication: check if this event was already processed
+            $existingEvent = StripeWebhookEvent::where('stripe_event_id', $event['id'])->first();
+            if ($existingEvent && $existingEvent->status === 'processed') {
+                Log::info('Duplicate webhook event skipped', ['event_id' => $event['id']]);
+
+                return response()->json(['received' => true]);
+            }
+
+            // Record the event
+            $webhookEvent = StripeWebhookEvent::updateOrCreate(
+                ['stripe_event_id' => $event['id']],
+                [
+                    'event_type' => $event['type'],
+                    'status' => 'pending',
+                    'payload' => $event->toArray(),
+                ]
+            );
+
             // Handle different event types
             $eventArray = $event->toArray();
 
@@ -613,6 +632,12 @@ class StripeController extends Controller
                     Log::info('Unhandled webhook event type: '.$event['type']);
             }
 
+            // Mark event as processed
+            $webhookEvent->update([
+                'status' => 'processed',
+                'processed_at' => now(),
+            ]);
+
             return response()->json(['received' => true]);
         } catch (\Stripe\Exception\SignatureVerificationException $e) {
             Log::error('Stripe webhook signature verification failed: '.$e->getMessage());
@@ -620,6 +645,16 @@ class StripeController extends Controller
             return response()->json(['error' => 'Invalid signature'], 400);
         } catch (\Exception $e) {
             Log::error('Stripe webhook handling failed: '.$e->getMessage());
+
+            // Mark event as failed if we have a record
+            if (isset($webhookEvent)) {
+                $webhookEvent->update([
+                    'status' => 'failed',
+                    'error_message' => $e->getMessage(),
+                    'retry_count' => $webhookEvent->retry_count + 1,
+                    'last_retry_at' => now(),
+                ]);
+            }
 
             return response()->json(['error' => 'Webhook processing failed'], 500);
         }

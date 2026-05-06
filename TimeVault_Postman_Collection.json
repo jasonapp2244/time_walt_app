@@ -1,0 +1,687 @@
+{
+	"info": {
+		"_postman_id": "time-vault-2026",
+		"name": "Time Vault - Payment + Bank + Withdraw",
+		"description": "Complete testing flow: Login → Create Payment → Confirm on Stripe → Confirm in App → Add Bank → Withdraw",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "BaseUrl",
+			"value": "http://127.0.0.1:8000/api",
+			"type": "string"
+		},
+		{
+			"key": "StripeSecretKey",
+			"value": "sk_test_YOUR_STRIPE_SECRET_KEY",
+			"type": "string"
+		},
+		{
+			"key": "AuthToken",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "PaymentIntentId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "HoldId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "BankAccountId",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "1. Authentication",
+			"item": [
+				{
+					"name": "1.1 Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData.success && jsonData.data && jsonData.data.token) {",
+									"    pm.collectionVariables.set('AuthToken', jsonData.data.token);",
+									"    console.log('Token saved: ' + jsonData.data.token);",
+									"}",
+									"",
+									"pm.test('Login successful', function () {",
+									"    pm.expect(jsonData.success).to.be.true;",
+									"    pm.expect(jsonData.data.token).to.not.be.empty;",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"test@example.com\",\n    \"password\": \"password123\"\n}"
+						},
+						"url": {
+							"raw": "{{BaseUrl}}/auth/login",
+							"host": ["{{BaseUrl}}"],
+							"path": ["auth", "login"]
+						},
+						"description": "Login to get Bearer token. Token auto-saved to collection variable."
+					}
+				}
+			]
+		},
+		{
+			"name": "2. Payment Flow",
+			"item": [
+				{
+					"name": "2.1 Create Payment Intent (App)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData.success && jsonData.data && jsonData.data.payment_intent_id) {",
+									"    pm.collectionVariables.set('PaymentIntentId', jsonData.data.payment_intent_id);",
+									"    console.log('PaymentIntent ID saved: ' + jsonData.data.payment_intent_id);",
+									"}",
+									"",
+									"pm.test('Payment intent created', function () {",
+									"    pm.expect(jsonData.success).to.be.true;",
+									"    pm.expect(jsonData.data.payment_intent_id).to.include('pi_');",
+									"    pm.expect(jsonData.data.client_secret).to.not.be.empty;",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{AuthToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"amount\": 100,\n    \"currency\": \"usd\",\n    \"title\": \"Test Payment\",\n    \"hold_period_type\": \"custom\",\n    \"hold_start_at\": \"2026-05-06\",\n    \"hold_end_at\": \"2026-05-07\"\n}"
+						},
+						"url": {
+							"raw": "{{BaseUrl}}/stripe/create-payment-intent",
+							"host": ["{{BaseUrl}}"],
+							"path": ["stripe", "create-payment-intent"]
+						},
+						"description": "Creates PaymentIntent on Stripe. Returns pi_xxx ID.\n\nTIP: Set hold_end_at to today/tomorrow for quick testing so hold expires fast."
+					}
+				},
+				{
+					"name": "2.2 Confirm Payment on Stripe (Simulates Flutter Payment Sheet)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"",
+									"pm.test('Stripe payment confirmed', function () {",
+									"    pm.expect(jsonData.status).to.equal('succeeded');",
+									"});",
+									"",
+									"console.log('Stripe PaymentIntent status: ' + jsonData.status);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{StripeSecretKey}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/x-www-form-urlencoded"
+							}
+						],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{
+									"key": "payment_method",
+									"value": "pm_card_visa",
+									"description": "Test card. Options: pm_card_visa, pm_card_mastercard, pm_card_bypassPending, pm_card_declined"
+								}
+							]
+						},
+						"url": {
+							"raw": "https://api.stripe.com/v1/payment_intents/{{PaymentIntentId}}/confirm",
+							"protocol": "https",
+							"host": ["api", "stripe", "com"],
+							"path": ["v1", "payment_intents", "{{PaymentIntentId}}", "confirm"]
+						},
+						"description": "This simulates what Flutter Payment Sheet does:\n1. Attaches a payment method (test card)\n2. Confirms the payment on Stripe\n\nAfter this, Stripe status = 'succeeded'\n\nTest payment methods:\n- pm_card_visa → Visa success\n- pm_card_mastercard → Mastercard success\n- pm_card_bypassPending → Bypass pending (good for transfers)\n- pm_card_declined → Test decline"
+					}
+				},
+				{
+					"name": "2.3 Confirm Payment in App (Stores in DB)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"",
+									"if (jsonData.success && jsonData.data && jsonData.data.hold) {",
+									"    pm.collectionVariables.set('HoldId', jsonData.data.hold.id);",
+									"    console.log('Hold ID saved: ' + jsonData.data.hold.id);",
+									"}",
+									"",
+									"pm.test('Payment confirmed and stored in DB', function () {",
+									"    pm.expect(jsonData.success).to.be.true;",
+									"    pm.expect(jsonData.data.payment).to.not.be.undefined;",
+									"    pm.expect(jsonData.data.hold).to.not.be.undefined;",
+									"});",
+									"",
+									"pm.test('Payment status is succeeded', function () {",
+									"    pm.expect(jsonData.data.payment.status).to.equal('succeeded');",
+									"});",
+									"",
+									"pm.test('Hold status is holding', function () {",
+									"    pm.expect(jsonData.data.hold.status).to.equal('holding');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{AuthToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"payment_intent_id\": \"{{PaymentIntentId}}\"\n}"
+						},
+						"url": {
+							"raw": "{{BaseUrl}}/stripe/confirm-payment",
+							"host": ["{{BaseUrl}}"],
+							"path": ["stripe", "confirm-payment"]
+						},
+						"description": "Calls YOUR app to:\n1. Verify payment succeeded on Stripe\n2. Create Payment record in DB\n3. Create PaymentHold record in DB\n4. Send email notification\n\nThis is the step that was missing before!"
+					}
+				}
+			]
+		},
+		{
+			"name": "3. Bank Account",
+			"item": [
+				{
+					"name": "3.1 Add Bank Account (US)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"",
+									"if (jsonData.success && jsonData.data && jsonData.data.id) {",
+									"    pm.collectionVariables.set('BankAccountId', jsonData.data.id);",
+									"    console.log('Bank Account ID saved: ' + jsonData.data.id);",
+									"}",
+									"",
+									"pm.test('Bank account added', function () {",
+									"    pm.expect(jsonData.success).to.be.true;",
+									"    pm.expect(jsonData.data.is_primary).to.be.true;",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{AuthToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"dob\": \"1990-01-15\",\n    \"account_number\": \"000123456789\",\n    \"bank_name\": \"Chase Bank\",\n    \"routing_number\": \"110000000\",\n    \"account_type\": \"checking\",\n    \"country\": \"US\",\n    \"currency\": \"usd\"\n}"
+						},
+						"url": {
+							"raw": "{{BaseUrl}}/bank-account",
+							"host": ["{{BaseUrl}}"],
+							"path": ["bank-account"]
+						},
+						"description": "Adds bank account + silently creates Stripe Custom Connect account (first time).\n\nFirst bank auto-becomes primary.\n\nFor Stripe test mode use:\n- routing_number: 110000000\n- account_number: 000123456789"
+					}
+				},
+				{
+					"name": "3.2 Add Bank Account (UK - IBAN)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{AuthToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"dob\": \"1990-01-15\",\n    \"account_number\": \"GB82WEST12345698765432\",\n    \"bank_name\": \"NatWest\",\n    \"iban\": \"GB82WEST12345698765432\",\n    \"account_type\": \"current\",\n    \"country\": \"GB\",\n    \"currency\": \"gbp\"\n}"
+						},
+						"url": {
+							"raw": "{{BaseUrl}}/bank-account",
+							"host": ["{{BaseUrl}}"],
+							"path": ["bank-account"]
+						},
+						"description": "Example for UK bank with IBAN. Use for non-US countries."
+					}
+				},
+				{
+					"name": "3.3 List Bank Accounts",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{AuthToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{BaseUrl}}/bank-account",
+							"host": ["{{BaseUrl}}"],
+							"path": ["bank-account"]
+						},
+						"description": "Returns all bank accounts with masked numbers (****1234)"
+					}
+				},
+				{
+					"name": "3.4 Set Primary Bank Account",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{AuthToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{BaseUrl}}/bank-account/{{BankAccountId}}/set-primary",
+							"host": ["{{BaseUrl}}"],
+							"path": ["bank-account", "{{BankAccountId}}", "set-primary"]
+						},
+						"description": "Set a specific bank account as primary for withdrawals"
+					}
+				},
+				{
+					"name": "3.5 Delete Bank Account",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{AuthToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{BaseUrl}}/bank-account/{{BankAccountId}}",
+							"host": ["{{BaseUrl}}"],
+							"path": ["bank-account", "{{BankAccountId}}"]
+						},
+						"description": "Delete a bank account. Cannot delete if withdrawal is pending. If primary deleted, next one auto-promoted."
+					}
+				}
+			]
+		},
+		{
+			"name": "4. Hold Period → Ready for Transfer",
+			"item": [
+				{
+					"name": "4.1 Check Payment Holds Summary",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{AuthToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{BaseUrl}}/payment-holds/summary",
+							"host": ["{{BaseUrl}}"],
+							"path": ["payment-holds", "summary"]
+						},
+						"description": "Check wallet balance:\n- total_locked_amount = money still in hold period\n- total_ready_for_transfer_amount = money available to withdraw\n\nIf ready amount is 0, run: php artisan check:payment-holds"
+					}
+				},
+				{
+					"name": "4.2 List Payment Holds",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{AuthToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{BaseUrl}}/payment-holds?per_page=15&page=1",
+							"host": ["{{BaseUrl}}"],
+							"path": ["payment-holds"],
+							"query": [
+								{
+									"key": "per_page",
+									"value": "15"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								}
+							]
+						},
+						"description": "List all holds with their status (holding, ready_for_transfer, transferred)"
+					}
+				}
+			]
+		},
+		{
+			"name": "5. Withdrawal",
+			"item": [
+				{
+					"name": "5.1 Withdraw Custom Amount",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"",
+									"pm.test('Withdrawal successful', function () {",
+									"    pm.expect(jsonData.success).to.be.true;",
+									"});",
+									"",
+									"if (jsonData.data) {",
+									"    console.log('Processed: $' + jsonData.data.processed_amount);",
+									"    console.log('Transfers: ' + jsonData.data.total_transfers);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{AuthToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"amount\": 50.00\n}"
+						},
+						"url": {
+							"raw": "{{BaseUrl}}/payment-holds/withdraw",
+							"host": ["{{BaseUrl}}"],
+							"path": ["payment-holds", "withdraw"]
+						},
+						"description": "Withdraw custom amount from available (ready_for_transfer) holds.\n\nMin: $0.50 | Max: $999,999.99\nPulls from oldest ready holds first (FIFO).\n\nPrerequisites:\n1. At least one hold must be in 'ready_for_transfer' status\n2. Must have a bank account added\n3. Stripe test balance must have funds (run: php artisan stripe:fund-test-balance)"
+					}
+				},
+				{
+					"name": "5.2 Request Payout for Specific Hold",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{AuthToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{BaseUrl}}/payment-holds/{{HoldId}}/request-payout",
+							"host": ["{{BaseUrl}}"],
+							"path": ["payment-holds", "{{HoldId}}", "request-payout"]
+						},
+						"description": "Request payout for a specific hold (by hold ID).\nHold must be in 'ready_for_transfer' status."
+					}
+				}
+			]
+		},
+		{
+			"name": "6. Transaction History",
+			"item": [
+				{
+					"name": "6.1 All Transactions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{AuthToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{BaseUrl}}/transactions/all?per_page=15",
+							"host": ["{{BaseUrl}}"],
+							"path": ["transactions", "all"],
+							"query": [
+								{
+									"key": "per_page",
+									"value": "15"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "6.2 Checkout Transactions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{AuthToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{BaseUrl}}/transactions/checkouts?per_page=15",
+							"host": ["{{BaseUrl}}"],
+							"path": ["transactions", "checkouts"],
+							"query": [
+								{
+									"key": "per_page",
+									"value": "15"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "6.3 Withdrawal Transactions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{AuthToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{BaseUrl}}/transactions/withdraws?per_page=15",
+							"host": ["{{BaseUrl}}"],
+							"path": ["transactions", "withdraws"],
+							"query": [
+								{
+									"key": "per_page",
+									"value": "15"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "6.4 Hold Amounts (Currently Locked)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{AuthToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{BaseUrl}}/transactions/hold-amounts?per_page=15",
+							"host": ["{{BaseUrl}}"],
+							"path": ["transactions", "hold-amounts"],
+							"query": [
+								{
+									"key": "per_page",
+									"value": "15"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "6.5 Ready for Transfer",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{AuthToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{BaseUrl}}/transactions/ready-for-transfer?per_page=15",
+							"host": ["{{BaseUrl}}"],
+							"path": ["transactions", "ready-for-transfer"],
+							"query": [
+								{
+									"key": "per_page",
+									"value": "15"
+								}
+							]
+						}
+					}
+				}
+			]
+		}
+	]
+}

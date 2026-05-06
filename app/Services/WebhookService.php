@@ -110,7 +110,7 @@ class WebhookService
         }
 
         // Create payment hold if hold period data exists and hold doesn't exist
-        if ($holdPeriodData && ! $payment->hold) {
+        if ($holdPeriodData && ! PaymentHold::where('payment_id', $payment->id)->exists()) {
             $this->paymentHoldService->createFromPayment($payment, $holdPeriodData);
         }
 
@@ -135,23 +135,46 @@ class WebhookService
         $payment = Payment::where('payment_intent_id_index', Payment::blindIndex($paymentIntentId))->first();
 
         if (! $payment) {
-            Log::warning('Payment not found for payment intent: '.substr($paymentIntentId, -6));
+            // Payment not found — create it to prevent lost payments
+            $userId = $paymentIntent['metadata']['user_id'] ?? null;
 
-            return;
+            if (! $userId) {
+                Log::error('Payment not found and user_id missing from metadata for payment intent: '.substr($paymentIntentId, -6));
+
+                return;
+            }
+
+            $amount = ($paymentIntent['amount'] ?? 0) / 100;
+            $currency = $paymentIntent['currency'] ?? 'usd';
+
+            $payment = Payment::create([
+                'user_id' => $userId,
+                'payment_intent_id' => $paymentIntentId,
+                'amount' => $amount,
+                'currency' => $currency,
+                'status' => 'succeeded',
+                'paid_at' => now(),
+                'stripe_data' => $paymentIntent,
+            ]);
+
+            Log::info('Payment record created from webhook (was missing)', [
+                'payment_id' => $payment->id,
+                'payment_intent_suffix' => substr($paymentIntentId, -6),
+            ]);
+        } else {
+            // Update existing payment status
+            $payment->update([
+                'status' => 'succeeded',
+                'paid_at' => now(),
+                'stripe_data' => $paymentIntent,
+            ]);
         }
-
-        // Update payment status
-        $payment->update([
-            'status' => 'succeeded',
-            'paid_at' => now(),
-            'stripe_data' => $paymentIntent,
-        ]);
 
         // Get hold period data from cache or metadata
         $holdPeriodData = $this->stripeService->getHoldPeriodData($paymentIntentId);
 
         // Create payment hold if not exists and hold period data available
-        if ($holdPeriodData && ! $payment->hold) {
+        if ($holdPeriodData && ! PaymentHold::where('payment_id', $payment->id)->exists()) {
             $this->paymentHoldService->createFromPayment($payment, $holdPeriodData);
         }
 

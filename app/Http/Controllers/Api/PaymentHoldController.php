@@ -452,12 +452,43 @@ class PaymentHoldController extends Controller
             DB::beginTransaction();
 
             try {
+                // Re-fetch holds with pessimistic lock to prevent concurrent over-withdrawal
+                $lockedHoldIds = $availableHolds->pluck('id')->toArray();
+                $lockedHolds = PaymentHold::whereIn('id', $lockedHoldIds)
+                    ->lockForUpdate()
+                    ->get()
+                    ->keyBy('id');
+
+                // Re-validate available amounts with locked data
+                $totalAvailableLocked = 0;
+                foreach ($lockedHolds as $hold) {
+                    $remaining = (float) ($hold->remaining_amount ?? $hold->amount);
+                    if ($remaining > 0 && $hold->status !== 'transferred') {
+                        $totalAvailableLocked += $remaining;
+                    }
+                }
+
+                if ($requestedAmount > $totalAvailableLocked) {
+                    DB::rollBack();
+
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Insufficient available funds. Available: \${$totalAvailableLocked}, Requested: \${$requestedAmount}",
+                        'data' => [
+                            'available_amount' => (float) $totalAvailableLocked,
+                            'requested_amount' => (float) $requestedAmount,
+                        ],
+                    ], 400);
+                }
+
                 \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
                 $remainingAmount = $requestedAmount;
                 $processedHolds = [];
 
                 // Process holds until we've transferred the requested amount
                 foreach ($availableHolds as $hold) {
+                    // Use the locked version for accurate remaining_amount
+                    $hold = $lockedHolds->get($hold->id) ?? $hold;
                     if ($remainingAmount <= 0) {
                         break;
                     }
@@ -487,7 +518,7 @@ class PaymentHoldController extends Controller
 
                     // Create Stripe transfer for this amount
                     $transfer = \Stripe\Transfer::create([
-                        'amount' => (int) ($amountFromThisHold * 100),
+                        'amount' => (int) round($amountFromThisHold * 100),
                         'currency' => $currency,
                         'destination' => $connectAccount->connect_account_id,
                         'description' => "Withdrawal from hold #{$hold->id}",
@@ -737,6 +768,8 @@ class PaymentHoldController extends Controller
             $holdDuration['days_remaining'] = $daysRemaining >= 0 ? $daysRemaining : 0;
 
             // Check if hold period is complete
+            $holdDuration['is_complete'] = $hold->hold_end_at->isPast();
+        } elseif ($hold->hold_end_at) {
             $holdDuration['is_complete'] = $hold->hold_end_at->isPast();
         }
 

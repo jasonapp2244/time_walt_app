@@ -36,7 +36,7 @@ class BankAccountController extends Controller
                     // First bank — create Stripe Custom Connect account
                     $nameParts = explode(' ', $user->full_name ?? 'User', 2);
                     $firstName = $nameParts[0];
-                    $lastName = $nameParts[1] ?? '';
+                    $lastName = $nameParts[1] ?? $firstName;
 
                     $accountParams = [
                         'type' => 'custom',
@@ -238,11 +238,15 @@ class BankAccountController extends Controller
         }
 
         DB::transaction(function () use ($user, $bankAccount) {
+            // Lock all user's bank accounts to prevent concurrent setPrimary race
+            UserBankAccount::where('user_id', $user->id)->lockForUpdate()->get();
+
             // Remove primary from all user's bank accounts
             UserBankAccount::where('user_id', $user->id)
                 ->update(['is_primary' => false]);
 
             // Set this one as primary
+            $bankAccount->refresh();
             $bankAccount->update(['is_primary' => true]);
         });
 
@@ -295,7 +299,7 @@ class BankAccountController extends Controller
 
             \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
 
-            // Delete external bank from Stripe (keep Connect account)
+            // Delete external bank from Stripe first (fail if Stripe rejects)
             $connectAccount = StripeConnectAccount::where('user_id', $user->id)->first();
 
             if ($connectAccount && $bankAccount->stripe_bank_account_id) {
@@ -304,21 +308,33 @@ class BankAccountController extends Controller
                         $connectAccount->connect_account_id,
                         $bankAccount->stripe_bank_account_id
                     );
-                } catch (\Exception $e) {
-                    Log::warning('Failed to delete bank from Stripe (may already be deleted): ' . $e->getMessage());
+                } catch (\Stripe\Exception\InvalidRequestException $e) {
+                    // Bank already deleted on Stripe (resource_missing) — safe to proceed
+                    if (strpos($e->getMessage(), 'No such external account') === false &&
+                        strpos($e->getMessage(), 'resource_missing') === false) {
+                        throw $e;
+                    }
+                    Log::info('Bank already removed from Stripe, proceeding with DB deletion', [
+                        'bank_account_id' => $id,
+                    ]);
                 }
             }
 
-            $wasPrimary = $bankAccount->is_primary;
-            $bankAccount->delete();
+            // Wrap DB deletion + primary reassignment in a transaction
+            DB::transaction(function () use ($user, $bankAccount) {
+                $wasPrimary = $bankAccount->is_primary;
+                $bankAccount->delete();
 
-            // If deleted bank was primary, make the next one primary
-            if ($wasPrimary) {
-                $nextBank = UserBankAccount::where('user_id', $user->id)->first();
-                if ($nextBank) {
-                    $nextBank->update(['is_primary' => true]);
+                // If deleted bank was primary, make the next one primary
+                if ($wasPrimary) {
+                    $nextBank = UserBankAccount::where('user_id', $user->id)
+                        ->orderBy('created_at', 'asc')
+                        ->first();
+                    if ($nextBank) {
+                        $nextBank->update(['is_primary' => true]);
+                    }
                 }
-            }
+            });
 
             Log::info('Bank account deleted', [
                 'user_id' => $user->id,

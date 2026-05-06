@@ -387,6 +387,7 @@ DELETE /api/bank-account
 ## Postman Environment Variables
 
 ```
+
 base_url:  http://127.0.0.1:8000
 token:     (from login response)
 ```
