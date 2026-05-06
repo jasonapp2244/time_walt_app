@@ -8,6 +8,7 @@ use App\Http\Requests\Profile\UpdateProfileRequest;
 use App\Http\Requests\Profile\UpdateTimezoneRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class ProfileController extends Controller
@@ -59,17 +60,24 @@ class ProfileController extends Controller
 
             if ($file->isValid()) {
                 // Delete old profile image if exists
-                if ($user->profile) {
-                    Storage::disk('public')->delete($user->profile);
+                $oldProfile = $user->profile;
+                if ($oldProfile && $oldProfile !== '0' && $oldProfile !== 'default.png') {
+                    Storage::disk('public')->delete($oldProfile);
                 }
 
                 // Store new image
                 $imagePath = $file->store('profiles', 'public');
-                $updateData['profile'] = $imagePath;
+
+                if ($imagePath) {
+                    $updateData['profile'] = $imagePath;
+
+                    // Force update via DB query to ensure it saves
+                    DB::table('users')
+                        ->where('id', $user->id)
+                        ->update(['profile' => $imagePath, 'updated_at' => now()]);
+                }
             }
         }
-
-        // Timezone is locked to app timezone — ignore any user-provided value
 
         if ($request->filled('language')) {
             $updateData['language'] = $request->input('language');
@@ -83,14 +91,20 @@ class ProfileController extends Controller
             ], 400);
         }
 
-        // Update user
-        $user->update($updateData);
+        // Update non-profile fields via model
+        $nonProfileData = collect($updateData)->except('profile')->toArray();
+        if (! empty($nonProfileData)) {
+            $user->update($nonProfileData);
+        }
+
+        // Refresh user from DB
+        $user = $user->fresh();
 
         return response()->json([
             'success' => true,
             'message' => 'Profile updated successfully.',
             'data' => [
-                'user' => $this->formatUser($user->fresh()),
+                'user' => $this->formatUser($user),
             ],
         ]);
     }
@@ -136,10 +150,7 @@ class ProfileController extends Controller
     {
         $tz = config('app.timezone');
 
-        $profileUrl = null;
-        if ($user->profile) {
-            $profileUrl = asset('storage/'.$user->profile);
-        }
+        $profileUrl = $this->getProfileUrl($user->profile);
 
         return [
             'id' => $user->id,
@@ -161,6 +172,18 @@ class ProfileController extends Controller
             'created_at' => $user->created_at?->setTimezone($tz)->toIso8601String(),
             'updated_at' => $user->updated_at?->setTimezone($tz)->toIso8601String(),
         ];
+    }
+
+    /**
+     * Get full profile image URL.
+     */
+    protected function getProfileUrl(?string $profile): string
+    {
+        if ($profile && $profile !== '0' && $profile !== 'default.png') {
+            return url('api/storage/' . $profile);
+        }
+
+        return url('api/storage/profiles/default.png');
     }
 
     /**
