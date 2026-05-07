@@ -55,7 +55,9 @@ class ProfileController extends Controller
         }
 
         // Handle profile image upload
-        if ($request->hasFile('profile_image')) {
+        $fileReceived = $request->hasFile('profile_image');
+
+        if ($fileReceived) {
             $file = $request->file('profile_image');
 
             if ($file->isValid()) {
@@ -71,7 +73,7 @@ class ProfileController extends Controller
                 if ($imagePath) {
                     $updateData['profile'] = $imagePath;
 
-                    // Force update via DB query to ensure it saves
+                    // Force update profile via raw DB query
                     DB::table('users')
                         ->where('id', $user->id)
                         ->update(['profile' => $imagePath, 'updated_at' => now()]);
@@ -88,6 +90,7 @@ class ProfileController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'No data provided to update. Please provide at least one field: full_name, phone, profile_image, timezone, or language.',
+                'file_received' => $fileReceived,
             ], 400);
         }
 
@@ -106,6 +109,7 @@ class ProfileController extends Controller
             'data' => [
                 'user' => $this->formatUser($user),
             ],
+            'file_received' => $fileReceived,
         ]);
     }
 
