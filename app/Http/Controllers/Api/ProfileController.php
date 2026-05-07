@@ -55,9 +55,7 @@ class ProfileController extends Controller
         }
 
         // Handle profile image upload
-        $fileReceived = $request->hasFile('profile_image');
-
-        if ($fileReceived) {
+        if ($request->hasFile('profile_image')) {
             $file = $request->file('profile_image');
 
             if ($file->isValid()) {
@@ -90,8 +88,7 @@ class ProfileController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'No data provided to update. Please provide at least one field: full_name, phone, profile_image, timezone, or language.',
-                'file_received' => $fileReceived,
-            ], 400);
+                ], 400);
         }
 
         // Update non-profile fields via model
@@ -109,7 +106,6 @@ class ProfileController extends Controller
             'data' => [
                 'user' => $this->formatUser($user),
             ],
-            'file_received' => $fileReceived,
         ]);
     }
 
@@ -184,10 +180,10 @@ class ProfileController extends Controller
     protected function getProfileUrl(?string $profile): string
     {
         if ($profile && $profile !== '0' && $profile !== 'default.png') {
-            return url('api/storage/' . $profile);
+            return asset('storage/' . $profile);
         }
 
-        return url('api/storage/profiles/default.png');
+        return asset('storage/profiles/default.png');
     }
 
     /**
