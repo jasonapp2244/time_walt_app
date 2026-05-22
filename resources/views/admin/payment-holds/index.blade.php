@@ -118,6 +118,7 @@
                         <thead>
                             <tr>
                                 <th style="width:50px;">#</th>
+                                <th>Hold ID</th>
                                 <th>User</th>
                                 <th>Title</th>
                                 <th>Amount</th>
@@ -134,6 +135,9 @@
                                 <td style="color:#6b7280; font-size:12px; font-weight:500;">
                                     {{ ($holds->currentPage() - 1) * $holds->perPage() + $loop->iteration }}
                                 </td>
+                                <td style="color:#2563eb; font-size:12px; font-weight:700;">
+                                    {{ str_pad($hold->id, 5, '0', STR_PAD_LEFT) }}
+                                </td>
                                 <td>
                                     <a href="{{ route('admin.users.show', $hold->user_id) }}"
                                        style="color:#111827; font-weight:600; font-size:13px; text-decoration:none;">
@@ -148,17 +152,23 @@
                                     ${{ number_format($hold->remaining_amount ?? $hold->amount, 2) }}
                                 </td>
                                 <td style="color:#374151; font-size:12px; font-weight:500;">
-                                    {{ $hold->hold_period_type ? str_replace('_', ' ', $hold->hold_period_type) : ($hold->hold_days ? $hold->hold_days.' days' : '—') }}
+                                    @php
+                                        $parts = [];
+                                        if ($hold->hold_days) $parts[] = $hold->hold_days . 'd';
+                                        if ($hold->hold_hours) $parts[] = $hold->hold_hours . 'h';
+                                        if ($hold->hold_minutes) $parts[] = $hold->hold_minutes . 'm';
+                                    @endphp
+                                    {{ $parts ? implode(' ', $parts) : ($hold->hold_period_type ? str_replace('_', ' ', $hold->hold_period_type) : '—') }}
                                 </td>
                                 <td style="color:#4b5563; font-size:12px; font-weight:500;">
-                                    {{ $hold->hold_start_at?->format('d M Y') ?? '—' }}
+                                    {{ $hold->hold_start_at?->format('d M Y, h:i A') ?? '—' }}
                                 </td>
                                 <td style="font-size:12px; font-weight:500;">
                                     @if($hold->hold_end_at)
                                         @if($hold->hold_end_at->isPast())
-                                            <span style="color:#1e8c3a; font-weight:600;">{{ $hold->hold_end_at->format('d M Y') }}</span>
+                                            <span style="color:#1e8c3a; font-weight:600;">{{ $hold->hold_end_at->format('d M Y, h:i A') }}</span>
                                         @else
-                                            <span style="color:#374151;">{{ $hold->hold_end_at->format('d M Y') }}</span>
+                                            <span style="color:#374151;">{{ $hold->hold_end_at->format('d M Y, h:i A') }}</span>
                                         @endif
                                     @else
                                         <span style="color:#6b7280;">—</span>
@@ -172,7 +182,7 @@
                             </tr>
                             @empty
                             <tr>
-                                <td colspan="9" class="text-center py-5" style="color:#6b7280;">
+                                <td colspan="10" class="text-center py-5" style="color:#6b7280;">
                                     <i class='bx bx-lock d-block mb-2' style="font-size:28px; color:#d4963e;"></i>
                                     No payment holds found
                                 </td>
@@ -183,10 +193,7 @@
                 </div>
             </div>
             @if($holds->hasPages())
-            <div class="card-footer" style="padding:12px 20px; display:flex; align-items:center; justify-content:space-between;">
-                <span style="font-size:12px; color:#4b5563; font-weight:500;">
-                    Showing {{ $holds->firstItem() }}–{{ $holds->lastItem() }} of {{ $holds->total() }} records
-                </span>
+            <div class="card-footer tv-pagination-footer">
                 {{ $holds->appends(request()->query())->links() }}
             </div>
             @endif

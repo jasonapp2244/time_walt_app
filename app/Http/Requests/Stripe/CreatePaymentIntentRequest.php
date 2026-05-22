@@ -30,8 +30,10 @@ class CreatePaymentIntentRequest extends FormRequest
             'currency' => ['required', 'string', 'size:3', Rule::in($supportedCurrencies)],
             'title' => ['nullable', 'string', 'max:255'], // Optional title/description for the payment hold
             'hold_period_type' => ['required', 'string', Rule::in(['custom'])], // Only custom hold period allowed
-            'hold_start_at' => ['required', 'date', 'after_or_equal:today'], // Required for custom period
-            'hold_end_at' => ['required', 'date', 'after:hold_start_at'], // Required for custom period
+            'hold_start_at' => ['required', 'date', 'after_or_equal:today'], // Date or datetime
+            'hold_end_at' => ['required', 'date', 'after:hold_start_at'], // Date or datetime
+            'hold_hours' => ['nullable', 'integer', 'min:0', 'max:23'], // Hours component
+            'hold_minutes' => ['nullable', 'integer', 'min:0', 'max:59'], // Minutes component
             'return_url' => ['nullable', 'url', 'max:500'], // Optional - will use config default if not provided
         ];
     }
@@ -42,21 +44,17 @@ class CreatePaymentIntentRequest extends FormRequest
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {
-            // No minimum hold period restriction - users can set any duration
-            // Just validate that dates are valid and end is after start
+            // Validate that dates are valid and end is after start (supports datetime precision)
             if ($this->hold_start_at && $this->hold_end_at) {
                 try {
-                    $startDate = \Carbon\Carbon::parse($this->hold_start_at)->startOfDay();
-                    $endDate = \Carbon\Carbon::parse($this->hold_end_at)->startOfDay();
-                    $days = $startDate->diffInDays($endDate);
+                    $startDate = \Carbon\Carbon::parse($this->hold_start_at);
+                    $endDate = \Carbon\Carbon::parse($this->hold_end_at);
 
-                    // Optional: Add minimum 1 day validation if needed
-                    // Uncomment the line below if you want to enforce at least 1 day
-                    // if ($days < 1) {
-                    //     $validator->errors()->add('hold_end_at', 'Hold period must be at least 1 day. Current period: '.$days.' days.');
-                    // }
+                    if ($endDate->lte($startDate)) {
+                        $validator->errors()->add('hold_end_at', 'Hold end must be after hold start.');
+                    }
                 } catch (\Exception $e) {
-                    $validator->errors()->add('hold_start_at', 'Invalid date format.');
+                    $validator->errors()->add('hold_start_at', 'Invalid date/time format.');
                 }
             }
         });
@@ -89,6 +87,12 @@ class CreatePaymentIntentRequest extends FormRequest
             'hold_end_at.required' => 'Hold end date is required.',
             'hold_end_at.date' => 'Hold end date must be a valid date.',
             'hold_end_at.after' => 'Hold end date must be after start date.',
+            'hold_hours.integer' => 'Hold hours must be a valid number.',
+            'hold_hours.min' => 'Hold hours cannot be negative.',
+            'hold_hours.max' => 'Hold hours cannot exceed 23.',
+            'hold_minutes.integer' => 'Hold minutes must be a valid number.',
+            'hold_minutes.min' => 'Hold minutes cannot be negative.',
+            'hold_minutes.max' => 'Hold minutes cannot exceed 59.',
         ];
     }
 }

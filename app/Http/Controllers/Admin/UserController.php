@@ -59,6 +59,32 @@ class UserController extends Controller
     }
 
     /**
+     * Return live stats for a single user as JSON for AJAX polling.
+     */
+    public function userStats(User $user): JsonResponse
+    {
+        $user->load([
+            'paymentHolds',
+            'transfers',
+        ]);
+
+        $bankAccountsCount = \App\Models\UserBankAccount::where('user_id', $user->id)->count();
+
+        return response()->json([
+            'total_held' => (float) $user->paymentHolds->where('status', 'holding')->sum('amount'),
+            'total_ready' => (float) $user->paymentHolds
+                ->whereIn('status', ['ready_for_transfer', 'partial_transferred'])
+                ->sum(fn ($hold) => (float) ($hold->remaining_amount ?? $hold->amount)),
+            'total_withdrawn' => (float) $user->transfers
+                ->where('status', 'completed')
+                ->sum('amount'),
+            'holds_count' => $user->paymentHolds->count(),
+            'transfers_count' => $user->transfers->count(),
+            'bank_accounts_count' => $bankAccountsCount,
+        ]);
+    }
+
+    /**
      * Show a single user with all their activity.
      */
     public function show(User $user): View
@@ -66,7 +92,7 @@ class UserController extends Controller
         $user->load([
             'notificationSettings',
             'paymentHolds' => fn ($q) => $q->with(['payment', 'transfer'])->latest(),
-            'transfers' => fn ($q) => $q->with('hold')->latest(),
+            'transfers' => fn ($q) => $q->with('hold.payment')->latest(),
         ]);
 
         $bankAccounts = \App\Models\UserBankAccount::where('user_id', $user->id)

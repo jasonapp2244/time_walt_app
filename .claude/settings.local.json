@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs basename:*)",
+      "Bash(xargs grep:*)",
+      "Bash(grep -E \"\\\\.php$\")",
+      "Bash(grep -l \"TODO\\\\|FIXME\\\\|stub\\\\|empty\" /f/xampp/htdocs/time_vault_with_admin_panel/app/Http/Controllers/**/*.php)",
+      "Bash(vendor/bin/pint --dirty)",
+      "Bash(find routes:*)",
+      "Bash(grep -o \"\\\\\\\\\\\\\\\\Stripe[^;]*\" app/Http/Controllers/Api/StripeController.php)",
+      "Bash(php artisan *)"
+    ]
+  }
+}

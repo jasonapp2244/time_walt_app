@@ -34,7 +34,7 @@ class PaymentHoldController extends Controller
             $perPage = min(max((int) $perPage, 1), 100); // Between 1 and 100
 
             $holds = PaymentHold::where('user_id', $user->id)
-                ->with(['payment', 'transfer'])
+                ->with(['payment', 'transfers'])
                 ->orderBy('created_at', 'desc')
                 ->paginate($perPage);
 
@@ -64,22 +64,22 @@ class PaymentHoldController extends Controller
                     ],
                 ];
 
-                // TRANSACTION OUT: Transfer (Money Going Out)
-                if ($hold->transfer) {
+                // TRANSACTION OUT: Transfers (Money Going Out)
+                foreach ($hold->transfers as $transfer) {
                     $transactions[] = [
                         'transaction_type' => 'transfer',
-                        'transaction_id' => "TRF-{$hold->transfer->id}",
+                        'transaction_id' => "TRF-{$transfer->id}",
                         'hold_id' => $hold->id,
-                        'amount' => (float) $hold->transfer->amount,
-                        'currency' => strtoupper($hold->transfer->currency),
-                        'status' => $hold->transfer->status,
-                        'date' => $hold->transfer->created_at->toIso8601String(),
+                        'amount' => (float) $transfer->amount,
+                        'currency' => strtoupper($transfer->currency),
+                        'status' => $transfer->status,
+                        'date' => $transfer->created_at->toIso8601String(),
                         'description' => 'Transfer to Stripe Connect account',
                         'transfer_details' => [
-                            'transfer_id' => $hold->transfer->id,
-                            'stripe_transfer_id' => $hold->transfer->stripe_transfer_id,
-                            'transfer_type' => $hold->transfer->transfer_type,
-                            'transferred_at' => $hold->transferred_at?->toIso8601String(),
+                            'transfer_id' => $transfer->id,
+                            'stripe_transfer_id' => $transfer->stripe_transfer_id,
+                            'transfer_type' => $transfer->transfer_type,
+                            'transferred_at' => $transfer->transferred_at?->toIso8601String(),
                         ],
                     ];
                 }
@@ -183,7 +183,10 @@ class PaymentHoldController extends Controller
                     'message' => 'Hold period not completed yet. Payout will be available after hold period ends.',
                     'data' => [
                         'hold_end_at' => $hold->hold_end_at?->toIso8601String(),
-                        'days_remaining' => $hold->hold_end_at ? max(0, now()->diffInDays($hold->hold_end_at, false)) : null,
+                        'days_remaining' => $hold->hold_end_at ? max(0, (int) now()->diffInDays($hold->hold_end_at, false)) : null,
+                        'hours_remaining' => $hold->hold_end_at ? max(0, intdiv((int) now()->diffInMinutes($hold->hold_end_at, false) % 1440, 60)) : null,
+                        'minutes_remaining' => $hold->hold_end_at ? max(0, (int) now()->diffInMinutes($hold->hold_end_at, false) % 60) : null,
+                        'total_minutes_remaining' => $hold->hold_end_at ? max(0, (int) now()->diffInMinutes($hold->hold_end_at, false)) : null,
                     ],
                 ], 400);
             }
@@ -285,14 +288,10 @@ class PaymentHoldController extends Controller
             // READY FOR TRANSFER: Money that completed hold period (can be withdrawn)
             // Includes: status='ready_for_transfer' OR status='partial_transferred' OR status='holding' with completed period
             $readyForTransferAmount = $holds
-                ->where(function ($query) {
-                    $query->where('status', 'ready_for_transfer')
-                        ->orWhere('status', 'partial_transferred')
-                        ->orWhere(function ($q) {
-                            $q->where('status', 'holding')
-                                ->whereNotNull('hold_end_at')
-                                ->where('hold_end_at', '<=', now());
-                        });
+                ->filter(function ($hold) {
+                    return $hold->status === 'ready_for_transfer'
+                        || $hold->status === 'partial_transferred'
+                        || ($hold->status === 'holding' && $hold->hold_end_at && $hold->hold_end_at->isPast());
                 })
                 ->sum(function ($hold) {
                     $remaining = $hold->remaining_amount ?? $hold->amount;
@@ -749,25 +748,37 @@ class PaymentHoldController extends Controller
     {
         $holdDuration = [
             'hold_days' => $hold->hold_days,
+            'hold_hours' => $hold->hold_hours ?? 0,
+            'hold_minutes' => $hold->hold_minutes ?? 0,
             'hold_period_type' => $hold->hold_period_type,
             'hold_start_at' => $hold->hold_start_at?->toIso8601String(),
             'hold_end_at' => $hold->hold_end_at?->toIso8601String(),
             'days_elapsed' => null,
+            'hours_elapsed' => null,
+            'minutes_elapsed' => null,
             'days_remaining' => null,
+            'hours_remaining' => null,
+            'minutes_remaining' => null,
+            'total_minutes_remaining' => null,
             'is_complete' => false,
         ];
 
         if ($hold->hold_start_at && $hold->hold_end_at) {
             $now = now();
 
-            // Calculate days elapsed since hold started
-            $holdDuration['days_elapsed'] = max(0, $hold->hold_start_at->diffInDays($now));
+            // Elapsed time
+            $elapsedMinutes = max(0, (int) $hold->hold_start_at->diffInMinutes($now));
+            $holdDuration['days_elapsed'] = intdiv($elapsedMinutes, 1440);
+            $holdDuration['hours_elapsed'] = intdiv($elapsedMinutes % 1440, 60);
+            $holdDuration['minutes_elapsed'] = $elapsedMinutes % 60;
 
-            // Calculate days remaining (can be negative if overdue)
-            $daysRemaining = $now->diffInDays($hold->hold_end_at, false);
-            $holdDuration['days_remaining'] = $daysRemaining >= 0 ? $daysRemaining : 0;
+            // Remaining time
+            $remainingMinutes = max(0, (int) $now->diffInMinutes($hold->hold_end_at, false));
+            $holdDuration['total_minutes_remaining'] = $remainingMinutes;
+            $holdDuration['days_remaining'] = intdiv($remainingMinutes, 1440);
+            $holdDuration['hours_remaining'] = intdiv($remainingMinutes % 1440, 60);
+            $holdDuration['minutes_remaining'] = $remainingMinutes % 60;
 
-            // Check if hold period is complete
             $holdDuration['is_complete'] = $hold->hold_end_at->isPast();
         } elseif ($hold->hold_end_at) {
             $holdDuration['is_complete'] = $hold->hold_end_at->isPast();

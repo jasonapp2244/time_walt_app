@@ -29,6 +29,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('/users', [UserController::class, 'index'])->name('users.index');
         Route::get('/users/stats', [UserController::class, 'stats'])->name('users.stats');
         Route::get('/users/{user}', [UserController::class, 'show'])->name('users.show');
+        Route::get('/users/{user}/stats', [UserController::class, 'userStats'])->name('users.stats.show');
 
         // Payment Holds
         Route::get('/payment-holds', [PaymentHoldController::class, 'index'])->name('payment-holds.index');

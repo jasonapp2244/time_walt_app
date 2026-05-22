@@ -18,7 +18,10 @@ class PaymentController extends Controller
         $query = Payment::with(['user', 'hold']);
 
         if ($request->filled('status')) {
-            $query->where('status', $request->status);
+            // Map display status to DB status (DB stores 'succeeded', UI shows 'completed')
+            $statusMap = ['completed' => 'succeeded'];
+            $dbStatus = $statusMap[$request->status] ?? $request->status;
+            $query->where('status', $dbStatus);
         }
 
         $payments = $query->latest()->paginate(10)->withQueryString();

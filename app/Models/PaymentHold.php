@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class PaymentHold extends Model
@@ -20,6 +21,8 @@ class PaymentHold extends Model
         'hold_start_at',
         'hold_end_at',
         'hold_days',
+        'hold_hours',
+        'hold_minutes',
         'hold_period_type',
         'status',
         'ready_at',
@@ -35,6 +38,8 @@ class PaymentHold extends Model
             'hold_start_at' => 'datetime',
             'hold_end_at' => 'datetime',
             'hold_days' => 'integer',
+            'hold_hours' => 'integer',
+            'hold_minutes' => 'integer',
             'status' => 'string',
             'ready_at' => 'datetime',
             'transferred_at' => 'datetime',
@@ -59,11 +64,19 @@ class PaymentHold extends Model
     }
 
     /**
-     * Get the transfer for the hold.
+     * Get all transfers for the hold.
+     */
+    public function transfers(): HasMany
+    {
+        return $this->hasMany(Transfer::class, 'hold_id');
+    }
+
+    /**
+     * Get the latest transfer for the hold (backward-compatible).
      */
     public function transfer(): HasOne
     {
-        return $this->hasOne(Transfer::class, 'hold_id');
+        return $this->hasOne(Transfer::class, 'hold_id')->latestOfMany();
     }
 
     /**

@@ -360,7 +360,23 @@
         }
 
         /* ── Pagination ───────────────────────────── */
-        .pagination { gap: 3px; flex-wrap: wrap; }
+        .tv-pagination-footer {
+            padding: 12px 20px !important;
+        }
+        .tv-pagination-footer nav {
+            width: 100%;
+        }
+        .tv-pagination-footer nav > div {
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .tv-pagination-footer nav p {
+            margin-bottom: 0 !important;
+            font-size: 12px !important;
+            color: #4b5563 !important;
+            font-weight: 500 !important;
+        }
+        .pagination { gap: 3px; flex-wrap: wrap; margin-bottom: 0 !important; }
         .pagination .page-item .page-link {
             background: #ffffff !important;
             border-color: rgba(189,126,46,0.2) !important;
@@ -368,6 +384,7 @@
             border-radius: 6px !important;
             font-size: 12px !important;
             padding: 4px 9px !important;
+            line-height: 1.4 !important;
         }
         .pagination .page-item.active .page-link {
             background: var(--tv-gold) !important;

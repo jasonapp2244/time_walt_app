@@ -74,6 +74,7 @@
                         <thead>
                             <tr>
                                 <th style="width:50px;">#</th>
+                                <th>Payment ID</th>
                                 <th>User</th>
                                 <th>Amount</th>
                                 <th>Currency</th>
@@ -87,6 +88,9 @@
                             <tr>
                                 <td style="color:#6b7280; font-size:12px; font-weight:500;">
                                     {{ ($payments->currentPage() - 1) * $payments->perPage() + $loop->iteration }}
+                                </td>
+                                <td style="color:#2563eb; font-size:12px; font-weight:700;">
+                                    {{ str_pad($payment->id, 5, '0', STR_PAD_LEFT) }}
                                 </td>
                                 <td>
                                     <a href="{{ route('admin.users.show', $payment->user_id) }}"
@@ -117,7 +121,7 @@
                             </tr>
                             @empty
                             <tr>
-                                <td colspan="7" class="text-center py-5" style="color:#6b7280;">
+                                <td colspan="8" class="text-center py-5" style="color:#6b7280;">
                                     <i class='bx bx-credit-card d-block mb-2' style="font-size:28px; color:#d4963e;"></i>
                                     No payments found
                                 </td>
@@ -128,10 +132,7 @@
                 </div>
             </div>
             @if($payments->hasPages())
-            <div class="card-footer" style="padding:12px 20px; display:flex; align-items:center; justify-content:space-between;">
-                <span style="font-size:12px; color:#4b5563; font-weight:500;">
-                    Showing {{ $payments->firstItem() }}–{{ $payments->lastItem() }} of {{ $payments->total() }} records
-                </span>
+            <div class="card-footer tv-pagination-footer">
                 {{ $payments->appends(request()->query())->links() }}
             </div>
             @endif

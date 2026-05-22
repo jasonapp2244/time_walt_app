@@ -49,6 +49,7 @@
                         <thead>
                             <tr>
                                 <th style="width:50px;">#</th>
+                                <th>User ID</th>
                                 <th>User</th>
                                 <th>Phone</th>
                                 <th>Status</th>
@@ -64,6 +65,9 @@
                             <tr>
                                 <td style="color:#6b7280; font-size:12px; font-weight:500;">
                                     {{ ($users->currentPage() - 1) * $users->perPage() + $loop->iteration }}
+                                </td>
+                                <td style="color:#2563eb; font-size:12px; font-weight:700;">
+                                    {{ str_pad($user->id, 5, '0', STR_PAD_LEFT) }}
                                 </td>
                                 <td>
                                     <div style="font-weight:600; color:#111827; font-size:13px; line-height:1.3;">
@@ -116,10 +120,7 @@
                 </div>
             </div>
             @if($users->hasPages())
-            <div class="card-footer" style="padding:12px 20px; display:flex; align-items:center; justify-content:space-between;">
-                <span style="font-size:12px; color:#4b5563; font-weight:500;">
-                    Showing {{ $users->firstItem() }}–{{ $users->lastItem() }} of {{ $users->total() }} users
-                </span>
+            <div class="card-footer tv-pagination-footer">
                 {{ $users->appends(request()->query())->links() }}
             </div>
             @endif

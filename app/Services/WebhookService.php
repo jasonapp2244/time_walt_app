@@ -65,9 +65,25 @@ class WebhookService
         // Check if payment already exists
         $payment = Payment::where('payment_intent_id_index', Payment::blindIndex($paymentIntentId))->first();
 
+        // Extract card details from latest charge
+        $charge = $paymentIntent->latest_charge;
+        if (is_string($charge)) {
+            $charge = \Stripe\Charge::retrieve($charge);
+        }
+        $cardDetails = $charge?->payment_method_details?->card ?? null;
+        $cardData = [
+            'card_brand' => $cardDetails->brand ?? null,
+            'card_last4' => $cardDetails->last4 ?? null,
+            'card_exp_month' => $cardDetails->exp_month ?? null,
+            'card_exp_year' => $cardDetails->exp_year ?? null,
+            'card_funding' => $cardDetails->funding ?? null,
+            'card_country' => $cardDetails->country ?? null,
+            'payment_method_type' => $cardDetails?->wallet?->type ?? 'card',
+        ];
+
         if (! $payment) {
             // Create payment record
-            $payment = Payment::create([
+            $payment = Payment::create(array_merge([
                 'user_id' => $userId,
                 'payment_intent_id' => $paymentIntentId,
                 'amount' => $amount,
@@ -75,14 +91,14 @@ class WebhookService
                 'status' => 'succeeded',
                 'paid_at' => now(),
                 'stripe_data' => $paymentIntent->toArray(),
-            ]);
+            ], $cardData));
         } else {
             // Update existing payment
-            $payment->update([
+            $payment->update(array_merge([
                 'status' => 'succeeded',
                 'paid_at' => now(),
                 'stripe_data' => $paymentIntent->toArray(),
-            ]);
+            ], $cardData));
         }
 
         // Get hold period data from PaymentIntent metadata or cache
@@ -90,10 +106,12 @@ class WebhookService
         if (isset($paymentIntent->metadata->hold_period_type)) {
             $holdPeriodData = [
                 'hold_period_type' => $paymentIntent->metadata->hold_period_type,
-                'hold_start_at'    => $paymentIntent->metadata->hold_start_at ?? null,
-                'hold_end_at'      => $paymentIntent->metadata->hold_end_at ?? null,
-                'hold_days'        => $paymentIntent->metadata->hold_days ?? null,
-                'title'            => $paymentIntent->metadata->title ?? null,
+                'hold_start_at' => $paymentIntent->metadata->hold_start_at ?? null,
+                'hold_end_at' => $paymentIntent->metadata->hold_end_at ?? null,
+                'hold_days' => $paymentIntent->metadata->hold_days ?? null,
+                'hold_hours' => $paymentIntent->metadata->hold_hours ?? 0,
+                'hold_minutes' => $paymentIntent->metadata->hold_minutes ?? 0,
+                'title' => $paymentIntent->metadata->title ?? null,
             ];
         } else {
             // Try to get from cache (fallback if metadata not set)
@@ -101,10 +119,12 @@ class WebhookService
             if ($cachedHoldData) {
                 $holdPeriodData = [
                     'hold_period_type' => $cachedHoldData['hold_period_type'] ?? null,
-                    'hold_start_at'    => $cachedHoldData['hold_start_at'] ?? null,
-                    'hold_end_at'      => $cachedHoldData['hold_end_at'] ?? null,
-                    'hold_days'        => $cachedHoldData['hold_days'] ?? null,
-                    'title'            => $cachedHoldData['title'] ?? null,
+                    'hold_start_at' => $cachedHoldData['hold_start_at'] ?? null,
+                    'hold_end_at' => $cachedHoldData['hold_end_at'] ?? null,
+                    'hold_days' => $cachedHoldData['hold_days'] ?? null,
+                    'hold_hours' => $cachedHoldData['hold_hours'] ?? 0,
+                    'hold_minutes' => $cachedHoldData['hold_minutes'] ?? 0,
+                    'title' => $cachedHoldData['title'] ?? null,
                 ];
             }
         }
@@ -134,6 +154,22 @@ class WebhookService
         // Find payment record
         $payment = Payment::where('payment_intent_id_index', Payment::blindIndex($paymentIntentId))->first();
 
+        // Extract card details from payment intent charges (array format)
+        $chargeData = $paymentIntent['latest_charge'] ?? ($paymentIntent['charges']['data'][0] ?? null);
+        if (is_string($chargeData)) {
+            $chargeData = \Stripe\Charge::retrieve($chargeData)->toArray();
+        }
+        $cardArr = $chargeData['payment_method_details']['card'] ?? [];
+        $cardData = [
+            'card_brand' => $cardArr['brand'] ?? null,
+            'card_last4' => $cardArr['last4'] ?? null,
+            'card_exp_month' => $cardArr['exp_month'] ?? null,
+            'card_exp_year' => $cardArr['exp_year'] ?? null,
+            'card_funding' => $cardArr['funding'] ?? null,
+            'card_country' => $cardArr['country'] ?? null,
+            'payment_method_type' => $cardArr['wallet']['type'] ?? 'card',
+        ];
+
         if (! $payment) {
             // Payment not found — create it to prevent lost payments
             $userId = $paymentIntent['metadata']['user_id'] ?? null;
@@ -147,7 +183,7 @@ class WebhookService
             $amount = ($paymentIntent['amount'] ?? 0) / 100;
             $currency = $paymentIntent['currency'] ?? 'usd';
 
-            $payment = Payment::create([
+            $payment = Payment::create(array_merge([
                 'user_id' => $userId,
                 'payment_intent_id' => $paymentIntentId,
                 'amount' => $amount,
@@ -155,7 +191,7 @@ class WebhookService
                 'status' => 'succeeded',
                 'paid_at' => now(),
                 'stripe_data' => $paymentIntent,
-            ]);
+            ], $cardData));
 
             Log::info('Payment record created from webhook (was missing)', [
                 'payment_id' => $payment->id,
@@ -163,11 +199,11 @@ class WebhookService
             ]);
         } else {
             // Update existing payment status
-            $payment->update([
+            $payment->update(array_merge([
                 'status' => 'succeeded',
                 'paid_at' => now(),
                 'stripe_data' => $paymentIntent,
-            ]);
+            ], $cardData));
         }
 
         // Get hold period data from cache or metadata

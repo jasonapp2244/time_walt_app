@@ -282,10 +282,16 @@
                                             ${{ number_format($hold->amount, 2) }}
                                         </td>
                                         <td style="color:#374151; font-size:12px; font-weight:500;">
-                                            {{ $hold->hold_period_type ? str_replace('_', ' ', $hold->hold_period_type) : ($hold->hold_days ? $hold->hold_days.' days' : '—') }}
+                                            @php
+                                                $parts = [];
+                                                if ($hold->hold_days) $parts[] = $hold->hold_days . 'd';
+                                                if ($hold->hold_hours) $parts[] = $hold->hold_hours . 'h';
+                                                if ($hold->hold_minutes) $parts[] = $hold->hold_minutes . 'm';
+                                            @endphp
+                                            {{ $parts ? implode(' ', $parts) : ($hold->hold_period_type ? str_replace('_', ' ', $hold->hold_period_type) : '—') }}
                                         </td>
                                         <td style="color:#374151; font-size:12px; font-weight:500;">
-                                            {{ $hold->hold_end_at?->format('d M Y') ?? '—' }}
+                                            {{ $hold->hold_end_at?->format('d M Y, h:i A') ?? '—' }}
                                         </td>
                                         <td>
                                             <span class="tv-badge badge-{{ str_replace('_','-',$hold->status) }}">

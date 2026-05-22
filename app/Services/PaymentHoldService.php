@@ -12,42 +12,53 @@ class PaymentHoldService
      * Create payment hold from payment with hold period data.
      *
      * Date handling:
-     *   - hold_start_at: passed date + current time  e.g. "2026-03-06" → 2026-03-06 15:32:04
-     *   - hold_end_at:   passed date + current time  e.g. "2026-03-07" → 2026-03-07 15:32:04
-     *   - If not passed:  calculated from hold_days starting now
+     *   - hold_start_at: full datetime "2026-03-06 14:30:00" or date-only "2026-03-06" (uses current time)
+     *   - hold_end_at:   full datetime or date-only (uses current time)
+     *   - If end not passed: calculated from hold_days + hold_hours + hold_minutes starting from start
      */
     public function createFromPayment(Payment $payment, array $holdPeriodData = []): PaymentHold
     {
         $appTz = config('app.timezone');
         $holdPeriodType = $holdPeriodData['hold_period_type'] ?? '1_month';
-        $holdDays = (int) ($holdPeriodData['hold_days'] ?? 30);
+        $holdDays = (int) ($holdPeriodData['hold_days'] ?? 0);
+        $holdHours = (int) ($holdPeriodData['hold_hours'] ?? 0);
+        $holdMinutes = (int) ($holdPeriodData['hold_minutes'] ?? 0);
         $title = $holdPeriodData['title'] ?? null;
 
-        // Current time components — applied to both dates
         $now = now();
-        $h = $now->hour;
-        $m = $now->minute;
-        $s = $now->second;
 
-        // hold_start_at: passed date + current time
+        // hold_start_at: parse as full datetime, or date + current time
         $rawStartDate = $holdPeriodData['hold_start_at'] ?? null;
         if ($rawStartDate) {
-            $startDate = Carbon::parse($rawStartDate, $appTz)->setTime($h, $m, $s);
+            $startDate = Carbon::parse($rawStartDate, $appTz);
+            // If only date was passed (no time component), apply current time
+            if (strlen(trim($rawStartDate)) <= 10) {
+                $startDate->setTime($now->hour, $now->minute, $now->second);
+            }
         } else {
             $startDate = $now->copy();
         }
 
-        // hold_end_at: passed date + current time
+        // hold_end_at: parse as full datetime, or date + current time
         $rawEndDate = $holdPeriodData['hold_end_at'] ?? null;
         if ($rawEndDate) {
-            $endDate = Carbon::parse($rawEndDate, $appTz)->setTime($h, $m, $s);
+            $endDate = Carbon::parse($rawEndDate, $appTz);
+            if (strlen(trim($rawEndDate)) <= 10) {
+                $endDate->setTime($now->hour, $now->minute, $now->second);
+            }
         } else {
-            // No end date — calculate from hold_days
-            $endDate = $startDate->copy()->addDays($holdDays);
+            // No end date — calculate from days + hours + minutes
+            $endDate = $startDate->copy()
+                ->addDays($holdDays > 0 ? $holdDays : 30)
+                ->addHours($holdHours)
+                ->addMinutes($holdMinutes);
         }
 
-        // Actual hold days between start and end
-        $holdDays = (int) $startDate->diffInDays($endDate);
+        // Calculate actual duration between start and end
+        $totalMinutes = (int) $startDate->diffInMinutes($endDate);
+        $holdDays = intdiv($totalMinutes, 1440);       // 1440 minutes in a day
+        $holdHours = intdiv($totalMinutes % 1440, 60);
+        $holdMinutes = $totalMinutes % 60;
 
         return PaymentHold::create([
             'payment_id' => $payment->id,
@@ -58,6 +69,8 @@ class PaymentHoldService
             'hold_start_at' => $startDate,
             'hold_end_at' => $endDate,
             'hold_days' => $holdDays,
+            'hold_hours' => $holdHours,
+            'hold_minutes' => $holdMinutes,
             'hold_period_type' => $holdPeriodType,
             'status' => 'holding',
         ]);

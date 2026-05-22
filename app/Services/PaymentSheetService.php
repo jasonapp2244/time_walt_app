@@ -77,6 +77,8 @@ class PaymentSheetService
             $metadata['hold_start_at'] = $data['hold_start_at'] ?? now()->toIso8601String();
             $metadata['hold_end_at'] = $data['hold_end_at'] ?? now()->addDays(30)->toIso8601String();
             $metadata['hold_days'] = (string) ($data['hold_days'] ?? 30);
+            $metadata['hold_hours'] = (string) ($data['hold_hours'] ?? 0);
+            $metadata['hold_minutes'] = (string) ($data['hold_minutes'] ?? 0);
         }
 
         if (isset($data['title'])) {
@@ -120,7 +122,7 @@ class PaymentSheetService
         ]);
 
         if ($paymentIntent->status !== 'succeeded') {
-            throw new \Exception('Payment not completed yet. Status: ' . $paymentIntent->status);
+            throw new \Exception('Payment not completed yet. Status: '.$paymentIntent->status);
         }
 
         $metadataUserId = $paymentIntent->metadata->user_id ?? null;
@@ -191,6 +193,8 @@ class PaymentSheetService
                     'hold_start_at' => $paymentIntent->metadata->hold_start_at ?? null,
                     'hold_end_at' => $paymentIntent->metadata->hold_end_at ?? null,
                     'hold_days' => $paymentIntent->metadata->hold_days ?? null,
+                    'hold_hours' => $paymentIntent->metadata->hold_hours ?? 0,
+                    'hold_minutes' => $paymentIntent->metadata->hold_minutes ?? 0,
                     'title' => $paymentIntent->metadata->title ?? null,
                 ];
 
@@ -278,6 +282,8 @@ class PaymentSheetService
             'hold_start_at' => $hold->hold_start_at->toIso8601String(),
             'hold_end_at' => $hold->hold_end_at->toIso8601String(),
             'hold_days' => $hold->hold_days,
+            'hold_hours' => $hold->hold_hours ?? 0,
+            'hold_minutes' => $hold->hold_minutes ?? 0,
             'title' => $hold->title,
         ];
     }

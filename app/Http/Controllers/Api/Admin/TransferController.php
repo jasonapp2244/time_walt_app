@@ -48,11 +48,20 @@ class TransferController extends Controller
                 ], 400);
             }
 
-            // Check if transfer already exists
-            if ($hold->transfer) {
+            // Check if remaining amount is available
+            $remainingAmount = $hold->remaining_amount ?? $hold->amount;
+            if ($remainingAmount <= 0) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Transfer already exists for this hold.',
+                    'message' => 'No remaining amount available for transfer.',
+                ], 400);
+            }
+
+            // Check if there's already a pending/processing transfer
+            if ($hold->transfers()->whereIn('status', ['pending', 'processing'])->exists()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'A pending transfer already exists for this hold.',
                 ], 400);
             }
 

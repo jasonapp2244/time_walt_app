@@ -174,6 +174,8 @@ class StripeService
                 $metadata['hold_start_at'] = $data['hold_start_at'] ?? now()->toIso8601String();
                 $metadata['hold_end_at'] = $data['hold_end_at'] ?? now()->addDays(30)->toIso8601String();
                 $metadata['hold_days'] = (string) ($data['hold_days'] ?? 30);
+                $metadata['hold_hours'] = (string) ($data['hold_hours'] ?? 0);
+                $metadata['hold_minutes'] = (string) ($data['hold_minutes'] ?? 0);
             }
 
             // Add title if provided
@@ -263,6 +265,8 @@ class StripeService
                             'hold_start_at' => $data['hold_start_at'] ?? null,
                             'hold_end_at' => $data['hold_end_at'] ?? null,
                             'hold_days' => $data['hold_days'] ?? null,
+                            'hold_hours' => $data['hold_hours'] ?? 0,
+                            'hold_minutes' => $data['hold_minutes'] ?? 0,
                             'user_id' => $data['user_id'],
                         ],
                         now()->addDays(7)
@@ -278,6 +282,8 @@ class StripeService
                             'hold_start_at' => $data['hold_start_at'] ?? null,
                             'hold_end_at' => $data['hold_end_at'] ?? null,
                             'hold_days' => $data['hold_days'] ?? null,
+                            'hold_hours' => $data['hold_hours'] ?? 0,
+                            'hold_minutes' => $data['hold_minutes'] ?? 0,
                             'user_id' => $data['user_id'],
                         ],
                         now()->addDays(7)
@@ -292,6 +298,8 @@ class StripeService
                     'start_at' => $data['hold_start_at'] ?? now()->toIso8601String(),
                     'end_at' => $data['hold_end_at'] ?? now()->addDays(30)->toIso8601String(),
                     'days' => (int) ($data['hold_days'] ?? 30),
+                    'hours' => (int) ($data['hold_hours'] ?? 0),
+                    'minutes' => (int) ($data['hold_minutes'] ?? 0),
                 ];
             }
 
@@ -404,6 +412,8 @@ class StripeService
                     'hold_start_at' => $paymentIntent->metadata->hold_start_at,
                     'hold_end_at' => $paymentIntent->metadata->hold_end_at,
                     'hold_days' => $paymentIntent->metadata->hold_days,
+                    'hold_hours' => $paymentIntent->metadata->hold_hours ?? 0,
+                    'hold_minutes' => $paymentIntent->metadata->hold_minutes ?? 0,
                 ];
             }
         } catch (\Exception $e) {

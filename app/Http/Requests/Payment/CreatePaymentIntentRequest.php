@@ -23,6 +23,8 @@ class CreatePaymentIntentRequest extends FormRequest
             'hold_period_type' => ['required', 'string', Rule::in(['custom'])],
             'hold_start_at' => ['required', 'date', 'after_or_equal:today'],
             'hold_end_at' => ['required', 'date', 'after:hold_start_at'],
+            'hold_hours' => ['nullable', 'integer', 'min:0', 'max:23'],
+            'hold_minutes' => ['nullable', 'integer', 'min:0', 'max:59'],
         ];
     }
 
@@ -46,6 +48,12 @@ class CreatePaymentIntentRequest extends FormRequest
             'hold_end_at.required' => 'Hold end date is required.',
             'hold_end_at.date' => 'Hold end date must be a valid date.',
             'hold_end_at.after' => 'Hold end date must be after start date.',
+            'hold_hours.integer' => 'Hold hours must be a valid number.',
+            'hold_hours.min' => 'Hold hours cannot be negative.',
+            'hold_hours.max' => 'Hold hours cannot exceed 23.',
+            'hold_minutes.integer' => 'Hold minutes must be a valid number.',
+            'hold_minutes.min' => 'Hold minutes cannot be negative.',
+            'hold_minutes.max' => 'Hold minutes cannot exceed 59.',
         ];
     }
 }

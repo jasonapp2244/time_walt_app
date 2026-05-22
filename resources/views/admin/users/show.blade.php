@@ -14,6 +14,11 @@
                 <h4 class="section-heading">{{ $user->full_name ?? 'User Detail' }}</h4>
                 <p class="section-sub">User ID #{{ $user->id }}</p>
             </div>
+            <div class="ms-auto d-flex align-items-center gap-3">
+                <span id="user-refresh-alert" style="display:none; font-size:12px; color:#c87000; font-weight:600; cursor:pointer; background:rgba(255,152,0,0.1); border:1px solid rgba(255,152,0,0.3); border-radius:6px; padding:4px 10px;" onclick="window.location.reload()">
+                    <i class='bx bx-refresh me-1'></i>New updates — click to reload
+                </span>
+            </div>
         </div>
 
         {{-- User Amount Summary --}}
@@ -24,7 +29,7 @@
                         <i class='bx bxs-lock-alt'></i>
                     </div>
                     <div>
-                        <div style="font-size:17px; font-weight:700; color:#c87000;">${{ number_format($userAmounts['total_held'], 2) }}</div>
+                        <div style="font-size:17px; font-weight:700; color:#c87000;" data-stat="total_held">${{ number_format($userAmounts['total_held'], 2) }}</div>
                         <div style="font-size:11px; color:#374151; font-weight:600; text-transform:uppercase; letter-spacing:0.6px;">Total Hold</div>
                     </div>
                 </div>
@@ -35,7 +40,7 @@
                         <i class='bx bxs-lock-open-alt'></i>
                     </div>
                     <div>
-                        <div style="font-size:17px; font-weight:700; color:#92621a;">${{ number_format($userAmounts['total_ready'], 2) }}</div>
+                        <div style="font-size:17px; font-weight:700; color:#92621a;" data-stat="total_ready">${{ number_format($userAmounts['total_ready'], 2) }}</div>
                         <div style="font-size:11px; color:#374151; font-weight:600; text-transform:uppercase; letter-spacing:0.6px;">Total Ready</div>
                     </div>
                 </div>
@@ -46,7 +51,7 @@
                         <i class='bx bxs-send'></i>
                     </div>
                     <div>
-                        <div style="font-size:17px; font-weight:700; color:#1e8c3a;">${{ number_format($userAmounts['total_withdrawn'], 2) }}</div>
+                        <div style="font-size:17px; font-weight:700; color:#1e8c3a;" data-stat="total_withdrawn">${{ number_format($userAmounts['total_withdrawn'], 2) }}</div>
                         <div style="font-size:11px; color:#374151; font-weight:600; text-transform:uppercase; letter-spacing:0.6px;">Total Withdrawn</div>
                     </div>
                 </div>
@@ -136,6 +141,8 @@
                             <table class="table mb-0">
                                 <thead>
                                     <tr>
+                                        <th style="width:50px;">#</th>
+                                        <th>Hold ID</th>
                                         <th>Title</th>
                                         <th>Amount</th>
                                         <th>Hold Period</th>
@@ -146,15 +153,23 @@
                                 <tbody>
                                     @forelse($user->paymentHolds as $hold)
                                     <tr>
+                                        <td style="color:#6b7280; font-size:12px; font-weight:500;">{{ $loop->iteration }}</td>
+                                        <td style="color:#2563eb; font-size:12px; font-weight:700;">{{ str_pad($hold->id, 5, '0', STR_PAD_LEFT) }}</td>
                                         <td style="color:#1f2937; font-size:13px; font-weight:500;">{{ $hold->title ?? '—' }}</td>
                                         <td style="color:#92621a; font-weight:700;">
                                             ${{ number_format($hold->amount, 2) }}
                                         </td>
                                         <td style="color:#374151; font-size:12px; font-weight:500;">
-                                            {{ $hold->hold_period_type ? str_replace('_', ' ', $hold->hold_period_type) : ($hold->hold_days ? $hold->hold_days.' days' : '—') }}
+                                            @php
+                                                $parts = [];
+                                                if ($hold->hold_days) $parts[] = $hold->hold_days . 'd';
+                                                if ($hold->hold_hours) $parts[] = $hold->hold_hours . 'h';
+                                                if ($hold->hold_minutes) $parts[] = $hold->hold_minutes . 'm';
+                                            @endphp
+                                            {{ $parts ? implode(' ', $parts) : ($hold->hold_period_type ? str_replace('_', ' ', $hold->hold_period_type) : '—') }}
                                         </td>
                                         <td style="color:#4b5563; font-size:12px; font-weight:500;">
-                                            {{ $hold->hold_end_at?->format('d M Y') ?? '—' }}
+                                            {{ $hold->hold_end_at?->format('d M Y, h:i A') ?? '—' }}
                                         </td>
                                         <td>
                                             <span class="tv-badge badge-{{ str_replace('_','-',$hold->status) }}">
@@ -164,7 +179,7 @@
                                     </tr>
                                     @empty
                                     <tr>
-                                        <td colspan="5" class="text-center py-3" style="color:#6b7280;">No holds</td>
+                                        <td colspan="7" class="text-center py-3" style="color:#6b7280;">No holds</td>
                                     </tr>
                                     @endforelse
                                 </tbody>
@@ -185,6 +200,7 @@
                             <table class="table mb-0">
                                 <thead>
                                     <tr>
+                                        <th style="width:50px;">#</th>
                                         <th>Bank Name</th>
                                         <th>Account</th>
                                         <th>Type</th>
@@ -196,6 +212,7 @@
                                 <tbody>
                                     @forelse($bankAccounts as $bank)
                                     <tr>
+                                        <td style="color:#6b7280; font-size:12px; font-weight:500;">{{ $loop->iteration }}</td>
                                         <td style="color:#1f2937; font-size:13px; font-weight:600;">{{ $bank->bank_name }}</td>
                                         <td style="color:#374151; font-size:13px; font-weight:600; font-family:monospace;">{{ $bank->masked_account_number }}</td>
                                         <td style="color:#374151; font-size:12px; font-weight:500;">{{ ucfirst($bank->account_type) }}</td>
@@ -217,7 +234,7 @@
                                     </tr>
                                     @empty
                                     <tr>
-                                        <td colspan="6" class="text-center py-3" style="color:#6b7280;">No bank accounts</td>
+                                        <td colspan="7" class="text-center py-3" style="color:#6b7280;">No bank accounts</td>
                                     </tr>
                                     @endforelse
                                 </tbody>
@@ -307,7 +324,10 @@
                             <table class="table mb-0">
                                 <thead>
                                     <tr>
+                                        <th style="width:50px;">#</th>
+                                        <th>Transfer ID</th>
                                         <th>Amount</th>
+                                        <th>To (Account)</th>
                                         <th>Type</th>
                                         <th>Status</th>
                                         <th>Date</th>
@@ -316,8 +336,24 @@
                                 <tbody>
                                     @forelse($user->transfers as $transfer)
                                     <tr>
+                                        <td style="color:#6b7280; font-size:12px; font-weight:500;">{{ $loop->iteration }}</td>
+                                        <td style="color:#2563eb; font-size:12px; font-weight:700;">{{ str_pad($transfer->id, 5, '0', STR_PAD_LEFT) }}</td>
                                         <td style="color:#1e8c3a; font-weight:700;">
                                             ${{ number_format($transfer->amount, 2) }}
+                                        </td>
+                                        <td style="color:#374151; font-size:12px; font-weight:500;">
+                                            @php
+                                                $bankAccount = $bankAccounts->first(function($bank) use ($transfer) {
+                                                    return $bank->user_id === $transfer->user_id;
+                                                });
+                                            @endphp
+                                            @if($bankAccount)
+                                                <i class='bx bxs-bank me-1' style="color:#2563eb;"></i>
+                                                <span style="font-weight:600;">{{ $bankAccount->bank_name }}</span>
+                                                •••• {{ substr($bankAccount->account_number, -4) }}
+                                            @else
+                                                <span style="color:#9ca3af;">—</span>
+                                            @endif
                                         </td>
                                         <td style="color:#374151; font-size:12px; font-weight:500;">
                                             {{ str_replace('_', ' ', ucfirst($transfer->transfer_type ?? '—')) }}
@@ -333,7 +369,7 @@
                                     </tr>
                                     @empty
                                     <tr>
-                                        <td colspan="4" class="text-center py-3" style="color:#6b7280;">No transfers</td>
+                                        <td colspan="7" class="text-center py-3" style="color:#6b7280;">No transfers</td>
                                     </tr>
                                     @endforelse
                                 </tbody>
@@ -348,3 +384,77 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    const POLL_INTERVAL = 1 * 60 * 1000;
+    const STATS_URL = '{{ route("admin.users.stats.show", $user->id) }}';
+
+    function fmtMoney(n) {
+        return '$' + new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+    }
+
+    function flash(el, val) {
+        if (el && el.textContent.trim() !== val) {
+            el.style.transition = 'opacity 0.3s';
+            el.style.opacity = '0.3';
+            setTimeout(() => { el.textContent = val; el.style.opacity = '1'; }, 300);
+        }
+    }
+
+    const initialSnapshot = {
+        holds_count: {{ $user->paymentHolds->count() }},
+        transfers_count: {{ $user->transfers->count() }},
+        bank_accounts_count: {{ $bankAccounts->count() }},
+    };
+    let reloading = false;
+
+    function autoReload(bannerId, message) {
+        if (reloading) { return; }
+        reloading = true;
+
+        const banner = document.getElementById(bannerId);
+        let secs = 5;
+
+        if (banner) {
+            banner.style.display = 'inline-flex';
+            banner.onclick = () => window.location.reload();
+            banner.innerHTML = `<i class='bx bx-refresh me-1'></i>${message} — reloading in <span id="tv-cd">${secs}</span>s`;
+        }
+
+        const timer = setInterval(() => {
+            secs--;
+            const cd = document.getElementById('tv-cd');
+            if (cd) { cd.textContent = secs; }
+            if (secs <= 0) { clearInterval(timer); window.location.reload(); }
+        }, 1000);
+    }
+
+    function pollStats() {
+        fetch(STATS_URL, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+            credentials: 'same-origin',
+        })
+        .then(r => { if (!r.ok) { throw new Error('HTTP ' + r.status); } return r.json(); })
+        .then(data => {
+            flash(document.querySelector('[data-stat="total_held"]'),      fmtMoney(data.total_held));
+            flash(document.querySelector('[data-stat="total_ready"]'),     fmtMoney(data.total_ready));
+            flash(document.querySelector('[data-stat="total_withdrawn"]'), fmtMoney(data.total_withdrawn));
+
+            const changed = data.holds_count         !== initialSnapshot.holds_count
+                         || data.transfers_count     !== initialSnapshot.transfers_count
+                         || data.bank_accounts_count !== initialSnapshot.bank_accounts_count;
+
+            if (changed) {
+                autoReload('user-refresh-alert', 'User activity updated');
+            }
+        })
+        .catch(err => console.warn('[UserDetail] Poll failed:', err));
+    }
+
+    setTimeout(pollStats, 5000);
+    setInterval(pollStats, POLL_INTERVAL);
+})();
+</script>
+@endpush

@@ -383,13 +383,13 @@ class TransactionHistoryController extends Controller
             $totalOriginalAmount = $allHoldingHolds->sum('amount');
             $averageHoldDays = $allHoldingHolds->avg('hold_days');
 
-            // Calculate days until release
+            // Calculate time until release (in minutes for precision)
             $now = now();
-            $earliestRelease = $allHoldingHolds->min(function ($hold) use ($now) {
-                return $hold->hold_end_at ? $now->diffInDays($hold->hold_end_at, false) : null;
+            $earliestReleaseMinutes = $allHoldingHolds->min(function ($hold) use ($now) {
+                return $hold->hold_end_at ? (int) $now->diffInMinutes($hold->hold_end_at, false) : null;
             });
-            $latestRelease = $allHoldingHolds->max(function ($hold) use ($now) {
-                return $hold->hold_end_at ? $now->diffInDays($hold->hold_end_at, false) : null;
+            $latestReleaseMinutes = $allHoldingHolds->max(function ($hold) use ($now) {
+                return $hold->hold_end_at ? (int) $now->diffInMinutes($hold->hold_end_at, false) : null;
             });
 
             return response()->json([
@@ -400,8 +400,12 @@ class TransactionHistoryController extends Controller
                     'total_original_amount' => (float) $totalOriginalAmount,
                     'total_holds' => $holds->total(),
                     'average_hold_days' => $averageHoldDays ? (int) $averageHoldDays : null,
-                    'earliest_release_days' => $earliestRelease !== null ? (int) $earliestRelease : null,
-                    'latest_release_days' => $latestRelease !== null ? (int) $latestRelease : null,
+                    'earliest_release_days' => $earliestReleaseMinutes !== null ? intdiv($earliestReleaseMinutes, 1440) : null,
+                    'earliest_release_hours' => $earliestReleaseMinutes !== null ? intdiv($earliestReleaseMinutes % 1440, 60) : null,
+                    'earliest_release_minutes' => $earliestReleaseMinutes !== null ? $earliestReleaseMinutes % 60 : null,
+                    'latest_release_days' => $latestReleaseMinutes !== null ? intdiv($latestReleaseMinutes, 1440) : null,
+                    'latest_release_hours' => $latestReleaseMinutes !== null ? intdiv($latestReleaseMinutes % 1440, 60) : null,
+                    'latest_release_minutes' => $latestReleaseMinutes !== null ? $latestReleaseMinutes % 60 : null,
                     'currency' => 'USD',
                 ],
                 'data' => $holdAmounts,
@@ -549,6 +553,7 @@ class TransactionHistoryController extends Controller
                 'hold_status' => $hold->status,
                 'paid_at' => $hold->payment?->paid_at?->toIso8601String(),
             ],
+            ...$this->getHoldTimeFields($hold),
         ];
     }
 
@@ -573,6 +578,7 @@ class TransactionHistoryController extends Controller
                 'transfer_type' => $hold->transfer->transfer_type,
                 'transferred_at' => $hold->transferred_at?->toIso8601String(),
             ],
+            ...$this->getHoldTimeFields($hold),
         ];
     }
 
@@ -613,6 +619,9 @@ class TransactionHistoryController extends Controller
                 'payment_intent_id' => $hold->payment?->payment_intent_id,
             ];
         }
+
+        $holdTimeFields = $this->getHoldTimeFields($hold);
+        $result = array_merge($result, $holdTimeFields);
 
         return $result;
     }
@@ -675,6 +684,12 @@ class TransactionHistoryController extends Controller
             'description' => 'Withdrawal request with multiple transfers',
             'transfers_count' => count($transfers),
             'transfers' => $transferDetails,
+            'hold_start' => null,
+            'hold_end' => null,
+            'total_days' => null,
+            'days_remaining' => null,
+            'hours_remaining' => null,
+            'minutes_remaining' => null,
         ];
     }
 
@@ -684,8 +699,10 @@ class TransactionHistoryController extends Controller
     protected function formatHoldAmountTransaction(PaymentHold $hold): array
     {
         $now = now();
-        $daysRemaining = $hold->hold_end_at ? max(0, $now->diffInDays($hold->hold_end_at, false)) : 0;
-        $daysElapsed = $hold->hold_start_at ? max(0, $hold->hold_start_at->diffInDays($now)) : 0;
+        $remainingMinutes = $hold->hold_end_at ? max(0, (int) $now->diffInMinutes($hold->hold_end_at, false)) : 0;
+        $daysRemaining = intdiv($remainingMinutes, 1440);
+        $elapsedMinutes = $hold->hold_start_at ? max(0, (int) $hold->hold_start_at->diffInMinutes($now)) : 0;
+        $daysElapsed = intdiv($elapsedMinutes, 1440);
         $remainingAmount = $hold->remaining_amount ?? $hold->amount;
 
         return [
@@ -698,11 +715,18 @@ class TransactionHistoryController extends Controller
             'status' => $hold->status,
             'hold_period' => [
                 'hold_days' => $hold->hold_days,
+                'hold_hours' => $hold->hold_hours ?? 0,
+                'hold_minutes' => $hold->hold_minutes ?? 0,
                 'hold_period_type' => $hold->hold_period_type,
                 'hold_start_at' => $hold->hold_start_at?->toIso8601String(),
                 'hold_end_at' => $hold->hold_end_at?->toIso8601String(),
                 'days_elapsed' => $daysElapsed,
+                'hours_elapsed' => intdiv($elapsedMinutes % 1440, 60),
+                'minutes_elapsed' => $elapsedMinutes % 60,
                 'days_remaining' => $daysRemaining,
+                'hours_remaining' => intdiv($remainingMinutes % 1440, 60),
+                'minutes_remaining' => $remainingMinutes % 60,
+                'total_minutes_remaining' => $remainingMinutes,
             ],
             'payment_details' => [
                 'payment_id' => $hold->payment?->id,
@@ -710,6 +734,7 @@ class TransactionHistoryController extends Controller
                 'paid_at' => $hold->payment?->paid_at?->toIso8601String(),
             ],
             'created_at' => $hold->created_at->toIso8601String(),
+            ...$this->getHoldTimeFields($hold),
         ];
     }
 
@@ -735,6 +760,8 @@ class TransactionHistoryController extends Controller
             'can_withdraw' => true,
             'hold_period' => [
                 'hold_days' => $hold->hold_days,
+                'hold_hours' => $hold->hold_hours ?? 0,
+                'hold_minutes' => $hold->hold_minutes ?? 0,
                 'hold_end_at' => $hold->hold_end_at?->toIso8601String(),
                 'is_completed' => $isCompleted,
                 'completed_at' => $isCompleted ? $hold->hold_end_at?->toIso8601String() : null,
@@ -746,6 +773,7 @@ class TransactionHistoryController extends Controller
             ],
             'ready_at' => $hold->ready_at?->toIso8601String(),
             'created_at' => $hold->created_at->toIso8601String(),
+            ...$this->getHoldTimeFields($hold),
         ];
     }
 
@@ -777,6 +805,42 @@ class TransactionHistoryController extends Controller
                 'paid_at' => $hold->payment?->paid_at?->toIso8601String(),
             ],
             'created_at' => $transfer->created_at->toIso8601String(),
+            ...$this->getHoldTimeFields($hold),
+        ];
+    }
+
+    /**
+     * Calculate hold time fields for any transaction item.
+     */
+    protected function getHoldTimeFields(?PaymentHold $hold): array
+    {
+        if (! $hold || ! $hold->hold_start_at || ! $hold->hold_end_at) {
+            return [
+                'hold_start' => null,
+                'hold_end' => null,
+                'total_days' => null,
+                'days_remaining' => null,
+                'hours_remaining' => null,
+                'minutes_remaining' => null,
+            ];
+        }
+
+        $now = now();
+        $totalDays = $hold->hold_days ?? (int) $hold->hold_start_at->diffInDays($hold->hold_end_at);
+
+        if ($hold->hold_end_at->isFuture()) {
+            $remainingMinutes = max(0, (int) $now->diffInMinutes($hold->hold_end_at, false));
+        } else {
+            $remainingMinutes = 0;
+        }
+
+        return [
+            'hold_start' => $hold->hold_start_at->toIso8601String(),
+            'hold_end' => $hold->hold_end_at->toIso8601String(),
+            'total_days' => $totalDays,
+            'days_remaining' => intdiv($remainingMinutes, 1440),
+            'hours_remaining' => intdiv($remainingMinutes % 1440, 60),
+            'minutes_remaining' => $remainingMinutes % 60,
         ];
     }
 

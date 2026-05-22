@@ -69,18 +69,15 @@ class VerifyPendingTransfers extends Command
                         'stripe_data' => $stripeTransfer->toArray(),
                     ]);
 
-                    // Update hold with remaining_amount calculation
+                    // Update hold status (remaining_amount was already deducted in withdraw())
                     if ($transfer->hold) {
                         $hold = $transfer->hold;
-                        // Calculate remaining amount
                         $currentRemaining = $hold->remaining_amount ?? $hold->amount;
-                        $newRemainingAmount = max(0, $currentRemaining - $transfer->amount);
 
-                        // Update hold status and remaining_amount
+                        // Only update status, do NOT deduct remaining_amount again
                         $hold->update([
-                            'remaining_amount' => $newRemainingAmount,
-                            'status' => $newRemainingAmount <= 0 ? 'transferred' : 'partial_transferred',
-                            'transferred_at' => $newRemainingAmount <= 0 ? now() : $hold->transferred_at,
+                            'status' => $currentRemaining <= 0 ? 'transferred' : 'partial_transferred',
+                            'transferred_at' => $currentRemaining <= 0 ? now() : $hold->transferred_at,
                         ]);
                     }
 

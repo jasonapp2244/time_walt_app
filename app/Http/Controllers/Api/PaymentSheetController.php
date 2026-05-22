@@ -31,6 +31,8 @@ class PaymentSheetController extends Controller
                 'hold_start_at' => $request->hold_start_at,
                 'hold_end_at' => $request->hold_end_at,
                 'hold_days' => $request->hold_days,
+                'hold_hours' => $request->hold_hours ?? 0,
+                'hold_minutes' => $request->hold_minutes ?? 0,
                 'title' => $request->title,
             ]);
 
@@ -40,7 +42,7 @@ class PaymentSheetController extends Controller
                 'data' => $result,
             ]);
         } catch (\Exception $e) {
-            Log::error('Create Payment Intent (Payment Sheet) Failed: ' . $e->getMessage());
+            Log::error('Create Payment Intent (Payment Sheet) Failed: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,
@@ -75,7 +77,7 @@ class PaymentSheetController extends Controller
                 'data' => $result,
             ]);
         } catch (\Exception $e) {
-            Log::error('Confirm Payment (Payment Sheet) Failed: ' . $e->getMessage());
+            Log::error('Confirm Payment (Payment Sheet) Failed: '.$e->getMessage());
 
             $message = 'Failed to confirm payment.';
             if (str_contains($e->getMessage(), 'not completed yet')) {

@@ -188,6 +188,8 @@ class StripeController extends Controller
                     'hold_start_at' => $request->hold_start_at,
                     'hold_end_at' => $request->hold_end_at,
                     // 'hold_days' => $request->hold_days,
+                    'hold_hours' => $request->hold_hours ?? 0,
+                    'hold_minutes' => $request->hold_minutes ?? 0,
                 ];
             }
 
@@ -305,6 +307,13 @@ class StripeController extends Controller
                 ]);
             }
 
+            // Extract card details from latest charge
+            $charge = $paymentIntent->latest_charge;
+            if (is_string($charge)) {
+                $charge = \Stripe\Charge::retrieve($charge);
+            }
+            $cardDetails = $charge?->payment_method_details?->card ?? null;
+
             // Create payment record
             $payment = Payment::create([
                 'user_id' => $userId,
@@ -314,6 +323,13 @@ class StripeController extends Controller
                 'status' => 'succeeded',
                 'paid_at' => now(),
                 'stripe_data' => $paymentIntent->toArray(),
+                'card_brand' => $cardDetails->brand ?? null,
+                'card_last4' => $cardDetails->last4 ?? null,
+                'card_exp_month' => $cardDetails->exp_month ?? null,
+                'card_exp_year' => $cardDetails->exp_year ?? null,
+                'card_funding' => $cardDetails->funding ?? null,
+                'card_country' => $cardDetails->country ?? null,
+                'payment_method_type' => $cardDetails?->wallet?->type ?? 'card',
             ]);
 
             Log::info('✅ Payment record created via verify-payment', [
@@ -329,6 +345,8 @@ class StripeController extends Controller
                     'hold_start_at' => $paymentIntent->metadata->hold_start_at ?? null,
                     'hold_end_at' => $paymentIntent->metadata->hold_end_at ?? null,
                     'hold_days' => $paymentIntent->metadata->hold_days ?? null,
+                    'hold_hours' => $paymentIntent->metadata->hold_hours ?? null,
+                    'hold_minutes' => $paymentIntent->metadata->hold_minutes ?? null,
                     'title' => $paymentIntent->metadata->title ?? null,
                 ];
 
@@ -407,6 +425,8 @@ class StripeController extends Controller
                         'hold_start_at' => $hold->hold_start_at->toIso8601String(),
                         'hold_end_at' => $hold->hold_end_at->toIso8601String(),
                         'hold_days' => $hold->hold_days,
+                        'hold_hours' => $hold->hold_hours ?? 0,
+                        'hold_minutes' => $hold->hold_minutes ?? 0,
                     ] : null,
                 ],
             ]);
@@ -494,6 +514,13 @@ class StripeController extends Controller
             if ($status === 'success' && $paymentIntent->status === 'succeeded') {
                 // SUCCESS: Create database records
                 if (! $payment) {
+                    // Extract card details from latest charge
+                    $charge = $paymentIntent->latest_charge;
+                    if (is_string($charge)) {
+                        $charge = \Stripe\Charge::retrieve($charge);
+                    }
+                    $cardDetails = $charge?->payment_method_details?->card ?? null;
+
                     // Create payment record
                     $payment = Payment::create([
                         'user_id' => $userId,
@@ -503,6 +530,13 @@ class StripeController extends Controller
                         'status' => 'succeeded',
                         'paid_at' => now(),
                         'stripe_data' => $paymentIntent->toArray(),
+                        'card_brand' => $cardDetails->brand ?? null,
+                        'card_last4' => $cardDetails->last4 ?? null,
+                        'card_exp_month' => $cardDetails->exp_month ?? null,
+                        'card_exp_year' => $cardDetails->exp_year ?? null,
+                        'card_funding' => $cardDetails->funding ?? null,
+                        'card_country' => $cardDetails->country ?? null,
+                        'payment_method_type' => $cardDetails?->wallet?->type ?? 'card',
                     ]);
 
                     Log::info('✅ Payment SUCCESS - Record created', [
@@ -530,6 +564,8 @@ class StripeController extends Controller
                         'hold_start_at' => $paymentIntent->metadata->hold_start_at ?? null,
                         'hold_end_at' => $paymentIntent->metadata->hold_end_at ?? null,
                         'hold_days' => $paymentIntent->metadata->hold_days ?? null,
+                        'hold_hours' => $paymentIntent->metadata->hold_hours ?? 0,
+                        'hold_minutes' => $paymentIntent->metadata->hold_minutes ?? 0,
                         'title' => $paymentIntent->metadata->title ?? null,
                     ];
 

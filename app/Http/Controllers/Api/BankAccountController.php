@@ -49,7 +49,7 @@ class BankAccountController extends Controller
                         'business_profile' => [
                             'url' => config('services.stripe.platform_url', 'https://timevault.app'),
                         ],
-                        'individual' => [
+                        'individual' => array_filter([
                             'first_name' => $firstName,
                             'last_name' => $lastName,
                             'dob' => [
@@ -58,7 +58,17 @@ class BankAccountController extends Controller
                                 'year' => $dob->year,
                             ],
                             'email' => $user->email,
-                        ],
+                            'phone' => $request->phone,
+                            'address' => [
+                                'line1' => $request->address_line1,
+                                'city' => $request->city,
+                                'state' => $request->state,
+                                'postal_code' => $request->postal_code,
+                                'country' => strtoupper($request->country),
+                            ],
+                            'ssn_last_4' => strtoupper($request->country) === 'US' ? $request->ssn_last_4 : null,
+                            'id_number' => strtoupper($request->country) !== 'US' ? $request->id_number : null,
+                        ]),
                         'tos_acceptance' => [
                             'date' => time(),
                             'ip' => $request->ip(),
@@ -157,7 +167,7 @@ class BankAccountController extends Controller
                 throw $e;
             }
         } catch (\Exception $e) {
-            Log::error('Add bank account failed: ' . $e->getMessage(), [
+            Log::error('Add bank account failed: '.$e->getMessage(), [
                 'user_id' => $request->user()->id,
             ]);
 
@@ -346,7 +356,7 @@ class BankAccountController extends Controller
                 'message' => 'Bank account removed successfully.',
             ]);
         } catch (\Exception $e) {
-            Log::error('Delete bank account failed: ' . $e->getMessage(), [
+            Log::error('Delete bank account failed: '.$e->getMessage(), [
                 'user_id' => $request->user()->id,
             ]);
 
