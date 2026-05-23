@@ -258,6 +258,17 @@ class BankAccountController extends Controller
             // Set this one as primary
             $bankAccount->refresh();
             $bankAccount->update(['is_primary' => true]);
+
+            // Sync default bank on Stripe Connect account
+            $connectAccount = StripeConnectAccount::where('user_id', $user->id)->first();
+            if ($connectAccount && $bankAccount->stripe_bank_account_id) {
+                \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
+                \Stripe\Account::updateExternalAccount(
+                    $connectAccount->connect_account_id,
+                    $bankAccount->stripe_bank_account_id,
+                    ['default_for_currency' => true]
+                );
+            }
         });
 
         Log::info('Primary bank account changed', [
@@ -331,17 +342,25 @@ class BankAccountController extends Controller
             }
 
             // Wrap DB deletion + primary reassignment in a transaction
-            DB::transaction(function () use ($user, $bankAccount) {
+            DB::transaction(function () use ($user, $bankAccount, $connectAccount) {
                 $wasPrimary = $bankAccount->is_primary;
                 $bankAccount->delete();
 
-                // If deleted bank was primary, make the next one primary
+                // If deleted bank was primary, make the next one primary + sync Stripe
                 if ($wasPrimary) {
                     $nextBank = UserBankAccount::where('user_id', $user->id)
                         ->orderBy('created_at', 'asc')
                         ->first();
                     if ($nextBank) {
                         $nextBank->update(['is_primary' => true]);
+
+                        if ($connectAccount && $nextBank->stripe_bank_account_id) {
+                            \Stripe\Account::updateExternalAccount(
+                                $connectAccount->connect_account_id,
+                                $nextBank->stripe_bank_account_id,
+                                ['default_for_currency' => true]
+                            );
+                        }
                     }
                 }
             });
