@@ -18,7 +18,7 @@ class TransferController extends Controller
      */
     public function index(Request $request): View
     {
-        $query = Transfer::with(['user', 'hold'])
+        $query = Transfer::with(['user', 'hold', 'bankAccount'])
             ->whereNull('abandoned_at');
 
         if ($request->filled('status')) {

@@ -84,6 +84,7 @@
                                 <th>Transfer ID</th>
                                 <th>User</th>
                                 <th>Amount</th>
+                                <th>To (Account)</th>
                                 <th>Currency</th>
                                 <th>Type</th>
                                 <th>Status</th>
@@ -109,6 +110,15 @@
                                 <td style="color:#1e8c3a; font-weight:700; font-size:15px;">
                                     ${{ number_format($transfer->amount, 2) }}
                                 </td>
+                                <td style="color:#374151; font-size:12px; font-weight:500;">
+                                    @if($transfer->bankAccount)
+                                        <i class='bx bxs-bank me-1' style="color:#2563eb;"></i>
+                                        <span style="font-weight:600;">{{ $transfer->bankAccount->bank_name }}</span>
+                                        •••• {{ substr($transfer->bankAccount->account_number, -4) }}
+                                    @else
+                                        <span style="color:#9ca3af;">—</span>
+                                    @endif
+                                </td>
                                 <td style="color:#374151; font-size:12px; font-weight:600;">
                                     {{ strtoupper($transfer->currency ?? 'USD') }}
                                 </td>
@@ -129,7 +139,7 @@
                             </tr>
                             @empty
                             <tr>
-                                <td colspan="9" class="text-center py-5" style="color:#6b7280;">
+                                <td colspan="10" class="text-center py-5" style="color:#6b7280;">
                                     <i class='bx bx-send d-block mb-2' style="font-size:28px; color:#d4963e;"></i>
                                     No transfers found
                                 </td>
