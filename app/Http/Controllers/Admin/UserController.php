@@ -71,7 +71,8 @@ class UserController extends Controller
         $bankAccountsCount = \App\Models\UserBankAccount::where('user_id', $user->id)->count();
 
         return response()->json([
-            'total_held' => (float) $user->paymentHolds->where('status', 'holding')->sum('amount'),
+            'total_held' => (float) $user->paymentHolds->where('status', 'holding')
+                ->sum(fn ($hold) => (float) ($hold->remaining_amount ?? $hold->amount)),
             'total_ready' => (float) $user->paymentHolds
                 ->whereIn('status', ['ready_for_transfer', 'partial_transferred'])
                 ->sum(fn ($hold) => (float) ($hold->remaining_amount ?? $hold->amount)),
@@ -101,7 +102,8 @@ class UserController extends Controller
             ->get();
 
         $userAmounts = [
-            'total_held' => $user->paymentHolds->where('status', 'holding')->sum('amount'),
+            'total_held' => $user->paymentHolds->where('status', 'holding')
+                ->sum(fn ($hold) => (float) ($hold->remaining_amount ?? $hold->amount)),
             'total_ready' => $user->paymentHolds
                 ->whereIn('status', ['ready_for_transfer', 'partial_transferred'])
                 ->sum(fn ($hold) => (float) ($hold->remaining_amount ?? $hold->amount)),

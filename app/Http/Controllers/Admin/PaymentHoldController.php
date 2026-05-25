@@ -57,8 +57,8 @@ class PaymentHoldController extends Controller
         ];
 
         $amountTotals = [
-            'holding' => (float) PaymentHold::where('status', 'holding')->whereNull('abandoned_at')->sum('amount'),
-            'ready' => (float) PaymentHold::whereIn('status', ['ready_for_transfer', 'partial_transferred'])->whereNull('abandoned_at')->sum('remaining_amount'),
+            'holding' => (float) PaymentHold::where('status', 'holding')->whereNull('abandoned_at')->sum(\Illuminate\Support\Facades\DB::raw('COALESCE(remaining_amount, amount)')),
+            'ready' => (float) PaymentHold::whereIn('status', ['ready_for_transfer', 'partial_transferred'])->whereNull('abandoned_at')->sum(\Illuminate\Support\Facades\DB::raw('COALESCE(remaining_amount, amount)')),
             'withdrawn' => (float) Transfer::where('status', 'completed')->sum('amount'),
         ];
 

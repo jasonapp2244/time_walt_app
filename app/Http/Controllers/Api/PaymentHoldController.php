@@ -90,14 +90,12 @@ class PaymentHoldController extends Controller
                 return strtotime($b['date']) - strtotime($a['date']);
             });
 
-            // Calculate summary
-            $checkoutTotal = collect($transactions)
-                ->where('transaction_type', 'checkout')
-                ->where('status', 'succeeded')
-                ->sum('amount');
+            // Calculate summary from ALL user data (not just current page)
+            $checkoutTotal = (float) PaymentHold::where('user_id', $user->id)
+                ->whereHas('payment', fn ($q) => $q->where('status', 'succeeded'))
+                ->sum(\Illuminate\Support\Facades\DB::raw('COALESCE(amount, 0)'));
 
-            $transferTotal = collect($transactions)
-                ->where('transaction_type', 'transfer')
+            $transferTotal = (float) Transfer::where('user_id', $user->id)
                 ->where('status', 'completed')
                 ->sum('amount');
 
@@ -566,16 +564,21 @@ class PaymentHoldController extends Controller
                     // Calculate new remaining amount
                     $newRemainingAmount = $availableInHold - $amountFromThisHold;
 
-                    // Update hold with remaining_amount and appropriate status
-                    // Only update if transfer is completed, otherwise leave status as is
-                    if ($transferStatus === 'completed') {
+                    // Update hold: deduct for completed and pending, skip for failed
+                    if ($transferStatus === 'failed') {
+                        // Transfer failed — do NOT deduct remaining_amount
+                        Log::warning('Transfer failed, skipping remaining_amount deduction', [
+                            'hold_id' => $hold->id,
+                            'amount' => $amountFromThisHold,
+                        ]);
+                    } elseif ($transferStatus === 'completed') {
                         $hold->update([
                             'remaining_amount' => $newRemainingAmount,
                             'status' => $newRemainingAmount <= 0 ? 'transferred' : 'partial_transferred',
                             'transferred_at' => $newRemainingAmount <= 0 ? now() : $hold->transferred_at,
                         ]);
                     } else {
-                        // Transfer is pending or failed - just update remaining_amount
+                        // Pending — deduct remaining_amount to prevent double-withdrawal
                         $hold->update([
                             'remaining_amount' => $newRemainingAmount,
                         ]);

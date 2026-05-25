@@ -70,7 +70,7 @@ class DashboardController extends Controller
 
             'total_holding_amount' => (float) PaymentHold::where('status', 'holding')
                 ->whereNull('abandoned_at')
-                ->sum('amount'),
+                ->sum(\Illuminate\Support\Facades\DB::raw('COALESCE(remaining_amount, amount)')),
 
             'holds_ready' => PaymentHold::whereIn('status', ['ready_for_transfer', 'partial_transferred'])
                 ->whereNull('abandoned_at')
@@ -78,7 +78,7 @@ class DashboardController extends Controller
 
             'total_ready_amount' => (float) PaymentHold::whereIn('status', ['ready_for_transfer', 'partial_transferred'])
                 ->whereNull('abandoned_at')
-                ->sum('remaining_amount'),
+                ->sum(\Illuminate\Support\Facades\DB::raw('COALESCE(remaining_amount, amount)')),
 
             'holds_transferred' => PaymentHold::whereIn('status', ['transferred', 'partial_transferred'])
                 ->whereNull('abandoned_at')
@@ -99,7 +99,7 @@ class DashboardController extends Controller
 
             'total_holds_amount' => (float) PaymentHold::whereIn('status', ['holding', 'ready_for_transfer', 'partial_transferred'])
                 ->whereNull('abandoned_at')
-                ->sum('remaining_amount'),
+                ->sum(\Illuminate\Support\Facades\DB::raw('COALESCE(remaining_amount, amount)')),
         ];
     }
 }

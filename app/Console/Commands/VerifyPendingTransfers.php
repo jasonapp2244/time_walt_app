@@ -97,6 +97,21 @@ class VerifyPendingTransfers extends Command
                         'stripe_data' => $stripeTransfer->toArray(),
                     ]);
 
+                    // Restore remaining_amount since money was never moved
+                    if ($transfer->hold) {
+                        $hold = $transfer->hold;
+                        $restoredAmount = ($hold->remaining_amount ?? 0) + $transfer->amount;
+                        $hold->update([
+                            'remaining_amount' => $restoredAmount,
+                            'status' => $restoredAmount >= $hold->amount ? 'ready_for_transfer' : 'partial_transferred',
+                        ]);
+                        Log::info('Restored remaining_amount after failed transfer', [
+                            'hold_id' => $hold->id,
+                            'restored_amount' => $transfer->amount,
+                            'new_remaining' => $restoredAmount,
+                        ]);
+                    }
+
                     $this->error("❌ Transfer ID: {$transfer->id} failed: {$stripeTransfer->failure_message}");
                     $failedCount++;
                 }
