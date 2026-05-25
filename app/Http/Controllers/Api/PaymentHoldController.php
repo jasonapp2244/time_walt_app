@@ -541,10 +541,16 @@ class PaymentHoldController extends Controller
                         $transferStatus = 'failed';
                     }
 
+                    // Get primary bank account for this transfer
+                    $primaryBank = \App\Models\UserBankAccount::where('user_id', $user->id)
+                        ->where('is_primary', true)
+                        ->first();
+
                     // Create transfer record
                     $transferRecord = Transfer::create([
                         'hold_id' => $hold->id,
                         'user_id' => $user->id,
+                        'bank_account_id' => $primaryBank?->id,
                         'stripe_transfer_id' => $transfer->id,
                         'stripe_connect_account_id' => $connectAccount->connect_account_id,
                         'amount' => $amountFromThisHold,

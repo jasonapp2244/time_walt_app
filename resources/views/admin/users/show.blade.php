@@ -343,14 +343,14 @@
                                         </td>
                                         <td style="color:#374151; font-size:12px; font-weight:500;">
                                             @php
-                                                $bankAccount = $bankAccounts->first(function($bank) use ($transfer) {
-                                                    return $bank->user_id === $transfer->user_id;
-                                                });
+                                                $transferBank = $transfer->bankAccount
+                                                    ?? $bankAccounts->firstWhere('is_primary', true)
+                                                    ?? $bankAccounts->first();
                                             @endphp
-                                            @if($bankAccount)
+                                            @if($transferBank)
                                                 <i class='bx bxs-bank me-1' style="color:#2563eb;"></i>
-                                                <span style="font-weight:600;">{{ $bankAccount->bank_name }}</span>
-                                                •••• {{ substr($bankAccount->account_number, -4) }}
+                                                <span style="font-weight:600;">{{ $transferBank->bank_name }}</span>
+                                                •••• {{ substr($transferBank->account_number, -4) }}
                                             @else
                                                 <span style="color:#9ca3af;">—</span>
                                             @endif

@@ -13,6 +13,7 @@ class Transfer extends Model
     protected $fillable = [
         'hold_id',
         'user_id',
+        'bank_account_id',
         'stripe_transfer_id',
         'stripe_transfer_id_index',
         'stripe_connect_account_id',
@@ -84,6 +85,14 @@ class Transfer extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Get the bank account used for this transfer.
+     */
+    public function bankAccount(): BelongsTo
+    {
+        return $this->belongsTo(UserBankAccount::class, 'bank_account_id');
     }
 
     /**

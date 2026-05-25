@@ -6,6 +6,7 @@ use App\Models\PaymentHold;
 use App\Models\StripeConnectAccount;
 use App\Models\Transfer;
 use App\Models\User;
+use App\Models\UserBankAccount;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -356,9 +357,14 @@ class StripeService
                 $adminId = ($user && isset($user->role) && $user->role === 'admin') ? $user->id : null;
             }
 
+            $primaryBank = UserBankAccount::where('user_id', $hold->user_id)
+                ->where('is_primary', true)
+                ->first();
+
             $transferRecord = Transfer::create([
                 'hold_id' => $hold->id,
                 'user_id' => $hold->user_id,
+                'bank_account_id' => $primaryBank?->id,
                 'stripe_transfer_id' => $transfer->id,
                 'stripe_connect_account_id' => $connectAccount->connect_account_id,
                 'amount' => $transferAmount,

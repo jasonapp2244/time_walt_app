@@ -92,7 +92,7 @@ class UserController extends Controller
         $user->load([
             'notificationSettings',
             'paymentHolds' => fn ($q) => $q->with(['payment', 'transfer'])->latest(),
-            'transfers' => fn ($q) => $q->with('hold.payment')->latest(),
+            'transfers' => fn ($q) => $q->with(['hold.payment', 'bankAccount'])->latest(),
         ]);
 
         $bankAccounts = \App\Models\UserBankAccount::where('user_id', $user->id)
