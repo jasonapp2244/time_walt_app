@@ -63,11 +63,6 @@ class ProfileController extends Controller
                 $oldProfile = $user->profile;
                 if ($oldProfile && $oldProfile !== '0' && $oldProfile !== 'default.png') {
                     Storage::disk('public')->delete($oldProfile);
-                    // Also clean up old location if exists
-                    $oldPath = storage_path('app/public/'.$oldProfile);
-                    if (file_exists($oldPath)) {
-                        @unlink($oldPath);
-                    }
                 }
 
                 // Store new image
