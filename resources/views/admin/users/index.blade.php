@@ -99,7 +99,7 @@
                                     {{ $user->transfers_count }}
                                 </td>
                                 <td style="color:#4b5563; font-size:12px; font-weight:500; white-space:nowrap;">
-                                    {{ $user->created_at->format('d M Y') }}
+                                    {{ $user->created_at->setTimezone(config('app.admin_timezone'))->format('d M Y') }}
                                 </td>
                                 <td style="text-align:center;">
                                     <a href="{{ route('admin.users.show', $user->id) }}" class="btn-tv-outline">

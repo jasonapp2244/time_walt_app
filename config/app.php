@@ -148,6 +148,8 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    'admin_timezone' => env('ADMIN_TIMEZONE', 'America/New_York'),
+
     'admin_panel_email' => env('ADMIN_PANEL_EMAIL'),
     'admin_panel_password' => env('ADMIN_PANEL_PASSWORD'),
 

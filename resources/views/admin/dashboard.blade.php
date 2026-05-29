@@ -17,7 +17,7 @@
                     <i class='bx bx-refresh me-1'></i>Updated <span id="stats-updated-time"></span>
                 </span>
                 <span style="font-size:12px; color:#4b5563; font-weight:500;">
-                    <i class='bx bx-time me-1' style="color:var(--tv-gold);"></i>{{ now()->format('D, d M Y — H:i') }}
+                    <i class='bx bx-time me-1' style="color:var(--tv-gold);"></i>{{ now()->setTimezone(config('app.admin_timezone'))->format('D, d M Y — H:i') }} ET
                 </span>
             </div>
         </div>
@@ -172,7 +172,7 @@
                                             </span>
                                         </td>
                                         <td style="color:#4b5563; font-size:12px; font-weight:500;">
-                                            {{ $payment->paid_at?->format('d M Y') ?? '—' }}
+                                            {{ $payment->paid_at?->setTimezone(config('app.admin_timezone'))->format('d M Y') ?? '—' }}
                                         </td>
                                     </tr>
                                     @empty
@@ -291,7 +291,7 @@
                                             {{ $parts ? implode(' ', $parts) : ($hold->hold_period_type ? str_replace('_', ' ', $hold->hold_period_type) : '—') }}
                                         </td>
                                         <td style="color:#374151; font-size:12px; font-weight:500;">
-                                            {{ $hold->hold_end_at?->format('d M Y, h:i A') ?? '—' }}
+                                            {{ $hold->hold_end_at?->setTimezone(config('app.admin_timezone'))->format('d M Y, h:i A') ?? '—' }}
                                         </td>
                                         <td>
                                             <span class="tv-badge badge-{{ str_replace('_','-',$hold->status) }}">

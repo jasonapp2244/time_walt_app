@@ -148,7 +148,7 @@ class ProfileController extends Controller
      */
     protected function formatUser($user): array
     {
-        $tz = config('app.timezone');
+        $tz = $user->timezone ?? 'UTC';
 
         $profileUrl = $this->getProfileUrl($user->profile);
 

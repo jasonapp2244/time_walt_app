@@ -107,7 +107,7 @@
                             <span style="font-size:11px; color:#374151; font-weight:700;
                                          text-transform:uppercase; letter-spacing:0.5px;">Joined</span>
                             <span style="font-size:13px; color:#111827; font-weight:600;">
-                                {{ $user->created_at->format('d M Y') }}
+                                {{ $user->created_at->setTimezone(config('app.admin_timezone'))->format('d M Y') }}
                             </span>
                         </div>
 
@@ -169,7 +169,7 @@
                                             {{ $parts ? implode(' ', $parts) : ($hold->hold_period_type ? str_replace('_', ' ', $hold->hold_period_type) : '—') }}
                                         </td>
                                         <td style="color:#4b5563; font-size:12px; font-weight:500;">
-                                            {{ $hold->hold_end_at?->format('d M Y, h:i A') ?? '—' }}
+                                            {{ $hold->hold_end_at?->setTimezone(config('app.admin_timezone'))->format('d M Y, h:i A') ?? '—' }}
                                         </td>
                                         <td>
                                             <span class="tv-badge badge-{{ str_replace('_','-',$hold->status) }}">
@@ -304,7 +304,7 @@
                                 </div>
                                 <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 20px;">
                                     <span style="font-size:11px; color:#374151; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Added On</span>
-                                    <span style="font-size:13px; color:#111827; font-weight:600;">{{ $bank->created_at->format('d M Y H:i') }}</span>
+                                    <span style="font-size:13px; color:#111827; font-weight:600;">{{ $bank->created_at->setTimezone(config('app.admin_timezone'))->format('d M Y H:i') }}</span>
                                 </div>
                             </div>
                         </div>
@@ -364,7 +364,7 @@
                                             </span>
                                         </td>
                                         <td style="color:#4b5563; font-size:12px; font-weight:500;">
-                                            {{ $transfer->transferred_at?->format('d M Y H:i') ?? $transfer->created_at->format('d M Y') }}
+                                            {{ $transfer->transferred_at?->setTimezone(config('app.admin_timezone'))->format('d M Y H:i') ?? $transfer->created_at->setTimezone(config('app.admin_timezone'))->format('d M Y') }}
                                         </td>
                                     </tr>
                                     @empty

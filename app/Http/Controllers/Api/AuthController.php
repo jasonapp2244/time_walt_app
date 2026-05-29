@@ -1131,7 +1131,7 @@ class AuthController extends Controller
      */
     protected function formatUser(User $user): array
     {
-        $tz = config('app.timezone');
+        $tz = $user->timezone ?? 'UTC';
 
         return [
             'id' => $user->id,

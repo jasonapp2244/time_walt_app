@@ -134,7 +134,7 @@
                                     {{ $transfer->failure_reason ?? '—' }}
                                 </td>
                                 <td style="color:#4b5563; font-size:12px; font-weight:500;">
-                                    {{ $transfer->transferred_at?->format('d M Y H:i') ?? $transfer->created_at->format('d M Y') }}
+                                    {{ $transfer->transferred_at?->setTimezone(config('app.admin_timezone'))->format('d M Y H:i') ?? $transfer->created_at->setTimezone(config('app.admin_timezone'))->format('d M Y') }}
                                 </td>
                             </tr>
                             @empty

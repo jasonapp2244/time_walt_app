@@ -161,14 +161,14 @@
                                     {{ $parts ? implode(' ', $parts) : ($hold->hold_period_type ? str_replace('_', ' ', $hold->hold_period_type) : '—') }}
                                 </td>
                                 <td style="color:#4b5563; font-size:12px; font-weight:500;">
-                                    {{ $hold->hold_start_at?->format('d M Y, h:i A') ?? '—' }}
+                                    {{ $hold->hold_start_at?->setTimezone(config('app.admin_timezone'))->format('d M Y, h:i A') ?? '—' }}
                                 </td>
                                 <td style="font-size:12px; font-weight:500;">
                                     @if($hold->hold_end_at)
                                         @if($hold->hold_end_at->isPast())
-                                            <span style="color:#1e8c3a; font-weight:600;">{{ $hold->hold_end_at->format('d M Y, h:i A') }}</span>
+                                            <span style="color:#1e8c3a; font-weight:600;">{{ $hold->hold_end_at->setTimezone(config('app.admin_timezone'))->format('d M Y, h:i A') }}</span>
                                         @else
-                                            <span style="color:#374151;">{{ $hold->hold_end_at->format('d M Y, h:i A') }}</span>
+                                            <span style="color:#374151;">{{ $hold->hold_end_at->setTimezone(config('app.admin_timezone'))->format('d M Y, h:i A') }}</span>
                                         @endif
                                     @else
                                         <span style="color:#6b7280;">—</span>

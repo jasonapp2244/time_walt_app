@@ -18,34 +18,39 @@ class PaymentHoldService
      */
     public function createFromPayment(Payment $payment, array $holdPeriodData = []): PaymentHold
     {
-        $appTz = config('app.timezone');
+        // Use user's timezone for interpreting input dates, store in UTC
+        $userTz = $holdPeriodData['user_timezone'] ?? $payment->user?->timezone ?? 'UTC';
         $holdPeriodType = $holdPeriodData['hold_period_type'] ?? '1_month';
         $holdDays = (int) ($holdPeriodData['hold_days'] ?? 0);
         $holdHours = (int) ($holdPeriodData['hold_hours'] ?? 0);
         $holdMinutes = (int) ($holdPeriodData['hold_minutes'] ?? 0);
         $title = $holdPeriodData['title'] ?? null;
 
-        $now = now();
+        $now = now(); // UTC
 
-        // hold_start_at: parse as full datetime, or date + current time
+        // hold_start_at: parse in user's timezone, then convert to UTC
         $rawStartDate = $holdPeriodData['hold_start_at'] ?? null;
         if ($rawStartDate) {
-            $startDate = Carbon::parse($rawStartDate, $appTz);
-            // If only date was passed (no time component), apply current time
+            $startDate = Carbon::parse($rawStartDate, $userTz);
+            // If only date was passed (no time component), apply current time in user's tz
             if (strlen(trim($rawStartDate)) <= 10) {
-                $startDate->setTime($now->hour, $now->minute, $now->second);
+                $nowInUserTz = now()->setTimezone($userTz);
+                $startDate->setTime($nowInUserTz->hour, $nowInUserTz->minute, $nowInUserTz->second);
             }
+            $startDate->setTimezone('UTC');
         } else {
             $startDate = $now->copy();
         }
 
-        // hold_end_at: parse as full datetime, or date + current time
+        // hold_end_at: parse in user's timezone, then convert to UTC
         $rawEndDate = $holdPeriodData['hold_end_at'] ?? null;
         if ($rawEndDate) {
-            $endDate = Carbon::parse($rawEndDate, $appTz);
+            $endDate = Carbon::parse($rawEndDate, $userTz);
             if (strlen(trim($rawEndDate)) <= 10) {
-                $endDate->setTime($now->hour, $now->minute, $now->second);
+                $nowInUserTz = now()->setTimezone($userTz);
+                $endDate->setTime($nowInUserTz->hour, $nowInUserTz->minute, $nowInUserTz->second);
             }
+            $endDate->setTimezone('UTC');
         } else {
             // No end date — calculate from days + hours + minutes
             $endDate = $startDate->copy()

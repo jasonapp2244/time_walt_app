@@ -116,7 +116,7 @@
                                     {{ $payment->failure_reason ?? '—' }}
                                 </td>
                                 <td style="color:#4b5563; font-size:12px; font-weight:500;">
-                                    {{ $payment->paid_at?->format('d M Y H:i') ?? '—' }}
+                                    {{ $payment->paid_at?->setTimezone(config('app.admin_timezone'))->format('d M Y H:i') ?? '—' }}
                                 </td>
                             </tr>
                             @empty
