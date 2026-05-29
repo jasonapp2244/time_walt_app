@@ -133,7 +133,7 @@
                     <div class="card-header py-3 px-4">
                         <h6 class="mb-0" style="color:#111827; font-weight:700;">
                             <i class='bx bxs-lock-alt me-2' style="color:var(--tv-gold);"></i>
-                            Payment Holds ({{ $user->paymentHolds->count() }})
+                            Payment Holds ({{ $paymentHolds->total() }})
                         </h6>
                     </div>
                     <div class="card-body p-0">
@@ -151,9 +151,9 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @forelse($user->paymentHolds as $hold)
+                                    @forelse($paymentHolds as $hold)
                                     <tr>
-                                        <td style="color:#6b7280; font-size:12px; font-weight:500;">{{ $loop->iteration }}</td>
+                                        <td style="color:#6b7280; font-size:12px; font-weight:500;">{{ ($paymentHolds->currentPage() - 1) * $paymentHolds->perPage() + $loop->iteration }}</td>
                                         <td style="color:#2563eb; font-size:12px; font-weight:700;">{{ str_pad($hold->id, 5, '0', STR_PAD_LEFT) }}</td>
                                         <td style="color:#1f2937; font-size:13px; font-weight:500;">{{ $hold->title ?? '—' }}</td>
                                         <td style="color:#92621a; font-weight:700;">
@@ -186,13 +186,18 @@
                             </table>
                         </div>
                     </div>
+                    @if($paymentHolds->hasPages())
+                    <div class="card-footer tv-pagination-footer">
+                        {{ $paymentHolds->links() }}
+                    </div>
+                    @endif
                 </div>
 
                 <div class="card mb-3">
                     <div class="card-header py-3 px-4">
                         <h6 class="mb-0" style="color:#111827; font-weight:700;">
                             <i class='bx bxs-bank me-2' style="color:var(--tv-gold);"></i>
-                            Bank Accounts ({{ $bankAccounts->count() }})
+                            Bank Accounts ({{ $bankAccounts->total() }})
                         </h6>
                     </div>
                     <div class="card-body p-0">
@@ -212,7 +217,7 @@
                                 <tbody>
                                     @forelse($bankAccounts as $bank)
                                     <tr>
-                                        <td style="color:#6b7280; font-size:12px; font-weight:500;">{{ $loop->iteration }}</td>
+                                        <td style="color:#6b7280; font-size:12px; font-weight:500;">{{ ($bankAccounts->currentPage() - 1) * $bankAccounts->perPage() + $loop->iteration }}</td>
                                         <td style="color:#1f2937; font-size:13px; font-weight:600;">{{ $bank->bank_name }}</td>
                                         <td style="color:#374151; font-size:13px; font-weight:600; font-family:monospace;">{{ $bank->masked_account_number }}</td>
                                         <td style="color:#374151; font-size:12px; font-weight:500;">{{ ucfirst($bank->account_type) }}</td>
@@ -241,6 +246,11 @@
                             </table>
                         </div>
                     </div>
+                    @if($bankAccounts->hasPages())
+                    <div class="card-footer tv-pagination-footer">
+                        {{ $bankAccounts->links() }}
+                    </div>
+                    @endif
                 </div>
 
                 {{-- Bank Account Detail Modals --}}
@@ -316,7 +326,7 @@
                     <div class="card-header py-3 px-4">
                         <h6 class="mb-0" style="color:#111827; font-weight:700;">
                             <i class='bx bxs-send me-2' style="color:var(--tv-gold);"></i>
-                            Transfers ({{ $user->transfers->count() }})
+                            Transfers ({{ $transfers->total() }})
                         </h6>
                     </div>
                     <div class="card-body p-0">
@@ -334,9 +344,9 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @forelse($user->transfers as $transfer)
+                                    @forelse($transfers as $transfer)
                                     <tr>
-                                        <td style="color:#6b7280; font-size:12px; font-weight:500;">{{ $loop->iteration }}</td>
+                                        <td style="color:#6b7280; font-size:12px; font-weight:500;">{{ ($transfers->currentPage() - 1) * $transfers->perPage() + $loop->iteration }}</td>
                                         <td style="color:#2563eb; font-size:12px; font-weight:700;">{{ str_pad($transfer->id, 5, '0', STR_PAD_LEFT) }}</td>
                                         <td style="color:#1e8c3a; font-weight:700;">
                                             ${{ number_format($transfer->amount, 2) }}
@@ -376,6 +386,11 @@
                             </table>
                         </div>
                     </div>
+                    @if($transfers->hasPages())
+                    <div class="card-footer tv-pagination-footer">
+                        {{ $transfers->links() }}
+                    </div>
+                    @endif
                 </div>
 
             </div>

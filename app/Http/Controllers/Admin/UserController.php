@@ -90,28 +90,40 @@ class UserController extends Controller
      */
     public function show(User $user): View
     {
-        $user->load([
-            'notificationSettings',
-            'paymentHolds' => fn ($q) => $q->with(['payment', 'transfer'])->latest(),
-            'transfers' => fn ($q) => $q->with(['hold.payment', 'bankAccount'])->latest(),
-        ]);
+        $user->load(['notificationSettings']);
+
+        // Paginated queries (10 per page)
+        $paymentHolds = \App\Models\PaymentHold::where('user_id', $user->id)
+            ->with(['payment', 'transfer'])
+            ->latest()
+            ->paginate(10, ['*'], 'holds_page')
+            ->withQueryString();
+
+        $transfers = \App\Models\Transfer::where('user_id', $user->id)
+            ->with(['hold.payment', 'bankAccount'])
+            ->latest()
+            ->paginate(10, ['*'], 'transfers_page')
+            ->withQueryString();
 
         $bankAccounts = \App\Models\UserBankAccount::where('user_id', $user->id)
             ->orderByDesc('is_primary')
             ->orderByDesc('created_at')
-            ->get();
+            ->paginate(10, ['*'], 'banks_page')
+            ->withQueryString();
 
+        // Amount summaries (from ALL records, not paginated)
         $userAmounts = [
-            'total_held' => $user->paymentHolds->where('status', 'holding')
-                ->sum(fn ($hold) => (float) ($hold->remaining_amount ?? $hold->amount)),
-            'total_ready' => $user->paymentHolds
+            'total_held' => (float) \App\Models\PaymentHold::where('user_id', $user->id)
+                ->where('status', 'holding')
+                ->sum(\Illuminate\Support\Facades\DB::raw('COALESCE(remaining_amount, amount)')),
+            'total_ready' => (float) \App\Models\PaymentHold::where('user_id', $user->id)
                 ->whereIn('status', ['ready_for_transfer', 'partial_transferred'])
-                ->sum(fn ($hold) => (float) ($hold->remaining_amount ?? $hold->amount)),
-            'total_withdrawn' => $user->transfers
+                ->sum(\Illuminate\Support\Facades\DB::raw('COALESCE(remaining_amount, amount)')),
+            'total_withdrawn' => (float) \App\Models\Transfer::where('user_id', $user->id)
                 ->where('status', 'completed')
                 ->sum('amount'),
         ];
 
-        return view('admin.users.show', compact('user', 'userAmounts', 'bankAccounts'));
+        return view('admin.users.show', compact('user', 'userAmounts', 'paymentHolds', 'transfers', 'bankAccounts'));
     }
 }
