@@ -21,7 +21,7 @@
 
         {{-- Amount Summary Banner --}}
         <div class="row g-3 mb-3">
-            <div class="col-4">
+            <div class="col-12 col-md-4">
                 <div style="background:#ffffff; border:1px solid rgba(255,152,0,0.22); border-radius:10px; padding:14px 18px; display:flex; align-items:center; gap:12px; box-shadow:0 1px 4px rgba(0,0,0,0.04);">
                     <div style="width:40px; height:40px; border-radius:10px; background:rgba(255,152,0,0.12); display:flex; align-items:center; justify-content:center; font-size:18px; color:#c87000; flex-shrink:0;">
                         <i class='bx bxs-lock-alt'></i>
@@ -32,7 +32,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-4">
+            <div class="col-12 col-md-4">
                 <div style="background:#ffffff; border:1px solid rgba(189,126,46,0.22); border-radius:10px; padding:14px 18px; display:flex; align-items:center; gap:12px; box-shadow:0 1px 4px rgba(0,0,0,0.04);">
                     <div style="width:40px; height:40px; border-radius:10px; background:rgba(189,126,46,0.12); display:flex; align-items:center; justify-content:center; font-size:18px; color:#92621a; flex-shrink:0;">
                         <i class='bx bxs-lock-open-alt'></i>
@@ -43,7 +43,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-4">
+            <div class="col-12 col-md-4">
                 <div style="background:#ffffff; border:1px solid rgba(40,167,69,0.22); border-radius:10px; padding:14px 18px; display:flex; align-items:center; gap:12px; box-shadow:0 1px 4px rgba(0,0,0,0.04);">
                     <div style="width:40px; height:40px; border-radius:10px; background:rgba(40,167,69,0.12); display:flex; align-items:center; justify-content:center; font-size:18px; color:#1e8c3a; flex-shrink:0;">
                         <i class='bx bxs-send'></i>

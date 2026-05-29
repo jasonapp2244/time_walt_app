@@ -24,7 +24,7 @@
 
         {{-- Status Summary --}}
         <div class="row g-3 mb-4">
-            <div class="col-4">
+            <div class="col-12 col-sm-4">
                 <a href="{{ route('admin.payments.index', ['status' => 'completed']) }}" style="text-decoration:none;">
                     <div class="stat-card">
                         <div class="stat-icon green mb-2"><i class='bx bxs-check-circle'></i></div>
@@ -33,7 +33,7 @@
                     </div>
                 </a>
             </div>
-            <div class="col-4">
+            <div class="col-12 col-sm-4">
                 <a href="{{ route('admin.payments.index', ['status' => 'pending']) }}" style="text-decoration:none;">
                     <div class="stat-card">
                         <div class="stat-icon orange mb-2"><i class='bx bx-time'></i></div>
@@ -42,7 +42,7 @@
                     </div>
                 </a>
             </div>
-            <div class="col-4">
+            <div class="col-12 col-sm-4">
                 <a href="{{ route('admin.payments.index', ['status' => 'failed']) }}" style="text-decoration:none;">
                     <div class="stat-card">
                         <div class="stat-icon red mb-2"><i class='bx bx-x-circle'></i></div>
