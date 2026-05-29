@@ -25,12 +25,16 @@ class CreatePaymentIntentRequest extends FormRequest
         // Get supported currencies from config (use keys as currency codes)
         $supportedCurrencies = array_keys(config('services.stripe.supported_currencies', ['usd' => 'USD', 'eur' => 'EUR', 'gbp' => 'GBP']));
 
+        // Use user's timezone for "today" check so late-night users aren't rejected
+        $userTz = $this->user()?->timezone ?? 'UTC';
+        $todayInUserTz = now()->setTimezone($userTz)->startOfDay()->toDateString();
+
         return [
             'amount' => ['required', 'numeric', 'min:1'], // amount in dollars (minimum $1.00)
             'currency' => ['required', 'string', 'size:3', Rule::in($supportedCurrencies)],
             'title' => ['nullable', 'string', 'max:255'], // Optional title/description for the payment hold
             'hold_period_type' => ['required', 'string', Rule::in(['custom'])], // Only custom hold period allowed
-            'hold_start_at' => ['required', 'date', 'after_or_equal:today'], // Date or datetime
+            'hold_start_at' => ['required', 'date', 'after_or_equal:'.$todayInUserTz], // Date or datetime
             'hold_end_at' => ['required', 'date', 'after:hold_start_at'], // Date or datetime
             'hold_hours' => ['nullable', 'integer', 'min:0', 'max:23'], // Hours component
             'hold_minutes' => ['nullable', 'integer', 'min:0', 'max:59'], // Minutes component
