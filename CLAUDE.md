@@ -69,8 +69,11 @@ Card fields saved: `card_brand`, `card_last4`, `card_exp_month`, `card_exp_year`
 ### Withdrawal Flow
 - User requests withdrawal via `PaymentHoldController::withdraw()` with a specific amount
 - System distributes across multiple eligible holds (oldest first), creating one Transfer per hold
-- `remaining_amount` is deducted in `withdraw()` — cron jobs must NOT deduct again
+- `remaining_amount` is deducted for `completed` and `pending` transfers — NOT deducted for `failed` transfers
+- Cron jobs must NOT deduct `remaining_amount` again (already done in `withdraw()`)
+- If a pending transfer later fails, `VerifyPendingTransfers` restores `remaining_amount`
 - Partial withdrawals supported: hold status becomes `partial_transferred`
+- Each Transfer stores `bank_account_id` to track which bank was used
 
 ### Transaction History API
 `TransactionHistoryController` provides transaction data in 5 categories:
@@ -87,10 +90,12 @@ Every transaction item includes hold time fields: `hold_start`, `hold_end`, `tot
 - Stripe Custom Connect account created silently on first bank add
 - Stripe does NOT support updating bank details — must delete old + add new
 - `UserBankAccount` model has `getMaskedAccountNumberAttribute()` for ****XXXX display
+- `setPrimary()` syncs Stripe `default_for_currency` so withdrawals go to the correct bank
+- `destroy()` also syncs Stripe default when a deleted primary bank is replaced by fallback
 
 ### Scheduled Commands (Cron)
 - `check:payment-holds` — Every 5 min. Marks matured holds as `ready_for_transfer`, sends notification. Must exclude abandoned holds (`whereNull('abandoned_at')`).
-- `verify:pending-transfers` — Every 5 min. Verifies pending transfers with Stripe API, updates status, sends batched emails. Only updates hold status — does NOT deduct `remaining_amount` (already done in `withdraw()`).
+- `verify:pending-transfers` — Every 5 min. Verifies pending transfers with Stripe API, updates status, sends batched emails. Only updates hold status — does NOT deduct `remaining_amount` (already done in `withdraw()`). Restores `remaining_amount` if a transfer fails.
 - `users:cleanup-unverified` — Daily at midnight ET. Hard-deletes unverified pending users older than 24 hours.
 - `fix:hold-remaining-amount` — Manual only. One-time data fix for remaining_amount inconsistencies.
 - `stripe:fund-test-balance` — Manual only. Test utility, guards against production.
@@ -123,7 +128,8 @@ Three data tables:
 - **Bank Accounts** — `#`, Bank Name, Account (masked), Type, Country, Status, Action (view modal)
 - **Transfers** — `#`, Transfer ID, Amount, To (Account) with bank name + last 4 digits, Type, Status, Date
 
-Controller loads: `transfers` with `hold.payment` (for card data chain), `paymentHolds` with `payment` and `transfer`.
+All three tables are paginated (10 per page) with independent page params (`holds_page`, `transfers_page`, `banks_page`).
+Controller loads paginated queries separately; amount summaries use `COALESCE(remaining_amount, amount)` for NULL safety.
 
 ## Conventions
 
@@ -135,9 +141,28 @@ Controller loads: `transfers` with `hold.payment` (for card data chain), `paymen
 - Follow patterns in sibling files for consistency
 - Tests use SQLite in-memory database (configured in `phpunit.xml`)
 
+## Timezone
+
+- `APP_TIMEZONE=UTC` — all dates stored in UTC in the database
+- `ADMIN_TIMEZONE=America/New_York` — admin panel displays dates in ET
+- `PaymentHoldService` parses user input dates in user's timezone (`$user->timezone`), converts to UTC for storage
+- API responses return ISO-8601 UTC dates; Flutter converts to local timezone for display
+- Cron compares UTC vs UTC — no DST issues
+- Validation `after_or_equal:today` uses user's timezone so late-night users aren't rejected
+
+## Deployment (Hostinger VPS)
+
+- **Domain:** `time-vault.devonlinetestserver.com`
+- **Path:** `/home/devonlinetestserver-time-vault/htdocs/time-vault.devonlinetestserver.com`
+- **Nginx:** Uses `location ^~ /storage/` with `alias` to serve files from `storage/app/public/` — do NOT use `php artisan storage:link` (symlinks cause "Too many levels" error on this VPS)
+- **PHP-FPM** runs as user `devonlinetestserver-time-vault` (not `www-data`) — profiles directory needs `chmod 777`
+- **Cron:** `* * * * * cd /path && php artisan schedule:run >> /dev/null 2>&1`
+- **Queue:** Needs a persistent worker or cron-based queue processing
+
 ## Key Config
 
 - Admin credentials: `ADMIN_PANEL_EMAIL` / `ADMIN_PANEL_PASSWORD` in `.env` (read via `config/app.php`)
+- Admin timezone: `ADMIN_TIMEZONE` in `.env` (read via `config/app.admin_timezone`)
 - Sanctum tokens expire after 24 hours (`config/sanctum.php`)
 - Stripe keys: `STRIPE_KEY`, `STRIPE_SECRET`, `STRIPE_WEBHOOK_SECRET`
 - Session, queue, and cache all use the `database` driver
