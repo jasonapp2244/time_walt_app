@@ -56,8 +56,22 @@ class ProfileController extends Controller
         }
 
         // Handle profile image upload
+        Log::info('Profile update debug', [
+            'has_file' => $request->hasFile('profile_image'),
+            'all_files' => array_keys($request->allFiles()),
+            'content_type' => $request->header('Content-Type'),
+            'has_profile_key' => $request->has('profile_image'),
+        ]);
         if ($request->hasFile('profile_image')) {
             $file = $request->file('profile_image');
+
+            Log::info('Profile image file details', [
+                'is_valid' => $file->isValid(),
+                'original_name' => $file->getClientOriginalName(),
+                'mime' => $file->getClientMimeType(),
+                'size' => $file->getSize(),
+                'error' => $file->getError(),
+            ]);
 
             if ($file->isValid()) {
                 // Delete old profile image if exists
@@ -68,6 +82,7 @@ class ProfileController extends Controller
 
                 // Store new image
                 $imagePath = $file->store('profiles', 'public');
+                Log::info('Profile image stored', ['path' => $imagePath, 'disk_root' => config('filesystems.disks.public.root')]);
 
                 if ($imagePath) {
                     $updateData['profile'] = $imagePath;
@@ -76,7 +91,10 @@ class ProfileController extends Controller
                     DB::table('users')
                         ->where('id', $user->id)
                         ->update(['profile' => $imagePath, 'updated_at' => now()]);
+                    Log::info('Profile DB updated', ['new_path' => $imagePath, 'user_id' => $user->id]);
                 }
+            } else {
+                Log::error('Profile image is NOT valid', ['error' => $file->getError()]);
             }
         }
 
