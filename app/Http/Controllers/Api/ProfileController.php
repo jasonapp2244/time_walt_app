@@ -55,6 +55,12 @@ class ProfileController extends Controller
         }
 
         // Handle profile image upload
+        Log::info('Profile update debug', [
+            'has_file' => $request->hasFile('profile_image'),
+            'all_files' => array_keys($request->allFiles()),
+            'content_type' => $request->header('Content-Type'),
+            'has_profile_key' => $request->has('profile_image'),
+        ]);
         if ($request->hasFile('profile_image')) {
             $file = $request->file('profile_image');
 
