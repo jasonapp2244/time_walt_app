@@ -32,6 +32,23 @@ class BankAccountController extends Controller
                 // Check if user already has a Connect account
                 $connectAccount = StripeConnectAccount::where('user_id', $user->id)->first();
 
+                // Verify existing Connect account is still accessible with current Stripe key
+                if ($connectAccount) {
+                    try {
+                        \Stripe\Account::retrieve($connectAccount->connect_account_id);
+                    } catch (\Stripe\Exception\PermissionException|\Stripe\Exception\InvalidRequestException $e) {
+                        Log::warning('Stale Connect account detected, recreating', [
+                            'user_id' => $user->id,
+                            'old_account' => substr($connectAccount->connect_account_id, -6),
+                            'error' => $e->getMessage(),
+                        ]);
+                        // Clean up stale records
+                        UserBankAccount::where('user_id', $user->id)->delete();
+                        $connectAccount->delete();
+                        $connectAccount = null;
+                    }
+                }
+
                 if (! $connectAccount) {
                     // First bank — create Stripe Custom Connect account
                     $nameParts = explode(' ', $user->full_name ?? 'User', 2);
