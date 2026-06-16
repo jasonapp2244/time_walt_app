@@ -5,10 +5,10 @@
             <img src="{{ asset('admin/images/logo-bg_remove.png') }}"
                  class="logo-tv-img"
                  onerror="this.style.display='none'"
-                 alt="Time Vault">
+                 alt="TimeVault">
         </div>
         <div>
-            <h4 class="logo-text">Time Vault</h4>
+            <h4 class="logo-text">TimeVault</h4>
         </div>
         <div class="toggle-icon ms-auto">
             <i class='bx bx-arrow-back'></i>

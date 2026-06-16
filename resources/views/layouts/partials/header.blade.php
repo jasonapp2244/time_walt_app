@@ -7,10 +7,10 @@
             {{-- Logo: visible on mobile only (sidebar hidden on mobile) --}}
             <div class="d-flex d-lg-none align-items-center gap-2 ms-2">
                 <img src="{{ asset('admin/images/logo-bg_remove.png') }}"
-                     alt="Time Vault"
+                     alt="TimeVault"
                      style="height:34px; width:auto; object-fit:contain;"
                      onerror="this.style.display='none'">
-                <span style="font-size:14px; font-weight:700; color:#92621a; letter-spacing:0.5px;">Time Vault</span>
+                <span style="font-size:14px; font-weight:700; color:#92621a; letter-spacing:0.5px;">TimeVault</span>
             </div>
 
             <div class="ms-auto d-flex align-items-center gap-2">

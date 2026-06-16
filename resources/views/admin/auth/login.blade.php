@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Login — Time Vault</title>
+    <title>Admin Login — TimeVault</title>
     <link href="{{ asset('admin/css/bootstrap.min.css') }}" rel="stylesheet">
     <link href="{{ asset('admin/css/icons.css') }}" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -464,12 +464,12 @@
         <div class="brand-logo">
             <div class="brand-icon">
                 <img src="{{ asset('admin/images/logo-bg_remove.png') }}"
-                     alt="Time Vault"
+                     alt="TimeVault"
                      style="width:36px; height:36px; object-fit:contain;"
                      onerror="this.style.display='none'; this.parentElement.innerHTML='V';">
             </div>
             <div>
-                <div class="brand-name">Time Vault</div>
+                <div class="brand-name">TimeVault</div>
                 <div class="brand-sub">Fintech Platform</div>
             </div>
         </div>
@@ -513,10 +513,10 @@
         {{-- Mobile-only logo (split-left is hidden on mobile) --}}
         <div class="mobile-brand">
             <img src="{{ asset('admin/images/logo-bg_remove.png') }}"
-                 alt="Time Vault"
+                 alt="TimeVault"
                  onerror="this.style.display='none'">
             <div>
-                <div class="mobile-brand-name">Time Vault</div>
+                <div class="mobile-brand-name">TimeVault</div>
                 <div class="mobile-brand-sub">Fintech Platform</div>
             </div>
         </div>
@@ -593,10 +593,10 @@
                 </button>
             </form>
 
-            <div class="panel-divider"><span>Time Vault Admin Portal</span></div>
+            <div class="panel-divider"><span>TimeVault Admin Portal</span></div>
 
             <div class="panel-footer">
-                &copy; {{ date('Y') }} <b>Time Vault</b>. All rights reserved.
+                &copy; {{ date('Y') }} <b>TimeVault</b>. All rights reserved.
             </div>
 
         </div>

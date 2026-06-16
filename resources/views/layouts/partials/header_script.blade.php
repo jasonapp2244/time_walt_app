@@ -30,7 +30,7 @@
     <link href="{{ asset('admin/css/semi-dark.css') }}" rel="stylesheet" />
     <link href="{{ asset('admin/css/header-colors.css') }}" rel="stylesheet" />
 
-    <title>@yield('title', 'Admin') — Time Vault</title>
+    <title>@yield('title', 'Admin') — TimeVault</title>
 
     <style>
         :root {
