@@ -3,14 +3,14 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OTP Verification - Time Vault</title>
+    <title>OTP Verification - TimeVault</title>
 </head>
 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
 <div style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 
     {{-- Header --}}
     <div style="background-color: #935510; padding: 30px; text-align: center;">
-        <h1 style="color: #f2cf7a; margin: 0; font-size: 28px; font-weight: bold;">Time Vault</h1>
+        <h1 style="color: #f2cf7a; margin: 0; font-size: 28px; font-weight: bold;">TimeVault</h1>
         <p style="color: #f2cf7a; margin: 8px 0 0 0; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; opacity: 0.85;">
             @if($type === 'verification')
                 Account Verification
@@ -31,7 +31,7 @@
 
         <p style="color: #000000; font-size: 16px; line-height: 1.8;">
             @if($type === 'verification')
-                Thank you for registering with Time Vault. Please use the verification code below to confirm your account.
+                Thank you for registering with TimeVault. Please use the verification code below to confirm your account.
             @elseif($type === 'password_reset')
                 We received a request to reset your password. Use the code below to proceed.
             @else

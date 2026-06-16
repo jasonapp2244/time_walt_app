@@ -25,7 +25,7 @@ class AdminSeeder extends Seeder
 
         User::create([
             'role' => 'admin',
-            'full_name' => 'Time Vault Admin',
+            'full_name' => 'TimeVault Admin',
             'email' => $adminEmail,
             'email_index' => $emailIndex,
             'phone' => '0000000000',
