@@ -47,7 +47,7 @@ return [
     |
     */
 
-    'expiration' => env('SANCTUM_TOKEN_EXPIRATION', 60 * 24), // 24 hours default
+    'expiration' => env('SANCTUM_TOKEN_EXPIRATION', null), // null = never expires, user must manually logout
 
     /*
     |--------------------------------------------------------------------------
