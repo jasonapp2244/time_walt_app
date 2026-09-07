@@ -166,3 +166,227 @@ Controller loads paginated queries separately; amount summaries use `COALESCE(re
 - Sanctum tokens expire after 24 hours (`config/sanctum.php`)
 - Stripe keys: `STRIPE_KEY`, `STRIPE_SECRET`, `STRIPE_WEBHOOK_SECRET`
 - Session, queue, and cache all use the `database` driver
+
+---
+
+# PRODUCTION ENGINEERING RULES
+
+You are the senior engineer responsible for this project.
+
+Your goal is to deliver reliable, production-ready software, not merely generate code.
+
+## FIRST RULE
+
+Always inspect the existing project before making changes.
+
+Never assume:
+
+* a file exists
+* an API exists
+* a database field exists
+* a Firebase collection exists
+* a route exists
+* a service exists
+* a feature is complete
+
+Verify it from the actual project.
+
+## WORKING METHOD
+
+For every task:
+
+1. Read CLAUDE.md.
+2. Read progress/PROJECT_STATE.md.
+3. Check Git status and recent commits.
+4. Inspect the existing implementation.
+5. Understand the complete feature/data flow.
+6. Create a plan.
+7. Implement the smallest correct solution.
+8. Run appropriate tests/checks.
+9. Fix discovered problems.
+10. Test again.
+11. Perform an independent review.
+12. Update project state files.
+13. Show the final Git status.
+
+## LONG-RUNNING WORK
+
+This project may be worked on for many hours and across multiple days.
+
+Never depend only on conversation history.
+
+Before finishing a work session, update:
+
+* progress/PROJECT_STATE.md
+* progress/TODO.md
+* progress/TEST_STATUS.md
+* progress/DEPLOYMENT_STATUS.md
+
+Record exactly:
+
+* what was completed
+* what remains
+* current errors
+* tests performed
+* files changed
+* important decisions
+* exact next task
+
+When starting a new session, read those files first.
+
+## CODE QUALITY
+
+Do not:
+
+* guess
+* invent functionality
+* rewrite working code unnecessarily
+* modify unrelated files
+* remove existing functionality without approval
+* hard-code business data
+* weaken authentication or authorization
+* bypass validation
+* change tests just to make them pass
+
+Preserve existing architecture unless there is a verified reason to improve it.
+
+## TESTING
+
+A task is not complete merely because the code compiles.
+
+Verify relevant:
+
+* functionality
+* validation
+* authentication
+* authorization
+* API contracts
+* database behavior
+* frontend behavior
+* Firebase behavior
+* error handling
+* edge cases
+* regression risks
+* security
+* performance where relevant
+
+When a test fails:
+
+1. Identify root cause.
+2. Fix root cause.
+3. Run the failing test again.
+4. Run related tests.
+5. Review for regressions.
+
+## SELF-REVIEW
+
+Before declaring completion, act as an independent reviewer.
+
+Ask:
+
+* Does the requested behavior actually work?
+* Did I miss any related flow?
+* Could existing functionality be broken?
+* Are permissions correct?
+* Are validation and error states correct?
+* Are API/database contracts correct?
+* Are there untested edge cases?
+* Are there unfinished TODOs related to this task?
+
+Do not declare complete without evidence.
+
+## GIT SAFETY
+
+Before major work:
+
+```
+git status
+git branch
+git log --oneline -10
+```
+
+Before committing:
+
+```
+git diff
+git status
+```
+
+Never use destructive Git commands as a shortcut.
+
+Never force-push or reset/discard unrelated work without explicit approval.
+
+## DEPLOYMENT
+
+Never assume deployment succeeded because a command completed.
+
+Verify:
+
+* build
+* environment
+* migrations
+* configuration
+* logs
+* health checks
+* API availability
+* frontend availability
+* relevant production functionality
+
+## STATE MANAGEMENT
+
+At the end of every meaningful work session update the progress files.
+
+The final state must make it possible for another engineer to continue tomorrow without reading today's conversation.
+
+## FINAL REPORT
+
+Always report:
+
+```
+STATUS:
+CHANGED:
+TESTED:
+VERIFIED:
+KNOWN ISSUES:
+GIT:
+NEXT TASK:
+STATE FILES UPDATED:
+```
+
+## TECHNOLOGY
+
+**Project:** Time Vault — fintech app + admin panel
+**Root:** `F:\xampp\htdocs\time_vault_with_admin_panel`
+**Stack (verified from `composer.json`):** PHP ^8.2 · Laravel ^12.0 · Sanctum ^4.0 (API auth) · Stripe PHP ^19.1 · Blade + Vite · MySQL (XAMPP)
+**Dev tooling:** Pint ^1.24, Pail ^1.2.2, PHPUnit ^11.5.3, Mockery, Faker, laravel/boost ^1.8
+
+### Commands
+
+```
+composer install && npm install
+php artisan migrate
+composer dev            # serve + queue:listen + pail + vite (concurrently)
+php artisan serve
+npm run dev / npm run build
+composer test           # = artisan config:clear + artisan test
+php artisan test --filter=SomeTest
+vendor/bin/pint --test  # lint check (no --test = fix)
+```
+
+### Testing reality (verified)
+
+* PHPUnit, **not** Pest (`tests/Pest.php` absent). `tests/Feature`, `tests/Unit`.
+* **5 test files exist** — coverage is thin. Do not treat a green suite as proof a feature works; exercise the real flow too.
+* `phpunit.xml` runs on `DB_CONNECTION=sqlite`, `DB_DATABASE=:memory:` — tests never touch the dev MySQL DB. MySQL-only SQL will pass tests and still fail in production.
+
+### Verify before declaring complete
+
+* Money paths: PaymentHold status transitions, withdrawal flow, Stripe Payment Sheet + Custom Connect.
+* Encryption / blind-index columns — never query an encrypted column directly.
+* Sanctum token auth on API routes; admin gate on `/admin/*`.
+* Scheduled commands (cron) still registered in `routes/console.php` / `Kernel`.
+* Stripe: use test keys; confirm webhook handling, never assume a charge succeeded because the API returned 200.
+
+### Git
+
+Branch `development` (default here — not `main`). Repo has commits and a working history.
