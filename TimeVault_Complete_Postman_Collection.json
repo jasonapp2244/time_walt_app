@@ -1,0 +1,669 @@
+{
+	"info": {
+		"name": "Time Vault - Complete API Collection",
+		"description": "Complete API testing collection for Time Vault app.\n\nBase URL: https://time-vault.devonlinetestserver.com/api\n\nFlow: Signup -> Verify OTP -> Login -> Profile -> Bank Account -> Payment -> Hold -> Withdraw",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "https://time-vault.devonlinetestserver.com/api"
+		},
+		{
+			"key": "token",
+			"value": ""
+		}
+	],
+	"item": [
+		{
+			"name": "1. Auth",
+			"item": [
+				{
+					"name": "1.1 Check Email",
+					"request": {
+						"method": "POST",
+						"header": [
+							{"key": "Content-Type", "value": "application/json"},
+							{"key": "Accept", "value": "application/json"}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"testuser@example.com\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/check-email",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "check-email"]
+						}
+					}
+				},
+				{
+					"name": "1.2 Signup",
+					"request": {
+						"method": "POST",
+						"header": [
+							{"key": "Content-Type", "value": "application/json"},
+							{"key": "Accept", "value": "application/json"}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"full_name\": \"Test User\",\n    \"email\": \"testuser@example.com\",\n    \"phone\": \"1234567890\",\n    \"password\": \"Test@1234\",\n    \"password_confirmation\": \"Test@1234\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/signup",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "signup"]
+						}
+					}
+				},
+				{
+					"name": "1.3 Verify OTP",
+					"request": {
+						"method": "POST",
+						"header": [
+							{"key": "Content-Type", "value": "application/json"},
+							{"key": "Accept", "value": "application/json"}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"testuser@example.com\",\n    \"otp_code\": \"1234\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/verify-otp",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "verify-otp"]
+						}
+					}
+				},
+				{
+					"name": "1.4 Resend OTP",
+					"request": {
+						"method": "POST",
+						"header": [
+							{"key": "Content-Type", "value": "application/json"},
+							{"key": "Accept", "value": "application/json"}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"testuser@example.com\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/resend-otp",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "resend-otp"]
+						}
+					}
+				},
+				{
+					"name": "1.5 Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData.data && jsonData.data.token) {",
+									"    pm.collectionVariables.set('token', jsonData.data.token);",
+									"    console.log('Token saved: ' + jsonData.data.token);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{"key": "Content-Type", "value": "application/json"},
+							{"key": "Accept", "value": "application/json"}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"testuser@example.com\",\n    \"password\": \"Test@1234\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/login",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "login"]
+						}
+					}
+				},
+				{
+					"name": "1.6 Forgot Password",
+					"request": {
+						"method": "POST",
+						"header": [
+							{"key": "Content-Type", "value": "application/json"},
+							{"key": "Accept", "value": "application/json"}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"testuser@example.com\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/forgot-password",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "forgot-password"]
+						}
+					}
+				},
+				{
+					"name": "1.7 Reset Password",
+					"request": {
+						"method": "POST",
+						"header": [
+							{"key": "Content-Type", "value": "application/json"},
+							{"key": "Accept", "value": "application/json"}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"testuser@example.com\",\n    \"otp_code\": \"1234\",\n    \"password\": \"NewTest@1234\",\n    \"password_confirmation\": \"NewTest@1234\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/reset-password",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "reset-password"]
+						}
+					}
+				},
+				{
+					"name": "1.8 Logout",
+					"request": {
+						"method": "POST",
+						"header": [
+							{"key": "Content-Type", "value": "application/json"},
+							{"key": "Accept", "value": "application/json"},
+							{"key": "Authorization", "value": "Bearer {{token}}"}
+						],
+						"url": {
+							"raw": "{{base_url}}/auth/logout",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "logout"]
+						}
+					}
+				},
+				{
+					"name": "1.9 Delete Account",
+					"request": {
+						"method": "POST",
+						"header": [
+							{"key": "Content-Type", "value": "application/json"},
+							{"key": "Accept", "value": "application/json"},
+							{"key": "Authorization", "value": "Bearer {{token}}"}
+						],
+						"url": {
+							"raw": "{{base_url}}/auth/delete-account",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "delete-account"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "2. Profile",
+			"item": [
+				{
+					"name": "2.1 Get Profile",
+					"request": {
+						"method": "GET",
+						"header": [
+							{"key": "Accept", "value": "application/json"},
+							{"key": "Authorization", "value": "Bearer {{token}}"}
+						],
+						"url": {
+							"raw": "{{base_url}}/profile",
+							"host": ["{{base_url}}"],
+							"path": ["profile"]
+						}
+					}
+				},
+				{
+					"name": "2.2 Update Profile",
+					"request": {
+						"method": "POST",
+						"header": [
+							{"key": "Accept", "value": "application/json"},
+							{"key": "Authorization", "value": "Bearer {{token}}"}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{"key": "full_name", "value": "Updated Name", "type": "text"},
+								{"key": "phone", "value": "9876543210", "type": "text"},
+								{"key": "profile_image", "type": "file", "src": "", "disabled": true}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/profile/update",
+							"host": ["{{base_url}}"],
+							"path": ["profile", "update"]
+						}
+					}
+				},
+				{
+					"name": "2.3 Change Password",
+					"request": {
+						"method": "POST",
+						"header": [
+							{"key": "Content-Type", "value": "application/json"},
+							{"key": "Accept", "value": "application/json"},
+							{"key": "Authorization", "value": "Bearer {{token}}"}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"current_password\": \"Test@1234\",\n    \"new_password\": \"NewTest@1234\",\n    \"new_password_confirmation\": \"NewTest@1234\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/profile/change-password",
+							"host": ["{{base_url}}"],
+							"path": ["profile", "change-password"]
+						}
+					}
+				},
+				{
+					"name": "2.4 Update Language",
+					"request": {
+						"method": "POST",
+						"header": [
+							{"key": "Content-Type", "value": "application/json"},
+							{"key": "Accept", "value": "application/json"},
+							{"key": "Authorization", "value": "Bearer {{token}}"}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"language\": \"en\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/profile/language",
+							"host": ["{{base_url}}"],
+							"path": ["profile", "language"]
+						}
+					}
+				},
+				{
+					"name": "2.5 Update Timezone",
+					"request": {
+						"method": "POST",
+						"header": [
+							{"key": "Content-Type", "value": "application/json"},
+							{"key": "Accept", "value": "application/json"},
+							{"key": "Authorization", "value": "Bearer {{token}}"}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"timezone\": \"America/New_York\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/profile/timezone",
+							"host": ["{{base_url}}"],
+							"path": ["profile", "timezone"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "3. Notification Settings",
+			"item": [
+				{
+					"name": "3.1 Get Notification Settings",
+					"request": {
+						"method": "GET",
+						"header": [
+							{"key": "Accept", "value": "application/json"},
+							{"key": "Authorization", "value": "Bearer {{token}}"}
+						],
+						"url": {
+							"raw": "{{base_url}}/notification-settings",
+							"host": ["{{base_url}}"],
+							"path": ["notification-settings"]
+						}
+					}
+				},
+				{
+					"name": "3.2 Update Notification Settings",
+					"request": {
+						"method": "POST",
+						"header": [
+							{"key": "Content-Type", "value": "application/json"},
+							{"key": "Accept", "value": "application/json"},
+							{"key": "Authorization", "value": "Bearer {{token}}"}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"password_alert\": true,\n    \"transaction_alert\": true,\n    \"push_notification_alert\": true,\n    \"email_alert\": true,\n    \"lock_alert\": true,\n    \"unlock_alert\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/notification-settings/update",
+							"host": ["{{base_url}}"],
+							"path": ["notification-settings", "update"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "4. Bank Account",
+			"item": [
+				{
+					"name": "4.1 Add Bank Account (US)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{"key": "Content-Type", "value": "application/json"},
+							{"key": "Accept", "value": "application/json"},
+							{"key": "Authorization", "value": "Bearer {{token}}"}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"dob\": \"1990-01-15\",\n    \"account_number\": \"000123456789\",\n    \"bank_name\": \"Test Bank\",\n    \"routing_number\": \"110000000\",\n    \"account_type\": \"checking\",\n    \"country\": \"US\",\n    \"currency\": \"usd\",\n    \"address_line1\": \"123 Main Street\",\n    \"city\": \"New York\",\n    \"state\": \"NY\",\n    \"postal_code\": \"10001\",\n    \"phone\": \"1234567890\",\n    \"ssn_last_4\": \"0000\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/bank-account",
+							"host": ["{{base_url}}"],
+							"path": ["bank-account"]
+						}
+					}
+				},
+				{
+					"name": "4.2 Get Bank Accounts",
+					"request": {
+						"method": "GET",
+						"header": [
+							{"key": "Accept", "value": "application/json"},
+							{"key": "Authorization", "value": "Bearer {{token}}"}
+						],
+						"url": {
+							"raw": "{{base_url}}/bank-account",
+							"host": ["{{base_url}}"],
+							"path": ["bank-account"]
+						}
+					}
+				},
+				{
+					"name": "4.3 Set Primary Bank",
+					"request": {
+						"method": "POST",
+						"header": [
+							{"key": "Content-Type", "value": "application/json"},
+							{"key": "Accept", "value": "application/json"},
+							{"key": "Authorization", "value": "Bearer {{token}}"}
+						],
+						"url": {
+							"raw": "{{base_url}}/bank-account/1/set-primary",
+							"host": ["{{base_url}}"],
+							"path": ["bank-account", "1", "set-primary"]
+						}
+					}
+				},
+				{
+					"name": "4.4 Delete Bank Account",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{"key": "Accept", "value": "application/json"},
+							{"key": "Authorization", "value": "Bearer {{token}}"}
+						],
+						"url": {
+							"raw": "{{base_url}}/bank-account/1",
+							"host": ["{{base_url}}"],
+							"path": ["bank-account", "1"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "5. Stripe Payments",
+			"item": [
+				{
+					"name": "5.1 Create Payment Intent",
+					"request": {
+						"method": "POST",
+						"header": [
+							{"key": "Content-Type", "value": "application/json"},
+							{"key": "Accept", "value": "application/json"},
+							{"key": "Authorization", "value": "Bearer {{token}}"}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"amount\": 50.00,\n    \"currency\": \"usd\",\n    \"title\": \"My Savings Vault\",\n    \"hold_period_type\": \"custom\",\n    \"hold_start_at\": \"2026-05-23\",\n    \"hold_end_at\": \"2026-06-23\",\n    \"hold_hours\": 0,\n    \"hold_minutes\": 0\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/stripe/create-payment-intent",
+							"host": ["{{base_url}}"],
+							"path": ["stripe", "create-payment-intent"]
+						}
+					}
+				},
+				{
+					"name": "5.2 Confirm Payment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{"key": "Content-Type", "value": "application/json"},
+							{"key": "Accept", "value": "application/json"},
+							{"key": "Authorization", "value": "Bearer {{token}}"}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"payment_intent_id\": \"pi_xxxxxxxxxxxxxxx\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/stripe/confirm-payment",
+							"host": ["{{base_url}}"],
+							"path": ["stripe", "confirm-payment"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "6. Payment Holds",
+			"item": [
+				{
+					"name": "6.1 List Payment Holds",
+					"request": {
+						"method": "GET",
+						"header": [
+							{"key": "Accept", "value": "application/json"},
+							{"key": "Authorization", "value": "Bearer {{token}}"}
+						],
+						"url": {
+							"raw": "{{base_url}}/payment-holds",
+							"host": ["{{base_url}}"],
+							"path": ["payment-holds"]
+						}
+					}
+				},
+				{
+					"name": "6.2 Balance Summary",
+					"request": {
+						"method": "GET",
+						"header": [
+							{"key": "Accept", "value": "application/json"},
+							{"key": "Authorization", "value": "Bearer {{token}}"}
+						],
+						"url": {
+							"raw": "{{base_url}}/payment-holds/summary",
+							"host": ["{{base_url}}"],
+							"path": ["payment-holds", "summary"]
+						}
+					}
+				},
+				{
+					"name": "6.3 Request Payout (Single Hold)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{"key": "Content-Type", "value": "application/json"},
+							{"key": "Accept", "value": "application/json"},
+							{"key": "Authorization", "value": "Bearer {{token}}"}
+						],
+						"url": {
+							"raw": "{{base_url}}/payment-holds/1/request-payout",
+							"host": ["{{base_url}}"],
+							"path": ["payment-holds", "1", "request-payout"]
+						}
+					}
+				},
+				{
+					"name": "6.4 Withdraw Amount",
+					"request": {
+						"method": "POST",
+						"header": [
+							{"key": "Content-Type", "value": "application/json"},
+							{"key": "Accept", "value": "application/json"},
+							{"key": "Authorization", "value": "Bearer {{token}}"}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"amount\": 25.00\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/payment-holds/withdraw",
+							"host": ["{{base_url}}"],
+							"path": ["payment-holds", "withdraw"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "7. Transaction History",
+			"item": [
+				{
+					"name": "7.1 All Transactions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{"key": "Accept", "value": "application/json"},
+							{"key": "Authorization", "value": "Bearer {{token}}"}
+						],
+						"url": {
+							"raw": "{{base_url}}/transactions/all",
+							"host": ["{{base_url}}"],
+							"path": ["transactions", "all"]
+						}
+					}
+				},
+				{
+					"name": "7.2 Checkouts Only",
+					"request": {
+						"method": "GET",
+						"header": [
+							{"key": "Accept", "value": "application/json"},
+							{"key": "Authorization", "value": "Bearer {{token}}"}
+						],
+						"url": {
+							"raw": "{{base_url}}/transactions/checkouts",
+							"host": ["{{base_url}}"],
+							"path": ["transactions", "checkouts"]
+						}
+					}
+				},
+				{
+					"name": "7.3 Withdrawals Only",
+					"request": {
+						"method": "GET",
+						"header": [
+							{"key": "Accept", "value": "application/json"},
+							{"key": "Authorization", "value": "Bearer {{token}}"}
+						],
+						"url": {
+							"raw": "{{base_url}}/transactions/withdraws",
+							"host": ["{{base_url}}"],
+							"path": ["transactions", "withdraws"]
+						}
+					}
+				},
+				{
+					"name": "7.4 Hold Amounts",
+					"request": {
+						"method": "GET",
+						"header": [
+							{"key": "Accept", "value": "application/json"},
+							{"key": "Authorization", "value": "Bearer {{token}}"}
+						],
+						"url": {
+							"raw": "{{base_url}}/transactions/hold-amounts",
+							"host": ["{{base_url}}"],
+							"path": ["transactions", "hold-amounts"]
+						}
+					}
+				},
+				{
+					"name": "7.5 Ready for Transfer",
+					"request": {
+						"method": "GET",
+						"header": [
+							{"key": "Accept", "value": "application/json"},
+							{"key": "Authorization", "value": "Bearer {{token}}"}
+						],
+						"url": {
+							"raw": "{{base_url}}/transactions/ready-for-transfer",
+							"host": ["{{base_url}}"],
+							"path": ["transactions", "ready-for-transfer"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "8. Admin API",
+			"item": [
+				{
+					"name": "8.1 Admin Transfer (Execute)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{"key": "Content-Type", "value": "application/json"},
+							{"key": "Accept", "value": "application/json"},
+							{"key": "Authorization", "value": "Bearer {{token}}"}
+						],
+						"url": {
+							"raw": "{{base_url}}/admin/transfer/1",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "transfer", "1"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "9. Other",
+			"item": [
+				{
+					"name": "9.1 Privacy Policy",
+					"request": {
+						"method": "GET",
+						"header": [
+							{"key": "Accept", "value": "application/json"}
+						],
+						"url": {
+							"raw": "{{base_url}}/privacy-policy",
+							"host": ["{{base_url}}"],
+							"path": ["privacy-policy"]
+						}
+					}
+				},
+				{
+					"name": "9.2 Refer Friend URL",
+					"request": {
+						"method": "GET",
+						"header": [
+							{"key": "Accept", "value": "application/json"},
+							{"key": "Authorization", "value": "Bearer {{token}}"}
+						],
+						"url": {
+							"raw": "{{base_url}}/refer-friend-url",
+							"host": ["{{base_url}}"],
+							"path": ["refer-friend-url"]
+						}
+					}
+				}
+			]
+		}
+	]
+}
