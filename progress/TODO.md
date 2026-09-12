@@ -8,52 +8,38 @@ One line per item. Keep it honest: an item is only done when it has been verifie
 
 ## IN PROGRESS
 
-- [ ] **Deploy the pushed commits to production** (`api.timevaultapp.co`). Must be run from the VPS root shell — no SSH credentials for `srv1017557` exist on the dev machine. Both `main` and `development` point at the same commit, so either branch is safe to deploy.
+- [ ] **Deploy the pushed commits to production** (`api.timevaultapp.co`). Must be run from the VPS shell — no SSH credentials for `srv1017557` exist on the dev machine. Both `main` and `development` point at the same commit, so either branch is safe to deploy.
+
+**One command, from the server root shell:**
 
 ```bash
-cd /home/timevaultapp-api/htdocs/api.timevaultapp.co
-
-# 1. See what the server is actually on, and whether anything was hand-edited there
-git branch --show-current
-git status --short          # MUST be clean; stash or commit local edits first, do not blow them away
-git log --oneline -3
-
-# 2. Pull
-git fetch origin
-git pull origin "$(git branch --show-current)"
-
-# 3. Dependencies (production flags — never install dev deps on the live box)
-composer install --no-dev --optimize-autoloader --no-interaction
-
-# 4. Migrations — check first, only run if something is pending
-php artisan migrate:status
-php artisan migrate --force          # skip entirely if nothing is pending
-
-# 5. Rebuild caches
-php artisan config:clear && php artisan config:cache
-php artisan route:clear  && php artisan route:cache
-php artisan view:clear   && php artisan view:cache
-
-# 6. Restart the queue so workers pick up new code
-php artisan queue:restart
-
-# 7. Permissions (CloudPanel site user)
-chown -R timevaultapp-api:timevaultapp-api storage bootstrap/cache
-chmod -R ug+rw storage bootstrap/cache
-
-# 8. Verify
-curl -i https://api.timevaultapp.co/up
-tail -n 50 storage/logs/laravel.log
+cd /home/timevaultapp-api/htdocs/api.timevaultapp.co && curl -fsSL https://raw.githubusercontent.com/jasonapp2244/time_walt_app/main/deploy.sh -o deploy.sh && chmod +x deploy.sh && ./deploy.sh
 ```
 
-> **NEVER run `php artisan key:generate` on this server.** `APP_KEY` encrypts `email`, `phone`, `full_name` and other PII at rest — regenerating it corrupts every existing record with `DecryptException: The MAC is invalid`.
-> **NEVER run `migrate:fresh`, `migrate:refresh` or `db:wipe`** against the production database.
+Every deploy after that one is just:
+
+```bash
+cd /home/timevaultapp-api/htdocs/api.timevaultapp.co && ./deploy.sh
+```
+
+`deploy.sh` lives in the repo root. It is idempotent and re-runnable, and it does, in order: preflight checks (`.env`, `APP_KEY`, `APP_ENV`, `APP_DEBUG`, site owner) → refuses to run if the server's working tree is dirty → records the current SHA as the rollback point → fetches and fast-forwards → `composer install --no-dev --optimize-autoloader` → backs the database up with `mysqldump` **only if the release adds migrations**, then `migrate --force` **only if something is pending** → rebuilds config/route/view/event caches → fixes `storage` + `bootstrap/cache` ownership → `queue:restart` → leaves maintenance mode → polls `/up` five times for a 200, printing the log tail and the rollback command if it never gets one.
+
+Other modes:
+
+```bash
+./deploy.sh --dry-run        # print every step, change nothing
+./deploy.sh --branch main    # deploy a specific branch
+./deploy.sh --rollback       # return to the SHA recorded by the last deploy
+```
+
+> The script never runs `key:generate` (`APP_KEY` decrypts `email`, `phone`, `full_name` at rest — regenerating it makes every existing row throw `DecryptException: The MAC is invalid`), never runs `migrate:fresh` / `migrate:refresh` / `migrate:reset` / `db:wipe`, never installs dev dependencies, and never discards uncommitted work it finds on the server — it stops and shows you instead.
 
 ## NEXT UP
 
-- [ ] Record the deploy evidence (HTTP status of `/up`, log tail, commit SHA on the server) in `DEPLOYMENT_STATUS.md`.
+- [ ] Record the deploy evidence (`/up` status, log tail, server-side SHA) in `DEPLOYMENT_STATUS.md`.
+- [ ] **Local database is 2 migrations behind** — `2026_05_22_000001_add_bank_account_id_to_transfers_table` and `2026_05_25_000001_convert_timestamps_from_et_to_utc` show as Pending on the dev machine. Confirm whether production has them; if not, the first `./deploy.sh` run will apply them (and will take a `mysqldump` first).
 - [ ] Run `vendor/bin/pint` to fix the 6 style failures, then re-run `php artisan test`.
-- [ ] Rewrite `deployeement.md` — it still targets the retired `stripe-sheet-and-admin-panel` branch and the `devonlinetestserver` test box, not `api.timevaultapp.co`.
+- [ ] Rewrite `deployeement.md` — it still targets the retired `stripe-sheet-and-admin-panel` branch and the `devonlinetestserver` test box, not `api.timevaultapp.co`. `deploy.sh` supersedes most of it.
 
 ## BACKLOG
 
@@ -63,10 +49,11 @@ tail -n 50 storage/logs/laravel.log
 
 ## BLOCKED (and what unblocks it)
 
-- **Production deploy from this machine** — blocked on SSH access. `~/.ssh/config` has no entry for `srv1017557` / `api.timevaultapp.co`, and the only configured host is `emp-ionos`. Unblocked either by adding a host entry + key, or by the user running the block above themselves.
+- **Running the deploy from the dev machine** — blocked on SSH access. `~/.ssh/config` has no entry for `srv1017557` / `api.timevaultapp.co`; the only configured host is `emp-ionos`. Unblocked by adding a host entry + key, or by the user running the one-liner above.
 
 ## DONE
 
+- [x] 2026-09-12 — `deploy.sh` added: one-command, idempotent production deploy with dry-run, rollback and health gate
 - [x] 2026-09-12 — Committed the outstanding docs/config work and pushed `development` to origin
 - [x] 2026-09-12 — Fast-forwarded `main` to `development` and pushed; both branches identical on GitHub
 - [x] 2026-09-12 — Filled in all four `progress/` handover files from their seeded templates
