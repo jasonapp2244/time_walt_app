@@ -182,16 +182,48 @@ CURRENT_BRANCH="$(git branch --show-current)"
 [ -n "$BRANCH" ] || BRANCH="$CURRENT_BRANCH"
 [ -n "$BRANCH" ] || die "detached HEAD and no --branch given"
 
-DIRTY="$(git status --porcelain --untracked-files=no)"
-if [ -n "$DIRTY" ]; then
-    printf '\n'
-    git status --short --untracked-files=no
+# A file whose only difference from HEAD is CRLF-vs-LF is a checkout artifact,
+# not somebody's hotfix - restoring it loses nothing. Anything with a real
+# content change stops the deploy and gets shown, so a human can decide.
+EOL_ONLY=""
+REAL_DIRTY=""
+EOL_COUNT=0
+while IFS= read -r CHANGED; do
+    [ -n "$CHANGED" ] || continue
+    if [ -f "$CHANGED" ] && git cat-file -e "HEAD:$CHANGED" 2>/dev/null; then
+        HEAD_SUM="$(git show "HEAD:$CHANGED" | tr -d '\r' | cksum)"
+        WORK_SUM="$(tr -d '\r' < "$CHANGED" | cksum)"
+        if [ "$HEAD_SUM" = "$WORK_SUM" ]; then
+            EOL_ONLY="$EOL_ONLY $CHANGED"
+            EOL_COUNT=$((EOL_COUNT + 1))
+            continue
+        fi
+    fi
+    REAL_DIRTY="$REAL_DIRTY $CHANGED"
+done < <(git diff --name-only HEAD)
+
+if [ -n "$REAL_DIRTY" ]; then
+    printf '\n       Files with real content changes:\n'
+    for CHANGED in $REAL_DIRTY; do printf '         %s\n' "$CHANGED"; done
+    printf '\n       What changed (first 40 lines):\n'
+    # shellcheck disable=SC2086
+    git --no-pager diff HEAD -- $REAL_DIRTY | head -n 40 | sed 's/^/         /'
     die "the server has uncommitted changes to tracked files (listed above).
        Someone edited files directly on production. Deal with them deliberately -
        'git stash' to park them, or commit them - then re-run.
        This script will not overwrite them for you."
 fi
-ok "no uncommitted changes to tracked files, on branch '$CURRENT_BRANCH'"
+
+if [ -n "$EOL_ONLY" ]; then
+    warn "$EOL_COUNT tracked file(s) differ from HEAD only in line endings (CRLF vs LF)"
+    warn "that is a checkout artifact, not an edit - restoring them from HEAD loses nothing"
+    for CHANGED in $EOL_ONLY; do printf '         %s\n' "$CHANGED"; done
+    # shellcheck disable=SC2086
+    run git checkout -- $EOL_ONLY
+    ok "line endings normalised"
+fi
+
+ok "no uncommitted content changes, on branch '$CURRENT_BRANCH'"
 
 PREV_SHA="$(git rev-parse HEAD)"
 ok "current SHA: $(git rev-parse --short HEAD)  (this is the rollback point)"
