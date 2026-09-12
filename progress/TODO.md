@@ -78,3 +78,11 @@ Re-exec as the site owner and the `safe.directory` registration both worked. The
 Fixed by classifying dirt rather than ignoring it: each changed file is compared to HEAD with CR stripped from both sides. Identical means line endings only — a checkout artifact — and the file is restored from HEAD. Anything else is a real edit, and the deploy still stops and now prints the diff. Candidates come from both `git status` and `git diff HEAD`, because those two disagree in exactly this case.
 
 Both paths were verified locally by converting a tracked file to CRLF.
+
+### Run 3 — 2026-09-12
+
+Line-ending classification worked: all 11 `.gitignore` files were correctly identified as checkout artifacts. The run then died on `fatal: Unable to create '.git/index.lock': Permission denied` — the checkout's internals are owned by `root` (from whenever it was first cloned or last touched as root), so the site user cannot write the git index.
+
+Fixed by repairing ownership **before** dropping privileges: while still root, the script counts paths under the app directory not owned by the site user and, if there are any, `chown -R`s the whole directory to the site owner. A single root-owned file inside `.git` is enough to break git for the site user, and root-owned files in `vendor/` break php-fpm later.
+
+Also added a preflight write check on `.git`, so running the script directly as the site user against a root-owned checkout fails immediately with instructions instead of halfway through.

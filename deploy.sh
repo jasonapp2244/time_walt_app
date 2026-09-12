@@ -92,6 +92,17 @@ SITE_USER="$(stat -c '%U' "$APP_DIR")"
 SITE_OWNER="$(stat -c '%U:%G' "$APP_DIR")"
 
 if [ "$(id -u)" -eq 0 ] && [ "$SITE_USER" != "root" ] && [ "${TV_DEPLOY_REEXEC:-0}" != "1" ]; then
+    # Repair ownership NOW, while we still have the privilege to do it. A single
+    # root-owned file inside .git is enough to make the site user's git fail on
+    # index.lock, and root-owned files in vendor/ break php-fpm later.
+    FOREIGN_COUNT="$(find "$APP_DIR" ! -user "$SITE_USER" 2>/dev/null | wc -l | tr -d ' ')"
+    if [ "${FOREIGN_COUNT:-0}" -gt 0 ]; then
+        warn "$FOREIGN_COUNT path(s) under $APP_DIR are not owned by $SITE_USER"
+        warn "repairing ownership before dropping privileges - the site user must own its own checkout"
+        run chown -R "$SITE_OWNER" "$APP_DIR"
+        ok "ownership repaired to $SITE_OWNER"
+    fi
+
     if command -v sudo >/dev/null 2>&1 && sudo -n -u "$SITE_USER" true >/dev/null 2>&1; then
         warn "running as root, but this site is owned by $SITE_USER"
         warn "re-running as $SITE_USER so composer and artisan do not leave root-owned files"
@@ -131,6 +142,15 @@ if ! git rev-parse --git-dir >/dev/null 2>&1; then
         || die "git still cannot read $APP_DIR. Check the directory's ownership and permissions."
 fi
 ok "git can read the repository"
+
+# Reading is not enough - git writes index.lock for almost every operation.
+if [ ! -w .git ] || [ ! -w .git/index ]; then
+    die "cannot write to $APP_DIR/.git as $(id -un) - git would fail on index.lock.
+       The checkout is owned by someone else (usually root, from an earlier deploy).
+       Re-run this script as root: it repairs ownership and then drops privileges
+       to $SITE_USER automatically."
+fi
+ok "git can write to the repository"
 
 env_get() {
     grep -E "^[[:space:]]*$1[[:space:]]*=" .env 2>/dev/null \
