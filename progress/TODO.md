@@ -70,3 +70,11 @@ The first `./deploy.sh` on `api.timevaultapp.co` aborted in preflight. Three iss
 3. **Untracked `deploy.sh` in the repo root would have aborted the merge** — the bootstrap now writes to `/tmp` instead, and the script moves any conflicting untracked file aside to `<name>.replaced-<timestamp>`.
 
 **Still open, and NOT a deploy problem — `APP_ENV=local` in the production `.env`.** The live API at `api.timevaultapp.co` is running with `APP_ENV=local`. `APP_DEBUG` is correctly `false`, so stack traces are not exposed, but `local` changes error rendering and framework/package behaviour on a payment-handling API. This is a `.env` edit, deliberately not automated — change it on the server, then run `php artisan config:cache` and re-verify `/up`.
+
+### Run 2 — 2026-09-12
+
+Re-exec as the site owner and the `safe.directory` registration both worked. The run then stopped on 11 tracked `.gitignore` files under `storage/` and `bootstrap/cache` showing as modified — their working copies on the server carry CRLF while the stored blobs are LF.
+
+Fixed by classifying dirt rather than ignoring it: each changed file is compared to HEAD with CR stripped from both sides. Identical means line endings only — a checkout artifact — and the file is restored from HEAD. Anything else is a real edit, and the deploy still stops and now prints the diff. Candidates come from both `git status` and `git diff HEAD`, because those two disagree in exactly this case.
+
+Both paths were verified locally by converting a tracked file to CRLF.
