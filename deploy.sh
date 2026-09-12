@@ -185,6 +185,19 @@ CURRENT_BRANCH="$(git branch --show-current)"
 # A file whose only difference from HEAD is CRLF-vs-LF is a checkout artifact,
 # not somebody's hotfix - restoring it loses nothing. Anything with a real
 # content change stops the deploy and gets shown, so a human can decide.
+# Drop stat-only dirt (mtime changed, contents did not) before judging anything.
+git update-index -q --refresh >/dev/null 2>&1 || true
+
+# Take candidates from both status and diff: status is what actually blocks a
+# merge, diff is what has real content behind it, and the two disagree exactly
+# in the line-ending case we are trying to identify.
+CANDIDATES="$(
+    {
+        git diff --name-only HEAD
+        git status --porcelain --untracked-files=no | sed 's/^...//'
+    } 2>/dev/null | sed -e 's/^"//' -e 's/"$//' | sort -u
+)"
+
 EOL_ONLY=""
 REAL_DIRTY=""
 EOL_COUNT=0
@@ -200,7 +213,9 @@ while IFS= read -r CHANGED; do
         fi
     fi
     REAL_DIRTY="$REAL_DIRTY $CHANGED"
-done < <(git diff --name-only HEAD)
+done <<CANDIDATE_LIST
+$CANDIDATES
+CANDIDATE_LIST
 
 if [ -n "$REAL_DIRTY" ]; then
     printf '\n       Files with real content changes:\n'
