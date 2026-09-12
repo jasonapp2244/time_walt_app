@@ -13,7 +13,7 @@ One line per item. Keep it honest: an item is only done when it has been verifie
 **One command, from the server root shell:**
 
 ```bash
-cd /home/timevaultapp-api/htdocs/api.timevaultapp.co && curl -fsSL https://raw.githubusercontent.com/jasonapp2244/time_walt_app/main/deploy.sh -o deploy.sh && chmod +x deploy.sh && ./deploy.sh
+curl -fsSL https://raw.githubusercontent.com/jasonapp2244/time_walt_app/main/deploy.sh -o /tmp/tv-deploy.sh && APP_DIR=/home/timevaultapp-api/htdocs/api.timevaultapp.co bash /tmp/tv-deploy.sh
 ```
 
 Every deploy after that one is just:
@@ -58,3 +58,15 @@ Other modes:
 - [x] 2026-09-12 — Fast-forwarded `main` to `development` and pushed; both branches identical on GitHub
 - [x] 2026-09-12 — Filled in all four `progress/` handover files from their seeded templates
 - [x] 2026-09-07 — Production engineering rules installed in `CLAUDE.md`, `progress/` folder created
+
+---
+
+## FIRST PRODUCTION RUN — 2026-09-12, findings
+
+The first `./deploy.sh` on `api.timevaultapp.co` aborted in preflight. Three issues, all now fixed in the script:
+
+1. **`fatal: detected dubious ownership`** — the deploy was run as `root` against a repo owned by `timevaultapp-api`. Fixed by re-exec'ing as the site owner instead of suppressing the warning, which also stops `composer`/`artisan` leaving root-owned files in `vendor/` and `bootstrap/cache`.
+2. **Failure banner printed twice** — the `ERR` trap re-entered `die()`. Single-fire guard added.
+3. **Untracked `deploy.sh` in the repo root would have aborted the merge** — the bootstrap now writes to `/tmp` instead, and the script moves any conflicting untracked file aside to `<name>.replaced-<timestamp>`.
+
+**Still open, and NOT a deploy problem — `APP_ENV=local` in the production `.env`.** The live API at `api.timevaultapp.co` is running with `APP_ENV=local`. `APP_DEBUG` is correctly `false`, so stack traces are not exposed, but `local` changes error rendering and framework/package behaviour on a payment-handling API. This is a `.env` edit, deliberately not automated — change it on the server, then run `php artisan config:cache` and re-verify `/up`.
