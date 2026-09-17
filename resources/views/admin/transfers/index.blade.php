@@ -113,8 +113,8 @@
                                 <td style="color:#374151; font-size:12px; font-weight:500;">
                                     @if($transfer->bankAccount)
                                         <i class='bx bxs-bank me-1' style="color:#2563eb;"></i>
-                                        <span style="font-weight:600;">{{ $transfer->bankAccount->bank_name }}</span>
-                                        •••• {{ substr($transfer->bankAccount->account_number, -4) }}
+                                        <span style="font-weight:600;">{{ $transfer->bankAccount?->safe('bank_name') ?? '—' }}</span>
+                                        •••• {{ substr($transfer->bankAccount?->safe('account_number', '', '') ?? '', -4) }}
                                     @else
                                         <span style="color:#9ca3af;">—</span>
                                     @endif

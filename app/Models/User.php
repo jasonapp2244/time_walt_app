@@ -9,6 +9,8 @@ use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
+    use \App\Models\Concerns\SafelyReadsEncryptedAttributes;
+
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
 
@@ -130,20 +132,12 @@ class User extends Authenticatable
      */
     public function displayName(string $fallback = '—'): string
     {
-        try {
-            return $this->full_name ?? $fallback;
-        } catch (\Throwable) {
-            return '[unreadable]';
-        }
+        return $this->safe('full_name', $fallback);
     }
 
     public function displayEmail(string $fallback = '—'): string
     {
-        try {
-            return $this->email ?? $fallback;
-        } catch (\Throwable) {
-            return '[unreadable]';
-        }
+        return $this->safe('email', $fallback);
     }
 
     /**

@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class StripeCustomer extends Model
 {
+    use \App\Models\Concerns\SafelyReadsEncryptedAttributes;
+
     protected $fillable = [
         'user_id',
         'stripe_customer_id',

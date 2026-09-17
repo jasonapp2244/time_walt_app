@@ -7,6 +7,7 @@ use App\Models\Payment;
 use App\Models\PaymentHold;
 use App\Models\Transfer;
 use App\Models\User;
+use App\Models\UserBankAccount;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -20,14 +21,30 @@ class UndecryptableUserRenderingTest extends TestCase
 {
     use RefreshDatabase;
 
+    private const BOGUS = 'eyJpdiI6ImJvZ3VzIiwidmFsdWUiOiJib2d1cyIsIm1hYyI6ImJvZ3VzIn0=';
+
     private function corrupt(User $user): User
     {
         DB::table('users')->where('id', $user->id)->update([
-            'email' => 'eyJpdiI6ImJvZ3VzIiwidmFsdWUiOiJib2d1cyIsIm1hYyI6ImJvZ3VzIn0=',
-            'full_name' => 'eyJpdiI6ImJvZ3VzIiwidmFsdWUiOiJib2d1cyIsIm1hYyI6ImJvZ3VzIn0=',
+            'email' => self::BOGUS,
+            'full_name' => self::BOGUS,
+            'phone' => self::BOGUS,
         ]);
 
         return $user->fresh();
+    }
+
+    /**
+     * Bank details are encrypted too, and the transfers page renders them.
+     */
+    private function corruptBankAccount(UserBankAccount $bank): void
+    {
+        DB::table('user_bank_accounts')->where('id', $bank->id)->update([
+            'bank_name' => self::BOGUS,
+            'account_number' => self::BOGUS,
+            'account_holder_name' => self::BOGUS,
+            'iban' => self::BOGUS,
+        ]);
     }
 
     private function admin(): User
@@ -101,10 +118,16 @@ class UndecryptableUserRenderingTest extends TestCase
 
         $payment = Payment::factory()->create(['user_id' => $user->id]);
         $hold = PaymentHold::factory()->create(['user_id' => $user->id, 'payment_id' => $payment->id]);
-        Transfer::factory()->create(['user_id' => $user->id, 'hold_id' => $hold->id]);
+        $bank = UserBankAccount::factory()->create(['user_id' => $user->id]);
+        Transfer::factory()->create([
+            'user_id' => $user->id,
+            'hold_id' => $hold->id,
+            'bank_account_id' => $bank->id,
+        ]);
         Feedback::factory()->create(['user_id' => $user->id]);
 
         $this->corrupt($user);
+        $this->corruptBankAccount($bank);
 
         $this->actingAs($this->admin())->get($url)->assertOk();
     }

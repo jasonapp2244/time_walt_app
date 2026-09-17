@@ -89,7 +89,7 @@
                             <span style="font-size:11px; color:#374151; font-weight:700;
                                          text-transform:uppercase; letter-spacing:0.5px;">Phone</span>
                             <span style="font-size:13px; color:#111827; font-weight:600;">
-                                {{ $user->phone ?? '—' }}
+                                {{ $user->safe('phone') }}
                             </span>
                         </div>
 
@@ -218,7 +218,7 @@
                                     @forelse($bankAccounts as $bank)
                                     <tr>
                                         <td style="color:#6b7280; font-size:12px; font-weight:500;">{{ ($bankAccounts->currentPage() - 1) * $bankAccounts->perPage() + $loop->iteration }}</td>
-                                        <td style="color:#1f2937; font-size:13px; font-weight:600;">{{ $bank->bank_name }}</td>
+                                        <td style="color:#1f2937; font-size:13px; font-weight:600;">{{ $bank->safe('bank_name') }}</td>
                                         <td style="color:#374151; font-size:13px; font-weight:600; font-family:monospace;">{{ $bank->masked_account_number }}</td>
                                         <td style="color:#374151; font-size:12px; font-weight:500;">{{ ucfirst($bank->account_type) }}</td>
                                         <td style="color:#374151; font-size:12px; font-weight:500;">{{ strtoupper($bank->country) }} ({{ strtoupper($bank->currency) }})</td>
@@ -260,7 +260,7 @@
                         <div class="modal-content" style="border:1px solid rgba(189,126,46,0.2); border-radius:12px; overflow:hidden;">
                             <div class="modal-header" style="background:rgba(189,126,46,0.06); border-bottom:1px solid rgba(189,126,46,0.12); padding:16px 20px;">
                                 <h6 class="modal-title" style="font-weight:700; color:#111827;">
-                                    <i class='bx bxs-bank me-2' style="color:#92621a;"></i>{{ $bank->bank_name }}
+                                    <i class='bx bxs-bank me-2' style="color:#92621a;"></i>{{ $bank->safe('bank_name') }}
                                     @if($bank->is_primary)
                                         <span class="tv-badge badge-completed ms-2" style="font-size:10px;">Primary</span>
                                     @endif
@@ -270,7 +270,7 @@
                             <div class="modal-body" style="padding:0;">
                                 <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 20px; border-bottom:1px solid rgba(0,0,0,0.05);">
                                     <span style="font-size:11px; color:#374151; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Account Holder</span>
-                                    <span style="font-size:13px; color:#111827; font-weight:600;">{{ $bank->account_holder_name }}</span>
+                                    <span style="font-size:13px; color:#111827; font-weight:600;">{{ $bank->safe('account_holder_name') }}</span>
                                 </div>
                                 <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 20px; border-bottom:1px solid rgba(0,0,0,0.05);">
                                     <span style="font-size:11px; color:#374151; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Account Number</span>
@@ -278,7 +278,7 @@
                                 </div>
                                 <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 20px; border-bottom:1px solid rgba(0,0,0,0.05);">
                                     <span style="font-size:11px; color:#374151; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Bank Name</span>
-                                    <span style="font-size:13px; color:#111827; font-weight:600;">{{ $bank->bank_name }}</span>
+                                    <span style="font-size:13px; color:#111827; font-weight:600;">{{ $bank->safe('bank_name') }}</span>
                                 </div>
                                 <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 20px; border-bottom:1px solid rgba(0,0,0,0.05);">
                                     <span style="font-size:11px; color:#374151; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Account Type</span>
@@ -292,10 +292,10 @@
                                     <span style="font-size:11px; color:#374151; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Currency</span>
                                     <span style="font-size:13px; color:#111827; font-weight:600;">{{ strtoupper($bank->currency) }}</span>
                                 </div>
-                                @if($bank->iban)
+                                @if($bank->safe('iban', '', ''))
                                 <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 20px; border-bottom:1px solid rgba(0,0,0,0.05);">
                                     <span style="font-size:11px; color:#374151; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">IBAN</span>
-                                    <span style="font-size:13px; color:#111827; font-weight:600;">{{ $bank->iban }}</span>
+                                    <span style="font-size:13px; color:#111827; font-weight:600;">{{ $bank->safe('iban') }}</span>
                                 </div>
                                 @endif
                                 @if($bank->swift_code)
@@ -359,8 +359,8 @@
                                             @endphp
                                             @if($transferBank)
                                                 <i class='bx bxs-bank me-1' style="color:#2563eb;"></i>
-                                                <span style="font-weight:600;">{{ $transferBank->bank_name }}</span>
-                                                •••• {{ substr($transferBank->account_number, -4) }}
+                                                <span style="font-weight:600;">{{ $transferBank->safe('bank_name') }}</span>
+                                                •••• {{ substr($transferBank->safe('account_number', '', ''), -4) }}
                                             @else
                                                 <span style="color:#9ca3af;">—</span>
                                             @endif

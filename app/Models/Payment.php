@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Payment extends Model
 {
+    use \App\Models\Concerns\SafelyReadsEncryptedAttributes;
     use HasFactory;
 
     protected $fillable = [

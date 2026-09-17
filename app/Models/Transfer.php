@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Transfer extends Model
 {
+    use \App\Models\Concerns\SafelyReadsEncryptedAttributes;
     use HasFactory;
 
     protected $fillable = [

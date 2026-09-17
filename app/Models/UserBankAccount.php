@@ -7,6 +7,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class UserBankAccount extends Model
 {
+    use \App\Models\Concerns\SafelyReadsEncryptedAttributes;
+    use \Illuminate\Database\Eloquent\Factories\HasFactory;
+
     protected $fillable = [
         'user_id',
         'account_holder_name',

@@ -78,7 +78,7 @@
                                     </div>
                                 </td>
                                 <td style="color:#374151; font-size:13px; font-weight:500;">
-                                    {{ $user->phone ?? '—' }}
+                                    {{ $user->safe('phone') }}
                                 </td>
                                 <td>
                                     <span class="tv-badge badge-{{ $user->status ?? 'active' }}">
