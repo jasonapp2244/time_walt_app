@@ -83,14 +83,14 @@
                                     @if($feedback->user)
                                         <a href="{{ route('admin.users.show', $feedback->user_id) }}"
                                            style="color:#111827; font-weight:600; font-size:13px; text-decoration:none;">
-                                            {{ $feedback->user->full_name ?? 'Unknown' }}
+                                            {{ $feedback->user->displayName('Unknown') }}
                                         </a>
                                     @else
                                         <span style="color:#9ca3af;">Deleted user</span>
                                     @endif
                                 </td>
                                 <td style="color:#374151; font-size:12px; font-weight:500;">
-                                    {{ $feedback->user?->email ?? '—' }}
+                                    {{ $feedback->user?->displayEmail() ?? '—' }}
                                 </td>
                                 <td style="color:#d4963e; font-size:14px; letter-spacing:1px; white-space:nowrap;">
                                     {{ str_repeat('★', $feedback->rating) }}<span style="color:#e5e7eb;">{{ str_repeat('★', 5 - $feedback->rating) }}</span>

@@ -123,6 +123,30 @@ class User extends Authenticatable
     }
 
     /**
+     * full_name and email are encrypted at rest. A row written under a previous
+     * APP_KEY throws on read, and "??" does not catch a thrown exception - so a
+     * single damaged row would 500 any admin page that lists it. These degrade
+     * to a placeholder instead.
+     */
+    public function displayName(string $fallback = '—'): string
+    {
+        try {
+            return $this->full_name ?? $fallback;
+        } catch (\Throwable) {
+            return '[unreadable]';
+        }
+    }
+
+    public function displayEmail(string $fallback = '—'): string
+    {
+        try {
+            return $this->email ?? $fallback;
+        } catch (\Throwable) {
+            return '[unreadable]';
+        }
+    }
+
+    /**
      * Get the notification settings for the user.
      */
     public function notificationSettings()

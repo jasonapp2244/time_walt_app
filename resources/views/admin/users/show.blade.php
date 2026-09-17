@@ -11,7 +11,7 @@
                 <i class='bx bx-arrow-back me-1'></i>Back
             </a>
             <div>
-                <h4 class="section-heading">{{ $user->full_name ?? 'User Detail' }}</h4>
+                <h4 class="section-heading">{{ $user->displayName('User Detail') }}</h4>
                 <p class="section-sub">User ID #{{ $user->id }}</p>
             </div>
             <div class="ms-auto d-flex align-items-center gap-3">
@@ -69,13 +69,13 @@
                                     border:2px solid rgba(189,126,46,0.35); display:flex; align-items:center;
                                     justify-content:center; font-size:28px; font-weight:700; color:#92621a;
                                     margin:0 auto 12px;">
-                            {{ strtoupper(substr($user->full_name ?? 'U', 0, 1)) }}
+                            {{ strtoupper(substr($user->displayName('U'), 0, 1)) }}
                         </div>
                         <div style="font-size:16px; font-weight:700; color:#111827; margin-bottom:3px;">
-                            {{ $user->full_name ?? '—' }}
+                            {{ $user->displayName() }}
                         </div>
                         <div style="font-size:12px; color:#6b7280; font-weight:500; margin-bottom:10px;">
-                            {{ $user->email ?? '—' }}
+                            {{ $user->displayEmail() }}
                         </div>
                         <span class="tv-badge badge-{{ $user->status ?? 'active' }}">
                             {{ ucfirst($user->status ?? 'active') }}

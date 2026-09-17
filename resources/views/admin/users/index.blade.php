@@ -71,10 +71,10 @@
                                 </td>
                                 <td>
                                     <div style="font-weight:600; color:#111827; font-size:13px; line-height:1.3;">
-                                        {{ $user->full_name ?? '—' }}
+                                        {{ $user->displayName() }}
                                     </div>
                                     <div style="font-size:11px; color:#6b7280; margin-top:2px;">
-                                        {{ $user->email ?? '' }}
+                                        {{ $user->displayEmail('') }}
                                     </div>
                                 </td>
                                 <td style="color:#374151; font-size:13px; font-weight:500;">

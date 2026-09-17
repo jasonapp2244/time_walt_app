@@ -22,10 +22,10 @@
                     <div style="width:36px; height:36px; border-radius:50%; background:rgba(189,126,46,0.12);
                                 border:2px solid rgba(189,126,46,0.35); display:flex; align-items:center;
                                 justify-content:center; font-weight:700; color:#bd7e2e; font-size:16px;">
-                        {{ strtoupper(substr(auth()->user()->full_name ?? 'A', 0, 1)) }}
+                        {{ strtoupper(substr(auth()->user()->displayName('A'), 0, 1)) }}
                     </div>
                     <div class="user-info">
-                        <p class="user-name mb-0">{{ auth()->user()->full_name ?? 'Admin' }}</p>
+                        <p class="user-name mb-0">{{ auth()->user()->displayName('Admin') }}</p>
                         <p class="designattion mb-0">Administrator</p>
                     </div>
                 </a>
@@ -34,7 +34,7 @@
                         <a class="dropdown-item d-flex align-items-center gap-2"
                            href="#" style="color:rgba(0,0,0,0.45); font-size:12px; pointer-events:none;">
                             <i class="bx bx-envelope" style="color:#bd7e2e;"></i>
-                            <span>{{ auth()->user()->email ?? '' }}</span>
+                            <span>{{ auth()->user()->displayEmail('') }}</span>
                         </a>
                     </li>
                     <li>
