@@ -11,7 +11,7 @@ One line per item. Keep it honest: an item is only done when it has been verifie
 - [ ] **Push `development` and `main` (both at `bff4900`), then re-run the deploy.** The 2026-09-17 production deploy shipped `28087e6` — tranche 1 only. The feedback feature is committed and merged locally but was never pushed, so it is not on origin and not on the server.
 - [ ] **Set `APP_ENV=production` in the production `.env`**, then `php artisan config:cache`. Beyond the usual reasons, `local` breaks the deploy script's own error gate: it greps for `production.ERROR` and the log says `local.ERROR`, so it reports 0 errors unconditionally.
 - [ ] **Fix the nightly `CleanupUnverifiedAccounts` failure** — user 1 is undecryptable under the current `APP_KEY` (`The MAC is invalid.`). See `DEPLOYMENT_STATUS.md` -> FIRST SUCCESSFUL DEPLOY.
-- [ ] **Diagnose `verify:pending-transfers` exit code 1** — query throws at `VerifyPendingTransfers.php:40`; the exception message was not captured.
+- [x] ~~Diagnose `verify:pending-transfers` exit code 1~~ — resolved. `Table 'time-vault-app-db.transfers' doesn't exist`, confined to 2026-09-14 22:20-22:50, nothing since. Production DB is `time-vault-app-db`. See `DEPLOYMENT_STATUS.md` -> finding 3.
 
 - [ ] **Deploy the pushed commits to production** (`api.timevaultapp.co`). Must be run from the VPS shell — no SSH credentials for `srv1017557` exist on the dev machine. Both `main` and `development` point at the same commit, so either branch is safe to deploy.
 

@@ -92,8 +92,21 @@ Record the pre-deploy SHA **before** pulling — that is the only thing that mak
    ```
    `app/Console/Commands/CleanupUnverifiedAccounts.php:57` logs `$account->email` *before* calling `delete()`. Reading that attribute decrypts it, and user 1's encrypted fields were written under a different `APP_KEY` than the one now in production. The read throws, the catch logs, and the account is never deleted — so it retries every night forever. Two ways out, both decisions for the owner: delete user row 1 directly in SQL (it is an unverified account older than 24h, so almost certainly a stale test row), or make the cleanup command tolerate undecryptable rows. Do **not** "fix" this by regenerating `APP_KEY` — that would break every other encrypted row.
 
-3. **`verify:pending-transfers` is failing with exit code 1.** The stack bottoms out at `VerifyPendingTransfers.php:40` → `Builder->get()` → `Builder->runSelect()`, i.e. the query itself throws, not the Stripe call. The exception message was above the captured tail, so the cause is still unknown. Get it with:
+3. **`verify:pending-transfers` and `check:payment-holds` failed on 2026-09-14 only — RESOLVED, not an open issue.**
+   ```
+   SQLSTATE[42S02]: Base table or view not found: 1146
+   Table 'time-vault-app-db.transfers' doesn't exist
+   Database: time-vault-app-db
+   ```
+   Every occurrence falls between 22:20 and 22:50 on 2026-09-14 and nothing since, so both scheduled commands recovered on their own. During that window the app was pointed at a database in which `transfers` and `payment_holds` did not exist — consistent with a restore, rename or import being performed at the time.
+
+   **The production database is `time-vault-app-db`**, not `time_walt` (which is the local dev name). Worth recording: nothing else in this repo states it.
+
+   This likely also explains finding 2. If rows were loaded from a dump taken under a different `APP_KEY`, they would be undecryptable now — same date, same cause, and user 1 is exactly such a row.
+
+   Re-confirm before treating it as closed:
    ```bash
-   grep -n "verify:pending-transfers\|VerifyPendingTransfers" storage/logs/laravel.log | head
-   grep -B 5 "VerifyPendingTransfers.php(40)" storage/logs/laravel.log | head -20
+   php artisan tinker --execute="echo config('database.connections.mysql.database'), PHP_EOL, DB::table('transfers')->count(), PHP_EOL;"
+   php artisan verify:pending-transfers
+   php artisan check:payment-holds
    ```
