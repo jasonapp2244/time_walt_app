@@ -8,7 +8,10 @@ One line per item. Keep it honest: an item is only done when it has been verifie
 
 ## IN PROGRESS
 
-- [ ] **Commit the feedback feature.** It is complete, verified and covered by 25 tests, but entirely uncommitted (5 modified files, 11 untracked). Nothing was staged this session by design. See `PROJECT_STATE.md` -> FILES CHANGED for the full list.
+- [ ] **Push `development` and `main` (both at `bff4900`), then re-run the deploy.** The 2026-09-17 production deploy shipped `28087e6` — tranche 1 only. The feedback feature is committed and merged locally but was never pushed, so it is not on origin and not on the server.
+- [ ] **Set `APP_ENV=production` in the production `.env`**, then `php artisan config:cache`. Beyond the usual reasons, `local` breaks the deploy script's own error gate: it greps for `production.ERROR` and the log says `local.ERROR`, so it reports 0 errors unconditionally.
+- [ ] **Fix the nightly `CleanupUnverifiedAccounts` failure** — user 1 is undecryptable under the current `APP_KEY` (`The MAC is invalid.`). See `DEPLOYMENT_STATUS.md` -> FIRST SUCCESSFUL DEPLOY.
+- [ ] **Diagnose `verify:pending-transfers` exit code 1** — query throws at `VerifyPendingTransfers.php:40`; the exception message was not captured.
 
 - [ ] **Deploy the pushed commits to production** (`api.timevaultapp.co`). Must be run from the VPS shell — no SSH credentials for `srv1017557` exist on the dev machine. Both `main` and `development` point at the same commit, so either branch is safe to deploy.
 
@@ -57,6 +60,9 @@ Other modes:
 - **Running the deploy from the dev machine** — blocked on SSH access. `~/.ssh/config` has no entry for `srv1017557` / `api.timevaultapp.co`; the only configured host is `emp-ionos`. Unblocked by adding a host entry + key, or by the user running the one-liner above.
 
 ## DONE
+
+- [x] 2026-09-18 — Merged `feature/user-feedback` into `development` and `main` (fast-forward, both at `bff4900`). Not pushed — no non-interactive GitHub credentials on this machine.
+- [x] 2026-09-17 — **First production deploy to complete.** `1c15798` -> `28087e6`, `/up` 200. Docs/tooling only; no runtime change and no migrations.
 
 - [x] 2026-09-17 — Feedback feature reviewed end to end (12 files); 9 defects fixed, including a missing rate limit that let one user trigger 1000 admin emails/minute
 - [x] 2026-09-17 — Test harness moved from sqlite `:memory:` to MySQL `time_walt_test`; sqlite could never run this schema, which is why every prior test was a placeholder

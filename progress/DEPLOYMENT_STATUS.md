@@ -1,6 +1,6 @@
 # DEPLOYMENT STATUS — Time Vault
 
-**Last updated:** 2026-09-17
+**Last updated:** 2026-09-18
 
 A command completing is not a successful deployment. Nothing goes in the VERIFIED column below without evidence.
 
@@ -11,7 +11,7 @@ A command completing is not a successful deployment. Nothing goes in the VERIFIE
 | Environment | URL / target | Last deployed | Verified |
 |---|---|---|---|
 | Local | `http://127.0.0.1:8000` (XAMPP, db `time_walt`; tests use `time_walt_test`) | 2026-09-17 | Yes — 30 tests pass, 63 routes resolve, `/up` 200, `/admin/feedback` 302 to login |
-| Production API | `https://api.timevaultapp.co` → `/home/timevaultapp-api/htdocs/api.timevaultapp.co` on VPS `srv1017557` (Hostinger CloudPanel) | **not yet — pending** | **No** |
+| Production API | `https://api.timevaultapp.co` → `/home/timevaultapp-api/htdocs/api.timevaultapp.co` on VPS `srv1017557` (Hostinger CloudPanel) | 2026-09-17, `1c15798` → `28087e6` | Partial — `/up` 200, but see FIRST SUCCESSFUL DEPLOY below |
 | Test server | `https://timevaultapp.devonlinetestserver.com` → `/home/devonlinetestserver-timevaultapp/htdocs/...` | unknown | No |
 
 ## PENDING RELEASE
@@ -28,9 +28,9 @@ Two tranches now sit between production and `main`.
 
 **Risk: documentation and tooling only.** No runtime change.
 
-### Tranche 2 — feedback feature, 2026-09-17, NOT YET COMMITTED
+### Tranche 2 — feedback feature, committed `bff4900`, NOT YET PUSHED OR DEPLOYED
 
-Still in the working tree. See `PROJECT_STATE.md` → FILES CHANGED. It adds: a user feedback API endpoint, an admin feedback page, a queued admin notification email, and one migration.
+Merged locally into `development` and `main` on 2026-09-18, but `origin` is still at `28087e6` and so is production. **The 2026-09-17 deploy did not include any of this.** See `PROJECT_STATE.md` → FILES CHANGED. It adds: a user feedback API endpoint, an admin feedback page, a queued admin notification email, and one migration.
 
 **Risk: this release is no longer docs-only.** Three things change on deploy:
 
@@ -73,3 +73,27 @@ curl -i https://api.timevaultapp.co/up
 ```
 
 Record the pre-deploy SHA **before** pulling — that is the only thing that makes this plan executable.
+
+---
+
+## FIRST SUCCESSFUL DEPLOY — 2026-09-17
+
+`1c15798` → `28087e6`, tranche 1 only. Ran as `timevaultapp-api` after repairing 7774 root-owned paths. `composer` had nothing to install, no migrations pending, caches rebuilt, `queue:restart` signalled, `/up` → 200 on attempt 1. The ownership, line-ending and `index.lock` fixes from runs 1-3 all held.
+
+**It did not ship the feedback feature.** That work was merged locally but never pushed, so `origin/main` was still `28087e6` when this ran.
+
+### Three things this run exposed
+
+1. **`APP_ENV=local` makes the deploy's own error gate blind.** The script's final line reports `log errors  0 lines match production.ERROR`. With `APP_ENV=local`, Laravel writes `local.ERROR`, so that grep can never match and the gate reports zero no matter how bad the log is. The log in fact contains recurring errors (below). Fixing `APP_ENV=production` fixes the gate as a side effect. Preflight already warns about this on every run.
+
+2. **`CleanupUnverifiedAccounts` has been failing daily since at least 2026-09-15.**
+   ```
+   local.ERROR: Failed to delete unverified account {"user_id":1,"error":"The MAC is invalid."}
+   ```
+   `app/Console/Commands/CleanupUnverifiedAccounts.php:57` logs `$account->email` *before* calling `delete()`. Reading that attribute decrypts it, and user 1's encrypted fields were written under a different `APP_KEY` than the one now in production. The read throws, the catch logs, and the account is never deleted — so it retries every night forever. Two ways out, both decisions for the owner: delete user row 1 directly in SQL (it is an unverified account older than 24h, so almost certainly a stale test row), or make the cleanup command tolerate undecryptable rows. Do **not** "fix" this by regenerating `APP_KEY` — that would break every other encrypted row.
+
+3. **`verify:pending-transfers` is failing with exit code 1.** The stack bottoms out at `VerifyPendingTransfers.php:40` → `Builder->get()` → `Builder->runSelect()`, i.e. the query itself throws, not the Stripe call. The exception message was above the captured tail, so the cause is still unknown. Get it with:
+   ```bash
+   grep -n "verify:pending-transfers\|VerifyPendingTransfers" storage/logs/laravel.log | head
+   grep -B 5 "VerifyPendingTransfers.php(40)" storage/logs/laravel.log | head -20
+   ```

@@ -1,7 +1,7 @@
 # PROJECT STATE — Time Vault
 
-**Last updated:** 2026-09-17
-**Git:** `development` and `main` level with `origin` as of 2026-09-12. The feedback feature described below is **uncommitted working-tree work** — nothing from this session is in git yet.
+**Last updated:** 2026-09-18
+**Git:** locally `development`, `main` and `feature/user-feedback` are all at `bff4900`. **`origin/development` and `origin/main` are still at `28087e6`** — the merge has not been pushed (no non-interactive GitHub credentials on this machine). Production is at `28087e6`, so the feedback feature is NOT live.
 
 This file is the handover document. Read it first at the start of every session, and update it before finishing one. It must let another engineer continue tomorrow without reading any conversation history.
 
@@ -48,7 +48,7 @@ Credentials are deliberately *not* in `phpunit.xml` — only `DB_CONNECTION` and
 
 ## REMAINING
 
-1. **Commit the feedback feature.** It is entirely uncommitted. Nothing was committed this session by design — the user decides when work enters history.
+1. **Deploy the feedback feature.** Merged to `main` on 2026-09-18 but not yet on the server. This is the first release that carries a migration — see `DEPLOYMENT_STATUS.md` for the three `.env`/worker preconditions that a "successful" deploy will not catch.
 2. **Deploy to production** — pull the new commits on `api.timevaultapp.co`. Commands are in TODO.md. Not run from this machine: no SSH credentials for `srv1017557` are configured here. Note this release is **no longer docs-only** — it adds a migration, so `deploy.sh` will take a `mysqldump` before migrating.
 3. Fix the 6 Pint style failures (`vendor/bin/pint` fixes them all automatically).
 4. Real coverage of the payment/hold/withdrawal flow — still the highest-value gap. The MySQL harness now makes it possible.
@@ -72,7 +72,7 @@ Credentials are deliberately *not* in `phpunit.xml` — only `DB_CONNECTION` and
 
 ## FILES CHANGED (most recent session)
 
-Feedback feature, all uncommitted:
+Feedback feature, commit `bff4900`:
 
 | File | Change |
 |---|---|
@@ -96,4 +96,4 @@ Unchanged but reviewed and found correct: `resources/views/emails/feedback-recei
 
 ## EXACT NEXT TASK
 
-Commit the feedback feature (it is working and covered, but nothing is staged), then run the production deploy on `api.timevaultapp.co` per `TODO.md` → IN PROGRESS. This release adds a migration, so confirm the `mysqldump` step runs before `migrate --force`.
+Run the production deploy on `api.timevaultapp.co` per `TODO.md` → IN PROGRESS. This release adds a migration, so confirm the `mysqldump` step runs before `migrate --force`, and set `ADMIN_EMAIL` plus `APP_ENV=production` in the server `.env` first.
