@@ -53,6 +53,13 @@
             </a>
         </li>
 
+        <li class="{{ request()->routeIs('admin.feedback.*') ? 'mm-active' : '' }}">
+            <a href="{{ route('admin.feedback.index') }}" class="{{ request()->routeIs('admin.feedback.*') ? 'active' : '' }}">
+                <div class="parent-icon"><i class='bx bxs-message-rounded-detail'></i></div>
+                <div class="menu-title">Feedback</div>
+            </a>
+        </li>
+
         <li class="{{ request()->routeIs('admin.privacy-policy.*') ? 'mm-active' : '' }}">
             <a href="{{ route('admin.privacy-policy.index') }}" class="{{ request()->routeIs('admin.privacy-policy.*') ? 'active' : '' }}">
                 <div class="parent-icon"><i class='bx bxs-shield-alt-2'></i></div>

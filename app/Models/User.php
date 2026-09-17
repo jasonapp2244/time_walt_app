@@ -169,4 +169,12 @@ class User extends Authenticatable
     {
         return $this->hasOne(UserBankAccount::class)->where('is_primary', true);
     }
+
+    /**
+     * Get all feedback submitted by the user.
+     */
+    public function feedbacks()
+    {
+        return $this->hasMany(Feedback::class);
+    }
 }

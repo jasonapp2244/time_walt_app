@@ -1,12 +1,14 @@
 # TODO — Time Vault
 
-**Last updated:** 2026-09-12
+**Last updated:** 2026-09-17
 
 One line per item. Keep it honest: an item is only done when it has been verified working, not when it compiles.
 
 ---
 
 ## IN PROGRESS
+
+- [ ] **Commit the feedback feature.** It is complete, verified and covered by 25 tests, but entirely uncommitted (5 modified files, 11 untracked). Nothing was staged this session by design. See `PROJECT_STATE.md` -> FILES CHANGED for the full list.
 
 - [ ] **Deploy the pushed commits to production** (`api.timevaultapp.co`). Must be run from the VPS shell — no SSH credentials for `srv1017557` exist on the dev machine. Both `main` and `development` point at the same commit, so either branch is safe to deploy.
 
@@ -36,6 +38,9 @@ Other modes:
 
 ## NEXT UP
 
+- [ ] **Create `time_walt_test` on every machine and CI runner that runs the suite.** `phpunit.xml` no longer uses sqlite — it could never build this schema. `CREATE DATABASE time_walt_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;` Details and the failing sqlite output are in `TEST_STATUS.md`.
+- [ ] **Confirm a queue worker runs wherever feedback is submitted.** `QUEUE_CONNECTION=database`, so with no `queue:work` the admin notification is written to `jobs` and never sent. Mail delivery over real SMTP is still unverified end to end.
+
 - [ ] Record the deploy evidence (`/up` status, log tail, server-side SHA) in `DEPLOYMENT_STATUS.md`.
 - [ ] **Local database is 2 migrations behind** — `2026_05_22_000001_add_bank_account_id_to_transfers_table` and `2026_05_25_000001_convert_timestamps_from_et_to_utc` show as Pending on the dev machine. Confirm whether production has them; if not, the first `./deploy.sh` run will apply them (and will take a `mysqldump` first).
 - [ ] Run `vendor/bin/pint` to fix the 6 style failures, then re-run `php artisan test`.
@@ -43,7 +48,7 @@ Other modes:
 
 ## BACKLOG
 
-- [ ] Real test coverage for the payment → hold → withdrawal flow (currently 5 placeholder `example` tests).
+- [ ] Real test coverage for the payment → hold → withdrawal flow. Now unblocked: the MySQL harness added on 2026-09-17 makes `RefreshDatabase` usable. The feedback tests under `tests/Feature/Feedback/` are the pattern to follow.
 - [ ] Feature tests for the partial-withdrawal `remaining_amount` accounting, including the failed-transfer restore path in `VerifyPendingTransfers`.
 - [ ] Decide whether `.claude/settings.local.json` should stay tracked — it is machine-local permission state and creates a diff on every machine that opens the repo.
 
@@ -52,6 +57,10 @@ Other modes:
 - **Running the deploy from the dev machine** — blocked on SSH access. `~/.ssh/config` has no entry for `srv1017557` / `api.timevaultapp.co`; the only configured host is `emp-ionos`. Unblocked by adding a host entry + key, or by the user running the one-liner above.
 
 ## DONE
+
+- [x] 2026-09-17 — Feedback feature reviewed end to end (12 files); 9 defects fixed, including a missing rate limit that let one user trigger 1000 admin emails/minute
+- [x] 2026-09-17 — Test harness moved from sqlite `:memory:` to MySQL `time_walt_test`; sqlite could never run this schema, which is why every prior test was a placeholder
+- [x] 2026-09-17 — 25 feature tests added for the feedback API, admin page and notification job (suite: 30 passed / 95 assertions)
 
 - [x] 2026-09-12 — `deploy.sh` added: one-command, idempotent production deploy with dry-run, rollback and health gate
 - [x] 2026-09-12 — Committed the outstanding docs/config work and pushed `development` to origin

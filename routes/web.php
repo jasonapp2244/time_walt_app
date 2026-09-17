@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\Auth\AdminLoginController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\FeedbackController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\PaymentHoldController;
 use App\Http\Controllers\Admin\PrivacyPolicyController;
@@ -44,7 +45,9 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('/transfers/stats', [TransferController::class, 'stats'])->name('transfers.stats');
         Route::post('/transfers/{hold}/execute', [TransferController::class, 'execute'])->name('transfers.execute');
         
-        // 
+        // Feedback
+        Route::get('/feedback', [FeedbackController::class, 'index'])->name('feedback.index');
+
         // Privacy Policy
         Route::get('/privacy-policy', [PrivacyPolicyController::class, 'index'])->name('privacy-policy.index');
         Route::post('/privacy-policy', [PrivacyPolicyController::class, 'store'])->name('privacy-policy.store');
