@@ -141,7 +141,7 @@
                                 <td>
                                     <a href="{{ route('admin.users.show', $hold->user_id) }}"
                                        style="color:#111827; font-weight:600; font-size:13px; text-decoration:none;">
-                                        {{ $hold->user?->full_name ?? 'Unknown' }}
+                                        {{ $hold->user?->displayName('Unknown') ?? 'Unknown' }}
                                     </a>
                                 </td>
                                 <td style="color:#1f2937; font-size:13px; font-weight:500;">{{ $hold->title ?? '—' }}</td>

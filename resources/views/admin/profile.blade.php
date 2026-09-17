@@ -43,11 +43,11 @@
                                         background:rgba(189,126,46,0.12); border:2px solid rgba(189,126,46,0.3);
                                         display:flex; align-items:center; justify-content:center;
                                         font-size:20px; font-weight:700; color:var(--tv-gold);">
-                                {{ strtoupper(substr($admin->full_name ?? 'A', 0, 1)) }}
+                                {{ strtoupper(substr($admin->displayName('A'), 0, 1)) }}
                             </div>
                             <div>
-                                <div style="font-size:14px; font-weight:600; color:#1a1a1a;">{{ $admin->full_name ?? 'Admin' }}</div>
-                                <div style="font-size:11px; color:rgba(0,0,0,0.4);">{{ $admin->email ?? '' }}</div>
+                                <div style="font-size:14px; font-weight:600; color:#1a1a1a;">{{ $admin->displayName('Admin') }}</div>
+                                <div style="font-size:11px; color:rgba(0,0,0,0.4);">{{ $admin->displayEmail('') }}</div>
                             </div>
                             <span class="tv-badge badge-active ms-auto">Administrator</span>
                         </div>
@@ -60,7 +60,7 @@
                                 <input
                                     type="text"
                                     name="full_name"
-                                    value="{{ old('full_name', $admin->full_name) }}"
+                                    value="{{ old('full_name', $admin->displayName('')) }}"
                                     required
                                     class="tv-input"
                                     style="padding:6px 10px; font-size:13px;"
@@ -75,7 +75,7 @@
                                 <input
                                     type="email"
                                     name="email"
-                                    value="{{ old('email', $admin->email) }}"
+                                    value="{{ old('email', $admin->displayEmail('')) }}"
                                     required
                                     class="tv-input"
                                     style="padding:6px 10px; font-size:13px;"

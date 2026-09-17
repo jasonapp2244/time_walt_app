@@ -10,7 +10,7 @@
         <div class="d-flex align-items-center mb-4">
             <div>
                 <h4 class="section-heading">Dashboard</h4>
-                <p class="section-sub">Welcome back, {{ auth()->user()->full_name ?? 'Admin' }}</p>
+                <p class="section-sub">Welcome back, {{ auth()->user()->displayName('Admin') }}</p>
             </div>
             <div class="ms-auto d-flex align-items-center gap-3">
                 <span id="stats-last-updated" style="font-size:11px; color:#9ca3af; font-weight:500; display:none;">
@@ -157,10 +157,10 @@
                                     <tr>
                                         <td>
                                             <div style="font-weight:600; color:#111827; font-size:13px;">
-                                                {{ $payment->user?->full_name ?? 'Unknown' }}
+                                                {{ $payment->user?->displayName('Unknown') ?? 'Unknown' }}
                                             </div>
                                             <div style="font-size:11px; color:#6b7280; margin-top:1px;">
-                                                {{ $payment->user?->email ?? '' }}
+                                                {{ $payment->user?->displayEmail('') ?? '' }}
                                             </div>
                                         </td>
                                         <td style="color:#92621a; font-weight:700;">
@@ -215,7 +215,7 @@
                                     <tr>
                                         <td>
                                             <div style="font-weight:600; color:#111827; font-size:13px;">
-                                                {{ $transfer->user?->full_name ?? 'Unknown' }}
+                                                {{ $transfer->user?->displayName('Unknown') ?? 'Unknown' }}
                                             </div>
                                         </td>
                                         <td style="color:#1e8c3a; font-weight:700;">
@@ -272,7 +272,7 @@
                                     <tr>
                                         <td>
                                             <div style="font-weight:600; color:#111827; font-size:13px;">
-                                                {{ $hold->user?->full_name ?? 'Unknown' }}
+                                                {{ $hold->user?->displayName('Unknown') ?? 'Unknown' }}
                                             </div>
                                         </td>
                                         <td style="color:#1f2937; font-size:13px; font-weight:500;">

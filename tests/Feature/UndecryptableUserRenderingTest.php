@@ -3,6 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\Feedback;
+use App\Models\Payment;
+use App\Models\PaymentHold;
+use App\Models\Transfer;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -85,6 +88,38 @@ class UndecryptableUserRenderingTest extends TestCase
             ->assertOk()
             ->assertSee('Submitted before the key changed.')
             ->assertSee('[unreadable]');
+    }
+
+    /**
+     * Every admin page that lists users must survive a damaged row - the
+     * dashboard was missed on the first pass and 500-ed in production.
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('adminPages')]
+    public function test_every_admin_listing_page_renders_with_a_damaged_row(string $url): void
+    {
+        $user = User::factory()->create();
+
+        $payment = Payment::factory()->create(['user_id' => $user->id]);
+        $hold = PaymentHold::factory()->create(['user_id' => $user->id, 'payment_id' => $payment->id]);
+        Transfer::factory()->create(['user_id' => $user->id, 'hold_id' => $hold->id]);
+        Feedback::factory()->create(['user_id' => $user->id]);
+
+        $this->corrupt($user);
+
+        $this->actingAs($this->admin())->get($url)->assertOk();
+    }
+
+    public static function adminPages(): array
+    {
+        return [
+            'dashboard' => ['/admin/dashboard'],
+            'users' => ['/admin/users'],
+            'payments' => ['/admin/payments'],
+            'payment holds' => ['/admin/payment-holds'],
+            'transfers' => ['/admin/transfers'],
+            'feedback' => ['/admin/feedback'],
+            'profile' => ['/admin/profile'],
+        ];
     }
 
     public function test_the_admin_layout_renders_when_the_admin_itself_is_damaged(): void

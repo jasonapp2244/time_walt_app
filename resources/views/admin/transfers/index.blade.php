@@ -104,7 +104,7 @@
                                 <td>
                                     <a href="{{ route('admin.users.show', $transfer->user_id) }}"
                                        style="color:#111827; font-weight:600; font-size:13px; text-decoration:none;">
-                                        {{ $transfer->user?->full_name ?? 'Unknown' }}
+                                        {{ $transfer->user?->displayName('Unknown') ?? 'Unknown' }}
                                     </a>
                                 </td>
                                 <td style="color:#1e8c3a; font-weight:700; font-size:15px;">

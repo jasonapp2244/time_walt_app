@@ -95,10 +95,10 @@
                                 <td>
                                     <a href="{{ route('admin.users.show', $payment->user_id) }}"
                                        style="color:#111827; font-weight:600; font-size:13px; text-decoration:none;">
-                                        {{ $payment->user?->full_name ?? 'Unknown' }}
+                                        {{ $payment->user?->displayName('Unknown') ?? 'Unknown' }}
                                     </a>
                                     <div style="font-size:11px; color:#6b7280; margin-top:1px;">
-                                        {{ $payment->user?->email ?? '' }}
+                                        {{ $payment->user?->displayEmail('') ?? '' }}
                                     </div>
                                 </td>
                                 <td style="color:#92621a; font-weight:700; font-size:15px;">
