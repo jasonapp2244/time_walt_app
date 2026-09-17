@@ -51,10 +51,20 @@ class CleanupUnverifiedAccounts extends Command
         $deletedCount = 0;
         foreach ($accounts as $account) {
             try {
+                // email is encrypted at rest. A row written under a previous
+                // APP_KEY throws "The MAC is invalid." on read - and because
+                // that read happened before the delete, such a row survived
+                // every nightly run forever instead of being cleaned up.
+                try {
+                    $email = $account->email;
+                } catch (\Throwable $e) {
+                    $email = '[undecryptable - written under a previous APP_KEY]';
+                }
+
                 // Log before deletion
                 Log::info('Cleaning up unverified account', [
                     'user_id' => $account->id,
-                    'email' => $account->email,
+                    'email' => $email,
                     'created_at' => $account->created_at,
                     'age_hours' => $account->created_at->diffInHours(now()),
                 ]);
