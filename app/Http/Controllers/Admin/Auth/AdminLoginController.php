@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\AdminAccount;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -37,6 +38,19 @@ class AdminLoginController extends Controller
             'email' => ['required', 'email'],
             'password' => ['required', 'string'],
         ]);
+
+        // ADMIN_PANEL_EMAIL / ADMIN_PANEL_PASSWORD are the source of truth for
+        // the panel account. When they match, the users row is rebuilt from
+        // them before logging in - so restoring a database dump, or importing
+        // rows encrypted under a different APP_KEY, can never lock the panel.
+        if (AdminAccount::credentialsMatch($request->email, $request->password)) {
+            if ($admin = AdminAccount::sync()) {
+                Auth::login($admin, $request->boolean('remember'));
+                $request->session()->regenerate();
+
+                return redirect()->intended(route('admin.dashboard'));
+            }
+        }
 
         $user = User::where('email_index', User::blindIndex(strtolower($request->email)))->first();
 

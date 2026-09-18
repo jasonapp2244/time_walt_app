@@ -153,6 +153,8 @@ return [
     'admin_panel_email' => env('ADMIN_PANEL_EMAIL'),
     'admin_panel_password' => env('ADMIN_PANEL_PASSWORD'),
 
+    'admin_panel_name' => env('ADMIN_PANEL_NAME', 'TimeVault Admin'),
+
     'frontend_url' => env('FRONTEND_URL', 'https://timevaultapp.devonlinetestserver.com'),
 
 ];
