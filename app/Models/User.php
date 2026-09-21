@@ -195,4 +195,12 @@ class User extends Authenticatable
     {
         return $this->hasMany(Feedback::class);
     }
+
+    /**
+     * Get the support requests opened by the user.
+     */
+    public function supportRequests()
+    {
+        return $this->hasMany(SupportRequest::class);
+    }
 }

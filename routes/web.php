@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\PaymentHoldController;
 use App\Http\Controllers\Admin\PrivacyPolicyController;
 use App\Http\Controllers\Admin\ProfileController;
+use App\Http\Controllers\Admin\SupportController;
 use App\Http\Controllers\Admin\TransferController;
 use App\Http\Controllers\Admin\UserController;
 use Illuminate\Support\Facades\Route;
@@ -47,6 +48,9 @@ Route::prefix('admin')->name('admin.')->group(function () {
         
         // Feedback
         Route::get('/feedback', [FeedbackController::class, 'index'])->name('feedback.index');
+
+        // Support
+        Route::get('/support', [SupportController::class, 'index'])->name('support.index');
 
         // Privacy Policy
         Route::get('/privacy-policy', [PrivacyPolicyController::class, 'index'])->name('privacy-policy.index');

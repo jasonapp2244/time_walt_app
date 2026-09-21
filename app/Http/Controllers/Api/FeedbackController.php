@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\SendFeedbackAcknowledgement;
 use App\Jobs\SendFeedbackNotification;
 use App\Models\Feedback;
 use Illuminate\Http\JsonResponse;
@@ -36,6 +37,7 @@ class FeedbackController extends Controller
         ]);
 
         SendFeedbackNotification::dispatch($feedback);
+        SendFeedbackAcknowledgement::dispatch($feedback);
 
         $tz = $user->timezone ?? 'UTC';
 

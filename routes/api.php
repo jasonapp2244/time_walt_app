@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AppConfigController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BankAccountController;
 use App\Http\Controllers\Api\FeedbackController;
+use App\Http\Controllers\Api\SupportController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PrivacyPolicyController;
 use App\Http\Controllers\Api\ProfileController;
@@ -53,6 +54,7 @@ Route::middleware(['auth:sanctum', 'throttle:1000,1'])->group(function () {
         Route::post('/language', [ProfileController::class, 'updateLanguage'])->name('language');
         Route::post('/timezone', [ProfileController::class, 'updateTimezone'])->name('timezone');
         Route::post('/feedback', [FeedbackController::class, 'submitFeedback'])->name('feedback')->middleware('throttle:10,1');
+        Route::post('/support', [SupportController::class, 'submitSupport'])->name('support')->middleware('throttle:10,1');
     });
 
     // Notification Settings Routes

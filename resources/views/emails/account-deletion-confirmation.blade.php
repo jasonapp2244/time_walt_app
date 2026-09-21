@@ -67,8 +67,12 @@
         <p style="margin-top: 30px;">Thank you for using our service. We're sorry to see you go!</p>
         
         <p style="color: #666; font-size: 14px; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
-            If you did not request this account deletion, please contact our support team immediately at 
-            <a href="mailto:support@example.com" style="color: #007bff;">support@example.com</a>
+            @if (config('mail.support_email'))
+                If you did not request this account deletion, please contact our support team immediately at
+                <a href="mailto:{{ config('mail.support_email') }}" style="color: #007bff;">{{ config('mail.support_email') }}</a>
+            @else
+                If you did not request this account deletion, please contact our support team immediately.
+            @endif
         </p>
         
         <p style="color: #999; font-size: 12px; margin-top: 20px; text-align: center;">

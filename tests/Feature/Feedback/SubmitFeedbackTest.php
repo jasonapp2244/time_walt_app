@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Feedback;
 
+use App\Jobs\SendFeedbackAcknowledgement;
 use App\Jobs\SendFeedbackNotification;
 use App\Models\Feedback;
 use App\Models\User;
@@ -91,6 +92,27 @@ class SubmitFeedbackTest extends TestCase
         Queue::assertPushed(
             SendFeedbackNotification::class,
             fn (SendFeedbackNotification $job) => $job->feedback->is($feedback)
+        );
+    }
+
+    public function test_it_queues_the_user_acknowledgement(): void
+    {
+        Queue::fake();
+
+        $user = $this->user();
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/profile/feedback', [
+                'rating' => 5,
+                'feedback' => 'Excellent support.',
+            ])
+            ->assertOk();
+
+        $feedback = Feedback::sole();
+
+        Queue::assertPushed(
+            SendFeedbackAcknowledgement::class,
+            fn (SendFeedbackAcknowledgement $job) => $job->feedback->is($feedback)
         );
     }
 

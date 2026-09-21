@@ -60,6 +60,13 @@
             </a>
         </li>
 
+        <li class="{{ request()->routeIs('admin.support.*') ? 'mm-active' : '' }}">
+            <a href="{{ route('admin.support.index') }}" class="{{ request()->routeIs('admin.support.*') ? 'active' : '' }}">
+                <div class="parent-icon"><i class='bx bxs-help-circle'></i></div>
+                <div class="menu-title">Support</div>
+            </a>
+        </li>
+
         <li class="{{ request()->routeIs('admin.privacy-policy.*') ? 'mm-active' : '' }}">
             <a href="{{ route('admin.privacy-policy.index') }}" class="{{ request()->routeIs('admin.privacy-policy.*') ? 'active' : '' }}">
                 <div class="parent-icon"><i class='bx bxs-shield-alt-2'></i></div>

@@ -3,14 +3,14 @@
 namespace App\Mail;
 
 use App\Mail\Concerns\RepliesToUser;
-use App\Models\Feedback;
+use App\Models\SupportRequest;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
-class FeedbackReceivedMail extends Mailable
+class SupportRequestReceivedMail extends Mailable
 {
     use Queueable, RepliesToUser, SerializesModels;
 
@@ -18,21 +18,20 @@ class FeedbackReceivedMail extends Mailable
      * Create a new message instance.
      */
     public function __construct(
-        public Feedback $feedback
+        public SupportRequest $supportRequest
     ) {}
 
     /**
      * Get the message envelope.
      *
-     * Replies go to the user who submitted the feedback, so an admin can answer
-     * straight from the notification. Falls back to no reply-to if the user row
-     * is gone, carries no address, or cannot be decrypted.
+     * The user's own subject goes in the mail subject so the admin inbox is
+     * scannable, and replies go straight back to the user who wrote in.
      */
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'New User Feedback Received',
-            replyTo: $this->replyToUser($this->feedback->user),
+            subject: 'New Support Request: '.$this->supportRequest->subject,
+            replyTo: $this->replyToUser($this->supportRequest->user),
         );
     }
 
@@ -42,10 +41,10 @@ class FeedbackReceivedMail extends Mailable
     public function content(): Content
     {
         return new Content(
-            view: 'emails.feedback-received',
+            view: 'emails.support-received',
             with: [
-                'feedback' => $this->feedback,
-                'user' => $this->feedback->user,
+                'supportRequest' => $this->supportRequest,
+                'user' => $this->supportRequest->user,
             ],
         );
     }

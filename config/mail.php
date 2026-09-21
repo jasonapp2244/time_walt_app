@@ -21,11 +21,20 @@ return [
     | Admin Email
     |--------------------------------------------------------------------------
     |
-    | Email address for admin notifications.
+    | Where admin notifications are delivered. "admin_email" receives feedback
+    | and every payment/transfer alert; "support_email" receives support
+    | requests and is the address shown to users, falling back to the admin
+    | address when SUPPORT_EMAIL is not set.
+    |
+    | Both deliberately default to null rather than a placeholder domain: an
+    | unset key makes the notification jobs log a warning and skip, which is
+    | recoverable. Mailing customer data to example.com is not.
     |
     */
 
-    'admin_email' => env('ADMIN_EMAIL', 'admin@example.com'),
+    'admin_email' => env('ADMIN_EMAIL'),
+
+    'support_email' => env('SUPPORT_EMAIL', env('ADMIN_EMAIL')),
 
     /*
     |--------------------------------------------------------------------------

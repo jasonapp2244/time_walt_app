@@ -1,6 +1,6 @@
 # TODO — Time Vault
 
-**Last updated:** 2026-09-17
+**Last updated:** 2026-09-22
 
 One line per item. Keep it honest: an item is only done when it has been verified working, not when it compiles.
 
@@ -8,7 +8,12 @@ One line per item. Keep it honest: an item is only done when it has been verifie
 
 ## IN PROGRESS
 
-- [ ] **Push `development` and `main` (both at `bff4900`), then re-run the deploy.** The 2026-09-17 production deploy shipped `28087e6` — tranche 1 only. The feedback feature is committed and merged locally but was never pushed, so it is not on origin and not on the server.
+- [ ] **Commit the support feature.** Built and verified on 2026-09-22 but left uncommitted — 16 new files, 6 modified, all in the working tree on `development`. Nothing is recorded in git history yet.
+- [ ] **Update the stored privacy policy contact address.** The active row still reads `support@timevaultapp.com` (`.com`, not `.co`) from the original seed. `PrivacyPolicySeeder` now pulls from `SUPPORT_EMAIL`, but it only runs on a fresh seed — fix the live row at `/admin/privacy-policy`.
+- [ ] **Check that `admin@timevaultapp.co` and `support@timevaultapp.co` receive mail.** Sending is verified; mailbox existence on that domain is not. A bounce lands in `MAIL_USERNAME` (`tauseefchoohan0401@gmail.com`).
+- [ ] **Set `ADMIN_EMAIL` and `SUPPORT_EMAIL` in the production `.env`** before deploying. Missing keys mean the jobs log a warning and send nothing — deploy will still look green.
+- [ ] **Point the Flutter support screen at `POST /api/profile/support`.** Body: `subject` (max 150) + `message` (max 2000), Sanctum bearer token, `throttle:10,1`. Success returns `data.support_request`. No client calls it yet.
+- [ ] **Push `development` and `main`, then re-run the deploy.** The 2026-09-17 production deploy shipped `28087e6` — tranche 1 only. Feedback is committed and merged locally but was never pushed; support is not committed at all. Neither is on origin or on the server.
 - [ ] **Set `APP_ENV=production` in the production `.env`**, then `php artisan config:cache`. Beyond the usual reasons, `local` breaks the deploy script's own error gate: it greps for `production.ERROR` and the log says `local.ERROR`, so it reports 0 errors unconditionally.
 - [ ] **Fix the nightly `CleanupUnverifiedAccounts` failure** — user 1 is undecryptable under the current `APP_KEY` (`The MAC is invalid.`). See `DEPLOYMENT_STATUS.md` -> FIRST SUCCESSFUL DEPLOY.
 - [x] ~~Diagnose `verify:pending-transfers` exit code 1~~ — resolved. `Table 'time-vault-app-db.transfers' doesn't exist`, confined to 2026-09-14 22:20-22:50, nothing since. Production DB is `time-vault-app-db`. See `DEPLOYMENT_STATUS.md` -> finding 3.
@@ -42,7 +47,8 @@ Other modes:
 ## NEXT UP
 
 - [ ] **Create `time_walt_test` on every machine and CI runner that runs the suite.** `phpunit.xml` no longer uses sqlite — it could never build this schema. `CREATE DATABASE time_walt_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;` Details and the failing sqlite output are in `TEST_STATUS.md`.
-- [ ] **Confirm a queue worker runs wherever feedback is submitted.** `QUEUE_CONNECTION=database`, so with no `queue:work` the admin notification is written to `jobs` and never sent. Mail delivery over real SMTP is still unverified end to end.
+- [ ] **Confirm a queue worker runs on production.** `QUEUE_CONNECTION=database`, so with no `queue:work` the feedback AND support notifications are written to `jobs` and never sent. Still unverified on the server.
+- [x] ~~Verify mail delivery over real SMTP end to end~~ — done 2026-09-22 locally, for all four mails: support → `SUPPORT_EMAIL`, feedback → `ADMIN_EMAIL`, and a confirmation back to the submitting user for each. `queue:work` drained all four, `failed_jobs` stayed at 0.
 
 - [ ] Record the deploy evidence (`/up` status, log tail, server-side SHA) in `DEPLOYMENT_STATUS.md`.
 - [ ] **Local database is 2 migrations behind** — `2026_05_22_000001_add_bank_account_id_to_transfers_table` and `2026_05_25_000001_convert_timestamps_from_et_to_utc` show as Pending on the dev machine. Confirm whether production has them; if not, the first `./deploy.sh` run will apply them (and will take a `mysqldump` first).
@@ -51,7 +57,7 @@ Other modes:
 
 ## BACKLOG
 
-- [ ] Real test coverage for the payment → hold → withdrawal flow. Now unblocked: the MySQL harness added on 2026-09-17 makes `RefreshDatabase` usable. The feedback tests under `tests/Feature/Feedback/` are the pattern to follow.
+- [ ] Real test coverage for the payment → hold → withdrawal flow. Now unblocked: the MySQL harness added on 2026-09-17 makes `RefreshDatabase` usable. The tests under `tests/Feature/Feedback/` and `tests/Feature/Support/` are the pattern to follow.
 - [ ] Feature tests for the partial-withdrawal `remaining_amount` accounting, including the failed-transfer restore path in `VerifyPendingTransfers`.
 - [ ] Decide whether `.claude/settings.local.json` should stay tracked — it is machine-local permission state and creates a diff on every machine that opens the repo.
 

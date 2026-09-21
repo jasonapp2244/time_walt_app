@@ -1,6 +1,6 @@
 # TEST STATUS — Time Vault
 
-**Last updated:** 2026-09-17
+**Last updated:** 2026-09-22
 
 ## How to test this project
 
@@ -29,13 +29,21 @@ Any test using `RefreshDatabase` died there, which is why every pre-existing tes
 
 ## Known coverage reality
 
-30 tests, 95 assertions. Honest split:
+110 tests, 300 assertions (run 2026-09-22). Honest split:
 
 | Area | Tests | Real? |
 |---|---|---|
 | `tests/Feature/Feedback/SubmitFeedbackTest.php` | 13 | Yes — API contract, validation, auth, persistence, queueing, timezone |
 | `tests/Feature/Feedback/AdminFeedbackIndexTest.php` | 7 | Yes — rendering, summary maths, filtering, pagination, authorization |
 | `tests/Feature/Feedback/SendFeedbackNotificationTest.php` | 5 | Yes — recipient, reply-to, skip path, failure logging, rendered body |
+| `tests/Feature/Support/SubmitSupportTest.php` | 10 | Yes — API contract, validation bounds (150 / 2000), auth, persistence, queueing, timezone |
+| `tests/Feature/Support/AdminSupportIndexTest.php` | 10 | Yes — rendering, today / 7-day counts in `ADMIN_TIMEZONE`, text search, blind-index email search, pagination, authorization |
+| `tests/Feature/Support/SendSupportNotificationTest.php` | 7 | Yes — recipient, reply-to, mail subject, skip path, failure logging, rendered body |
+| `tests/Feature/Support/UndecryptableUserNotificationTest.php` | 5 | Yes — regression: both notification mails must still reach the admin when the user's row cannot be decrypted |
+| `tests/Feature/Support/SendSupportAcknowledgementTest.php` | 6 | Yes — user is the recipient, support inbox is not, reply-to, subject, rendered body, undecryptable skip, failure logging |
+| `tests/Feature/Feedback/SendFeedbackAcknowledgementTest.php` | 6 | Yes — same shape for feedback, reply-to the admin inbox |
+| `tests/Feature/Mail/ConfiguredRecipientsTest.php` | 6 | Yes — env fallback chain, no placeholder default, deletion-email contact line, and a guard that no template hardcodes an address |
+| `tests/Feature/UndecryptableUserRenderingTest.php`, `Admin/AdminAccountFromEnvTest.php`, `CleanupUnverifiedAccountsTest.php` | remainder | Yes — added between 2026-09-17 and 2026-09-21 |
 | `AppConfigTest`, `Auth/ChangePasswordTest`, `SendTransferCompletedNotificationTest`, `Feature/ExampleTest`, `Unit/ExampleTest` | 5 | **No — placeholders** |
 
 Everything outside the feedback feature is still unverified by tests. A green suite proves the feedback feature works and that the application boots — nothing more. For payments, holds, transfers and withdrawals, verify the real flow by hand: functionality, validation, authentication, authorization, API contract, database behaviour, error handling and edge cases.

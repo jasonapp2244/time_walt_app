@@ -28,6 +28,10 @@ class PrivacyPolicySeeder extends Seeder
      */
     private function getPrivacyPolicyContent(): string
     {
+        // The address users are told to write to is the same one support
+        // requests are delivered to, so the two can never drift apart.
+        $supportEmail = config('mail.support_email') ?? 'the support address in the app';
+
         return 'Last Updated: '.now()->format('F d, Y')."
 
 1. Introduction
@@ -101,7 +105,7 @@ We may update this privacy policy from time to time. We will notify you of any c
 
 13. Contact Us
 If you have any questions about this privacy policy, please contact us at:
-Email: support@timewaltapp.com
+Email: {$supportEmail}
 Phone: +1 (555) 123-4567
 
 14. Cookie Policy

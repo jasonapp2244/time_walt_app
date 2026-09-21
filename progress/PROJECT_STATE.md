@@ -1,7 +1,7 @@
 # PROJECT STATE — Time Vault
 
-**Last updated:** 2026-09-18
-**Git:** locally `development`, `main` and `feature/user-feedback` are all at `bff4900`. **`origin/development` and `origin/main` are still at `28087e6`** — the merge has not been pushed (no non-interactive GitHub credentials on this machine). Production is at `28087e6`, so the feedback feature is NOT live.
+**Last updated:** 2026-09-22 (third session)
+**Git:** all of the 2026-09-22 work (support feature, mail routing, user acknowledgements, env-driven addresses) is committed on **`feature/user-support`**, branched from `development` at `60e0cc2` and pushed to origin. It is **not merged** into `development` or `main`, and not deployed. `development` and `main` are both at `60e0cc2` and in sync with origin.
 
 This file is the handover document. Read it first at the start of every session, and update it before finishing one. It must let another engineer continue tomorrow without reading any conversation history.
 
@@ -18,9 +18,10 @@ Laravel 12 fintech backend (Stripe Payment Sheet + Custom Connect + Transfers) w
 
 Repo: https://github.com/jasonapp2244/time_walt_app.git — branches `main` and `development` only.
 
-Local verification baseline (run 2026-09-17):
-- `php artisan test` → **30 passed / 95 assertions**. 25 of those are real feedback-feature tests added this session; the other 5 remain `example` placeholders.
-- `php artisan route:list` → **63 routes**, no boot errors.
+Local verification baseline (run 2026-09-22):
+- `php artisan test` → **110 passed / 300 assertions**. 5 remain `example` placeholders; the rest is real coverage of feedback, support and the undecryptable-user paths.
+- `php artisan route:list` → **65 routes**, no boot errors.
+- **All four notification emails verified over real SMTP on 2026-09-22.** One support request and one feedback submission over the live API queued four jobs, `queue:work` drained them, `failed_jobs` stayed 0: `Support notification` → `SUPPORT_EMAIL`, `Support acknowledgement` → the user, `Feedback notification` → `ADMIN_EMAIL`, `Feedback acknowledgement` → the user.
 - `vendor/bin/pint --test` → fail on 6 files (pre-existing, cosmetic only). See KNOWN ISSUES.
 
 ### Tests now run on MySQL, not sqlite
@@ -42,13 +43,19 @@ Credentials are deliberately *not* in `phpunit.xml` — only `DB_CONNECTION` and
 
 ## COMPLETED
 
+- 2026-09-22 (3rd) — Removed every hardcoded email address from the codebase: `config/mail.php` no longer falls back to `admin@example.com`, the account-deletion email and the privacy-policy seeder read `mail.support_email`, and `AdminSeeder` refuses to seed a known-credential admin. `.env` mail keys grouped and documented.
+- 2026-09-22 (2nd) — Split the notification recipients (`ADMIN_EMAIL` = feedback, `SUPPORT_EMAIL` = support) and added a confirmation email back to the submitting user for both features. 15 new tests; suite now 104.
+- 2026-09-22 — Built the user support feature end to end (API + admin page + queued admin email), mirroring the feedback stack, and fixed a crash that stopped BOTH notification mails reaching the admin when the submitting user's row could not be decrypted. 32 new tests.
 - 2026-09-17 — Reviewed the whole feedback feature (12 files), fixed 9 defects, and added 25 feature tests. Detail in FILES CHANGED below.
 - 2026-09-12 — Committed the outstanding documentation/config work and pushed it to `origin/development`; fast-forwarded `main` to the same commit and pushed. Both branches on GitHub now carry identical trees.
 - Earlier (from git history): TimeVault rename across admin panel + email templates, auto-recovery from stale Stripe Connect accounts, token auto-expiry disabled, profile image upload debug logging added and removed.
 
 ## REMAINING
 
-1. **Deploy the feedback feature.** Merged to `main` on 2026-09-18 but not yet on the server. This is the first release that carries a migration — see `DEPLOYMENT_STATUS.md` for the three `.env`/worker preconditions that a "successful" deploy will not catch.
+1. **Review and merge `feature/user-support`, then deploy.** It carries the support feature, the mail routing split and the env-driven addresses. Together with the feedback work already on `development` it carries two migrations — see `DEPLOYMENT_STATUS.md` for the `.env`/worker preconditions that a "successful" deploy will not catch.
+2. **Point the Flutter support screen at `POST /api/profile/support`** (`subject` + `message`). The endpoint works locally but no client calls it yet.
+3. **The stored privacy policy still shows `support@timevaultapp.com`** (`.com`, not `.co`) — it was seeded before the address changed, and the seeder fix only affects fresh seeds. Edit it at `/admin/privacy-policy`, or re-seed on an empty table.
+4. **Confirm `admin@timevaultapp.co` and `support@timevaultapp.co` actually receive mail.** Both were verified as *sent* over SMTP on 2026-09-22; whether those mailboxes exist and accept delivery on that domain has not been confirmed from this machine. A bounce would arrive at `MAIL_USERNAME`.
 2. **Deploy to production** — pull the new commits on `api.timevaultapp.co`. Commands are in TODO.md. Not run from this machine: no SSH credentials for `srv1017557` are configured here. Note this release is **no longer docs-only** — it adds a migration, so `deploy.sh` will take a `mysqldump` before migrating.
 3. Fix the 6 Pint style failures (`vendor/bin/pint` fixes them all automatically).
 4. Real coverage of the payment/hold/withdrawal flow — still the highest-value gap. The MySQL harness now makes it possible.
@@ -57,7 +64,8 @@ Credentials are deliberately *not* in `phpunit.xml` — only `DB_CONNECTION` and
 ## CURRENT ERRORS / KNOWN ISSUES
 
 - `vendor/bin/pint --test` fails on: `app/Console/Commands/FundTestBalance.php`, `app/Http/Controllers/Api/ProfileController.php`, `app/Providers/AppServiceProvider.php`, `routes/api.php`, `routes/web.php`, `tests/Feature/SendTransferCompletedNotificationTest.php`. Formatting only. Left unfixed deliberately so the feedback changeset stays clean; all new feedback files are Pint-clean.
-- 5 of the 30 tests are still `example` placeholders (`AppConfigTest`, `Auth/ChangePasswordTest`, `SendTransferCompletedNotificationTest`, `Feature/ExampleTest`, `Unit/ExampleTest`).
+- The feedback endpoint returns BOTH `errors.rating` and `errors.ratting` when the rating is missing, with `message` = `"The rating field is required. (and 1 more error)"`, although the comment in `FeedbackController` claims a single key. A client reading `errors.rating` is fine; one that displays `message` verbatim shows the suffix. Left as-is — it is a shipped API contract. The support endpoint does not share this shape.
+- 5 of the 89 tests are still `example` placeholders (`AppConfigTest`, `Auth/ChangePasswordTest`, `SendTransferCompletedNotificationTest`, `Feature/ExampleTest`, `Unit/ExampleTest`).
 - **The Semgrep Guardian plugin blocks all file writes when not logged in.** Its hook matches `Write|Edit|Bash` (`~/.claude/plugins/cache/claude-plugins-official/semgrep/2.3.0/hooks/hooks.json`) and rejects every edit with "Not logged into Semgrep Guardian". Hooks load at session start, so disabling the plugin mid-session does not release it — restart the session. This session's edits were made through the PowerShell tool, which the matcher does not cover.
 - `.env` has `ADMIN_EMAIL` declared twice (identical value). Harmless; last one wins.
 - `.claude/settings.local.json.bak-20260909185555` is left untracked on purpose (editor backup artifact, not project content).
@@ -72,7 +80,63 @@ Credentials are deliberately *not* in `phpunit.xml` — only `DB_CONNECTION` and
 
 ## FILES CHANGED (most recent session)
 
-Feedback feature, commit `bff4900`:
+Everything env-driven, 2026-09-22 (third session), on `feature/user-support`:
+
+| File | Change |
+|---|---|
+| `config/mail.php` | `admin_email` and `support_email` now default to **null** instead of `admin@example.com`. An unset key makes the job warn and skip; it no longer mails customer detail to a domain nobody here owns |
+| `resources/views/emails/account-deletion-confirmation.blade.php` | Told users to contact `support@example.com`. Now renders `mail.support_email`, and drops the sentence entirely rather than printing an empty `mailto:` when no address is configured |
+| `database/seeders/PrivacyPolicySeeder.php` | The seeded policy hardcoded `support@timewaltapp.com` (note the typo). Now interpolates `mail.support_email` |
+| `database/seeders/AdminSeeder.php` | Fell back to `admin@timevault.com` / a password literally set to `admin@timevault.com`. Now aborts with a clear message unless `ADMIN_PANEL_EMAIL` and `ADMIN_PANEL_PASSWORD` are set, and takes the display name from `ADMIN_PANEL_NAME` |
+| `.env` | The two recipient keys moved out of the Stripe block into the mail block, with comments explaining what each one feeds. `ADMIN_PANEL_EMAIL` labelled as sign-in, not a recipient |
+| `.env.example` | Full documented block: `ADMIN_EMAIL`, `SUPPORT_EMAIL`, `ADMIN_PANEL_EMAIL`, `ADMIN_PANEL_PASSWORD`, `ADMIN_TIMEZONE`, left empty rather than pre-filled |
+| `tests/Feature/Mail/ConfiguredRecipientsTest.php` | New — 6 tests: the `SUPPORT_EMAIL` → `ADMIN_EMAIL` fallback, no placeholder default, the deletion email with and without a configured address, and a scan asserting **no** template hardcodes an address |
+
+Mail routing + user acknowledgements, 2026-09-22 (second session), on `feature/user-support`:
+
+| File | Change |
+|---|---|
+| `.env` | `ADMIN_EMAIL` → `admin@timevaultapp.co`, new `SUPPORT_EMAIL=support@timevaultapp.co`. The file declared `ADMIN_EMAIL` twice with the old address; the stale duplicate was removed, since "last one wins" would have silently overridden the new value |
+| `.env.example` | Documents both keys for the first time |
+| `config/mail.php` | Added `support_email`, falling back to `ADMIN_EMAIL` so an environment that sets only the one key still receives support mail |
+| `app/Jobs/SendSupportNotification.php` | Now sends to `mail.support_email` instead of `mail.admin_email` |
+| `app/Mail/Concerns/SendsToUser.php` | New — resolves the submitting user's address and name through `rescue()`, so an undecryptable row is skipped rather than failing the job |
+| `app/Mail/SupportAcknowledgementMail.php` | New — `We received your request: <subject>`, reply-to `SUPPORT_EMAIL` |
+| `app/Mail/FeedbackAcknowledgementMail.php` | New — `We received your feedback`, reply-to `ADMIN_EMAIL` |
+| `app/Jobs/SendSupportAcknowledgement.php`, `app/Jobs/SendFeedbackAcknowledgement.php` | New — deliberately separate jobs, so a failed acknowledgement cannot make the queue retry and re-send the admin notification |
+| `resources/views/emails/support-acknowledgement.blade.php`, `feedback-acknowledgement.blade.php` | New — echo back what the user sent, with a reference number on the support one |
+| `app/Http/Controllers/Api/SupportController.php`, `FeedbackController.php` | Dispatch the acknowledgement alongside the existing notification |
+| `tests/Feature/Support/SendSupportAcknowledgementTest.php`, `tests/Feature/Feedback/SendFeedbackAcknowledgementTest.php` | New — 6 tests each: recipient, reply-to, subject, rendered body, undecryptable-user skip, failure logging |
+| `tests/Feature/Support/SendSupportNotificationTest.php`, `SubmitSupportTest.php`, `UndecryptableUserNotificationTest.php`, `tests/Feature/Feedback/SubmitFeedbackTest.php` | Updated for the split recipients and the second queued job |
+| `CLAUDE.md` | Job count 8 → 12; documented the two recipient keys under Key Config |
+
+Support feature + mail hardening, 2026-09-22 (first session), on `feature/user-support`:
+
+| File | Change |
+|---|---|
+| `database/migrations/2026_09_22_000001_create_support_requests_table.php` | New — `support_requests` (user_id FK cascade, subject 150, message text, indexes on `[user_id, created_at]` and `created_at`) |
+| `app/Models/SupportRequest.php` | New |
+| `database/factories/SupportRequestFactory.php` | New |
+| `app/Http/Requests/Support/SubmitSupportRequest.php` | New — subject required/max:150, message required/max:2000. Form Request, per the CLAUDE.md convention |
+| `app/Http/Controllers/Api/SupportController.php` | New — `POST /api/profile/support`; trims both fields, dispatches the notification, returns `data.support_request` with `created_at` in the user's timezone |
+| `app/Jobs/SendSupportNotification.php` | New — mirrors `SendFeedbackNotification`: warns and skips with no `ADMIN_EMAIL`, eager-loads `user`, logs and rethrows so the queue retries |
+| `app/Mail/SupportRequestReceivedMail.php` | New — subject `New Support Request: <user subject>`, reply-to the user |
+| `app/Mail/Concerns/RepliesToUser.php` | New — shared reply-to builder; reads `email` / `full_name` through `rescue()` so an undecryptable row yields no reply-to instead of throwing |
+| `app/Mail/FeedbackReceivedMail.php` | **Bug fix** — read `$user->email` / `$user->full_name` raw in `envelope()`. A row written under a previous `APP_KEY` threw `DecryptException`, the queued job failed, and the admin never received the feedback email. Now uses the shared concern |
+| `resources/views/emails/feedback-received.blade.php` | **Bug fix** — same crash in the view; now `displayName()` / `displayEmail()` |
+| `resources/views/emails/support-received.blade.php` | New — matches the feedback template, safe accessors from the start |
+| `app/Http/Controllers/Admin/SupportController.php` | New — paginated list (15/page), search over subject/message plus exact email via blind index, global today / last-7-days counts computed in `ADMIN_TIMEZONE` |
+| `resources/views/admin/support/index.blade.php` | New — read-only table: `#`, padded ID, user, email, subject, message, date |
+| `resources/views/layouts/partials/sidebar.blade.php` | Added the Support link between Feedback and Privacy Policy |
+| `routes/api.php` | `POST /api/profile/support`, `throttle:10,1` to match feedback |
+| `routes/web.php` | `GET /admin/support` inside the `admin` middleware group |
+| `app/Models/User.php` | Added the `supportRequests()` hasMany relation |
+| `tests/Feature/Support/SubmitSupportTest.php` | New — 10 tests |
+| `tests/Feature/Support/AdminSupportIndexTest.php` | New — 10 tests |
+| `tests/Feature/Support/SendSupportNotificationTest.php` | New — 7 tests |
+| `tests/Feature/Support/UndecryptableUserNotificationTest.php` | New — 5 tests, regression cover for the mail crash above, on both mailables |
+
+Previous session — feedback feature, commit `bff4900`:
 
 | File | Change |
 |---|---|
@@ -96,4 +160,4 @@ Unchanged but reviewed and found correct: `resources/views/emails/feedback-recei
 
 ## EXACT NEXT TASK
 
-Run the production deploy on `api.timevaultapp.co` per `TODO.md` → IN PROGRESS. This release adds a migration, so confirm the `mysqldump` step runs before `migrate --force`, and set `ADMIN_EMAIL` plus `APP_ENV=production` in the server `.env` first.
+Review and merge `feature/user-support` into `development` (and `main`), then run the production deploy on `api.timevaultapp.co` per `TODO.md` → IN PROGRESS. The release now carries **two** migrations (`create_feedbacks_table`, `create_support_requests_table`), so confirm the `mysqldump` step runs before `migrate --force`, and set `ADMIN_EMAIL` plus `APP_ENV=production` in the server `.env` first. A queue worker must be running on the server or neither the feedback nor the support email is ever sent.

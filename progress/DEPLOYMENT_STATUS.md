@@ -1,6 +1,6 @@
 # DEPLOYMENT STATUS — Time Vault
 
-**Last updated:** 2026-09-18
+**Last updated:** 2026-09-22
 
 A command completing is not a successful deployment. Nothing goes in the VERIFIED column below without evidence.
 
@@ -10,7 +10,7 @@ A command completing is not a successful deployment. Nothing goes in the VERIFIE
 
 | Environment | URL / target | Last deployed | Verified |
 |---|---|---|---|
-| Local | `http://127.0.0.1:8000` (XAMPP, db `time_walt`; tests use `time_walt_test`) | 2026-09-17 | Yes — 30 tests pass, 63 routes resolve, `/up` 200, `/admin/feedback` 302 to login |
+| Local | `http://127.0.0.1:8000` (XAMPP, db `time_walt`; tests use `time_walt_test`) | 2026-09-22 | Yes — 89 tests pass, 65 routes resolve, `/up` 200, `/admin/feedback` and `/admin/support` render for an admin and 302 to login for everyone else, and a real support email was delivered over Gmail SMTP |
 | Production API | `https://api.timevaultapp.co` → `/home/timevaultapp-api/htdocs/api.timevaultapp.co` on VPS `srv1017557` (Hostinger CloudPanel) | 2026-09-17, `1c15798` → `28087e6` | Partial — `/up` 200, but see FIRST SUCCESSFUL DEPLOY below |
 | Test server | `https://timevaultapp.devonlinetestserver.com` → `/home/devonlinetestserver-timevaultapp/htdocs/...` | unknown | No |
 
@@ -27,6 +27,19 @@ Two tranches now sit between production and `main`.
 - `.claude/settings.local.json` permission list updated
 
 **Risk: documentation and tooling only.** No runtime change.
+
+### Tranche 3 — support feature, 2026-09-22, NOT YET COMMITTED
+
+User support requests: `POST /api/profile/support`, a read-only `/admin/support` page, and a queued admin email to the same `ADMIN_EMAIL` the feedback notification uses. See `PROJECT_STATE.md` → FILES CHANGED.
+
+**Risk: same shape as tranche 2, plus one bug fix.**
+
+1. **A second migration runs.** `2026_09_22_000001_create_support_requests_table` — create-only, additive, alters nothing existing. `deploy.sh` will detect it and `mysqldump` first.
+2. **A second queued job.** `SendSupportNotification` on the same `database` queue. No worker on the server means support emails pile up in `jobs` exactly as feedback ones would.
+3. **Two recipient keys now, not one.** `ADMIN_EMAIL=admin@timevaultapp.co` receives feedback; `SUPPORT_EMAIL=support@timevaultapp.co` receives support requests. `SUPPORT_EMAIL` falls back to `ADMIN_EMAIL` if unset, but `ADMIN_EMAIL` has no fallback — with neither key set, both jobs log a warning and send nothing, and the deploy still reports success.
+   Each submission also sends a confirmation to the user who wrote in, so a production submission now produces **two** emails per feature, not one.
+   As of the third session neither key has a built-in default. Previously a missing `ADMIN_EMAIL` meant mail went to `admin@example.com`; now it means no mail at all, with a warning in the log. Check `storage/logs/laravel.log` for `notification skipped` after deploy.
+4. **Carries a fix for a live defect:** both notification mailables read the encrypted `email` / `full_name` columns unguarded, so a user row written under an older `APP_KEY` made the queued job throw and the admin email was never sent. Whether production has such rows is unconfirmed — locally 32 of 33 users are affected. After deploy, check `failed_jobs` for `SendFeedbackNotification` entries carrying `The MAC is invalid`; they are that bug.
 
 ### Tranche 2 — feedback feature, committed `bff4900`, NOT YET PUSHED OR DEPLOYED
 
@@ -47,9 +60,11 @@ Deploy command block: `progress/TODO.md` → IN PROGRESS.
 - [ ] Build succeeded (`composer install --no-dev` exits 0)
 - [ ] Environment / config values correct for the target (`APP_ENV=production`, `APP_DEBUG=false`, `APP_KEY` **untouched**)
 - [ ] `mysqldump` backup taken **before** migrating (tranche 2 adds a migration — check the deploy log for it)
-- [ ] Migrations ran and schema matches expectations (`php artisan migrate:status` — expect `create_feedbacks_table` to go from Pending to Ran)
-- [ ] `ADMIN_EMAIL` is set in the production `.env` (otherwise feedback notifications are skipped silently)
+- [ ] Migrations ran and schema matches expectations (`php artisan migrate:status` — expect `create_feedbacks_table` AND `create_support_requests_table` to go from Pending to Ran)
+- [ ] `ADMIN_EMAIL` and `SUPPORT_EMAIL` are set in the production `.env` (otherwise the notifications are skipped silently)
 - [ ] Submit one feedback from the app and confirm the row lands in `feedbacks` and the admin email arrives
+- [ ] Submit one support request and confirm the row lands in `support_requests`, `/admin/support` lists it, the support inbox gets the notification, and the submitting user gets the confirmation
+- [ ] `failed_jobs` is empty after both submissions (a `DecryptException` there means the mail hardening did not deploy)
 - [ ] Logs clean (`tail -n 50 storage/logs/laravel.log`, no new errors after deploy)
 - [ ] Health check responds (`curl -i https://api.timevaultapp.co/up` → 200)
 - [ ] API reachable and returning the expected contract

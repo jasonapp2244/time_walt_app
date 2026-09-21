@@ -45,7 +45,7 @@ PII fields (email, phone, full_name, provider_id, fcm_token, device_id, otp_code
 **Critical:** Never regenerate `APP_KEY` after data has been seeded/created — it will corrupt all encrypted fields.
 
 ### Async Notifications
-8 queued jobs in `app/Jobs/` handle email notifications asynchronously via database-backed queue. The queue worker runs as part of `composer dev` or via Supervisor in production.
+12 queued jobs in `app/Jobs/` handle email notifications asynchronously via database-backed queue. The queue worker runs as part of `composer dev` or via Supervisor in production.
 
 ### Payment Flow
 Stripe Payment Sheet flow: create Customer → create EphemeralKey → create PaymentIntent → confirm on device → webhook confirms → create PaymentHold with configurable hold duration. Users manually request withdrawals when holds mature (no auto-transfer).
@@ -162,6 +162,7 @@ Controller loads paginated queries separately; amount summaries use `COALESCE(re
 ## Key Config
 
 - Admin credentials: `ADMIN_PANEL_EMAIL` / `ADMIN_PANEL_PASSWORD` in `.env` (read via `config/app.php`)
+- Notification recipients: `ADMIN_EMAIL` (feedback) and `SUPPORT_EMAIL` (support requests) in `.env`, read via `config/mail.php` as `mail.admin_email` / `mail.support_email`. `SUPPORT_EMAIL` falls back to `ADMIN_EMAIL`. Unset means the job logs a warning and sends nothing — no error surfaces
 - Admin timezone: `ADMIN_TIMEZONE` in `.env` (read via `config/app.admin_timezone`)
 - Sanctum tokens expire after 24 hours (`config/sanctum.php`)
 - Stripe keys: `STRIPE_KEY`, `STRIPE_SECRET`, `STRIPE_WEBHOOK_SECRET`

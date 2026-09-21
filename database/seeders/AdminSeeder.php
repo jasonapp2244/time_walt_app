@@ -13,7 +13,16 @@ class AdminSeeder extends Seeder
      */
     public function run(): void
     {
-        $adminEmail = config('app.admin_panel_email', 'admin@timevault.com');
+        $adminEmail = config('app.admin_panel_email');
+        $adminPassword = config('app.admin_panel_password');
+
+        // Seeding a default address and password would create a known-credential
+        // admin on any environment that forgot the keys. Fail loudly instead.
+        if (blank($adminEmail) || blank($adminPassword)) {
+            $this->command->error('ADMIN_PANEL_EMAIL and ADMIN_PANEL_PASSWORD must be set in .env before seeding the admin user.');
+
+            return;
+        }
 
         $emailIndex = User::blindIndex(strtolower($adminEmail));
 
@@ -25,12 +34,12 @@ class AdminSeeder extends Seeder
 
         User::create([
             'role' => 'admin',
-            'full_name' => 'TimeVault Admin',
+            'full_name' => config('app.admin_panel_name', 'TimeVault Admin'),
             'email' => $adminEmail,
             'email_index' => $emailIndex,
             'phone' => '0000000000',
             'phone_index' => User::blindIndex('0000000000'),
-            'password' => Hash::make(config('app.admin_panel_password', 'admin@timevault.com')),
+            'password' => Hash::make($adminPassword),
             'profile' => 'default.png',
             'is_verified' => true,
             'status' => 'active',

@@ -2,17 +2,18 @@
 
 namespace App\Mail;
 
-use App\Mail\Concerns\RepliesToUser;
+use App\Mail\Concerns\SendsToUser;
 use App\Models\Feedback;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Address;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
-class FeedbackReceivedMail extends Mailable
+class FeedbackAcknowledgementMail extends Mailable
 {
-    use Queueable, RepliesToUser, SerializesModels;
+    use Queueable, SendsToUser, SerializesModels;
 
     /**
      * Create a new message instance.
@@ -24,15 +25,20 @@ class FeedbackReceivedMail extends Mailable
     /**
      * Get the message envelope.
      *
-     * Replies go to the user who submitted the feedback, so an admin can answer
-     * straight from the notification. Falls back to no reply-to if the user row
-     * is gone, carries no address, or cannot be decrypted.
+     * A reply from the user should reach the team that reads feedback, not the
+     * app's own From address.
      */
     public function envelope(): Envelope
     {
+        $replyTo = [];
+
+        if ($admin = config('mail.admin_email')) {
+            $replyTo[] = new Address($admin, config('app.name'));
+        }
+
         return new Envelope(
-            subject: 'New User Feedback Received',
-            replyTo: $this->replyToUser($this->feedback->user),
+            subject: 'We received your feedback',
+            replyTo: $replyTo,
         );
     }
 
@@ -42,10 +48,10 @@ class FeedbackReceivedMail extends Mailable
     public function content(): Content
     {
         return new Content(
-            view: 'emails.feedback-received',
+            view: 'emails.feedback-acknowledgement',
             with: [
                 'feedback' => $this->feedback,
-                'user' => $this->feedback->user,
+                'name' => $this->readableName($this->feedback->user),
             ],
         );
     }
