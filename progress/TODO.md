@@ -53,7 +53,7 @@ Other modes:
 - [ ] Record the deploy evidence (`/up` status, log tail, server-side SHA) in `DEPLOYMENT_STATUS.md`.
 - [ ] **Local database is 2 migrations behind** — `2026_05_22_000001_add_bank_account_id_to_transfers_table` and `2026_05_25_000001_convert_timestamps_from_et_to_utc` show as Pending on the dev machine. Confirm whether production has them; if not, the first `./deploy.sh` run will apply them (and will take a `mysqldump` first).
 - [ ] Run `vendor/bin/pint` to fix the 6 style failures, then re-run `php artisan test`.
-- [ ] Rewrite `deployeement.md` — it still targets the retired `stripe-sheet-and-admin-panel` branch and the `devonlinetestserver` test box, not `api.timevaultapp.co`. `deploy.sh` supersedes most of it.
+- [x] ~~Rewrite `deployeement.md`~~ — deleted on 2026-09-22 instead. It targeted a branch that no longer exists and a server that is not the live one, and `deploy.sh` supersedes it. Recoverable from git history if ever needed.
 
 ## BACKLOG
 

@@ -14,7 +14,7 @@ Laravel 12 fintech backend (Stripe Payment Sheet + Custom Connect + Transfers) w
 | Target | Path | Notes |
 |---|---|---|
 | **Production API** | `/home/timevaultapp-api/htdocs/api.timevaultapp.co` | Hostinger VPS `srv1017557`, CloudPanel. Git checkout of `origin`. This is the live backend the Flutter app talks to. |
-| Test server | `/home/devonlinetestserver-timevaultapp/htdocs/timevaultapp.devonlinetestserver.com` | Documented in `deployeement.md`; that guide still names branch `stripe-sheet-and-admin-panel`, which no longer exists on origin. |
+| Test server | `/home/devonlinetestserver-timevaultapp/htdocs/timevaultapp.devonlinetestserver.com` | Was documented in `deployeement.md`, deleted 2026-09-22 — it named a branch that no longer exists on origin. Deploy this target with `deploy.sh --branch <name>` like any other. |
 
 Repo: https://github.com/jasonapp2244/time_walt_app.git — branches `main` and `development` only.
 
@@ -59,7 +59,7 @@ Credentials are deliberately *not* in `phpunit.xml` — only `DB_CONNECTION` and
 2. **Deploy to production** — pull the new commits on `api.timevaultapp.co`. Commands are in TODO.md. Not run from this machine: no SSH credentials for `srv1017557` are configured here. Note this release is **no longer docs-only** — it adds a migration, so `deploy.sh` will take a `mysqldump` before migrating.
 3. Fix the 6 Pint style failures (`vendor/bin/pint` fixes them all automatically).
 4. Real coverage of the payment/hold/withdrawal flow — still the highest-value gap. The MySQL harness now makes it possible.
-5. Correct `deployeement.md`: it targets the retired `stripe-sheet-and-admin-panel` branch and the test server, not `api.timevaultapp.co`.
+5. ~~Correct `deployeement.md`~~ — deleted 2026-09-22 along with the Flutter integration guides, the AI prompt files, the duplicate Postman collections and the editor tooling config. `deploy.sh` is the deployment reference now.
 
 ## CURRENT ERRORS / KNOWN ISSUES
 

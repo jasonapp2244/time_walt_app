@@ -22,3 +22,7 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Machine-local Claude Code permission state - not project content.
+.claude/settings.local.json
+.claude/settings.local.json.bak-*

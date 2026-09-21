@@ -1048,9 +1048,9 @@ composer test
 
 ### Testing Resources
 
-- **Postman Collection**: `postman_collection_stripe.json` (pre-configured API endpoints)
-- **Testing Guide**: `POSTMAN_STRIPE_TESTING_GUIDE.md` (Stripe payment flow testing)
-- **Payment Flow Doc**: `stripe_payment_sheet_flow.md` (Stripe PaymentSheet integration)
+- **Postman Collection**: `TimeVault_Complete_Postman_Collection.json` (all API endpoints)
+
+> The narrower Stripe collection, the Postman testing guide, the PaymentSheet flow document and the Flutter integration guides were removed from the repository on 2026-09-22 to keep dev material off the production server. They remain in git history.
 - **PHPUnit**: `phpunit.xml` configuration with `tests/` directory
 
 ---
