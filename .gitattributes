@@ -9,3 +9,7 @@
 /.github export-ignore
 CHANGELOG.md export-ignore
 .styleci.yml export-ignore
+
+# Shell scripts must stay LF and executable - a CRLF shebang fails on the server
+# with "bad interpreter: No such file or directory".
+*.sh text eol=lf
