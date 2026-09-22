@@ -8,20 +8,27 @@ One line per item. Keep it honest: an item is only done when it has been verifie
 
 ## IN PROGRESS
 
-- [ ] **Install the production queue worker.** One command, as root on the server:
-      `sudo /home/timevaultapp-api/htdocs/api.timevaultapp.co/deploy/install-queue-worker.sh`
-      Until this runs, support/feedback/OTP email only sends when someone runs
-      `php artisan queue:work` by hand. The script self-verifies by dispatching a test job.
-      Requires the branch carrying `deploy/` to be on the server first.
+- [x] ~~**Install the production queue worker.**~~ Done 2026-09-22. systemd service
+      `timevault-queue`, installed by hand rather than via the script (the branch carrying
+      `deploy/` is still unpushed). Verified on the server: `active (running)`, `enabled`
+      at boot, `User=timevaultapp-api` (not root), PID 1993466, and still `active` after
+      `php artisan queue:restart` — so `deploy.sh` cannot orphan it.
+- [x] ~~**Install the scheduler cron.**~~ Done 2026-09-22. `* * * * * cd <app> && /usr/bin/php
+      artisan schedule:run` in **`timevaultapp-api`'s** crontab, not root's. `schedule:run`
+      exits 0 and `schedule:list` shows both money-path commands.
+- [ ] **Confirm the cron daemon itself is running** (`systemctl is-active cron`). The crontab
+      entry is verified present, but an entry does nothing if the daemon is stopped — the same
+      silent-failure shape as the missing worker. Also still unconfirmed: `jobs`/`failed_jobs`
+      counts on production, and one real app submission arriving by email with no command run.
 
-- [ ] **Deploy to production.** `development` and `main` are at `e25dc2a`; the server is still at `60e0cc2`, two commits behind. Run on the server: check `ADMIN_EMAIL`/`SUPPORT_EMAIL` are in `.env`, remove the stray `deploy.sh.replaced-*` file, then `./deploy.sh --branch main`. Verify with `php artisan migrate:status | grep support_requests`, `curl .../up`, and `ps aux | grep -c '[q]ueue:work'`.
+- [ ] **Deploy the current `main` to production.** The support feature IS already live there — probing `POST /api/profile/support` from outside returns 401 (route exists), not 404 — so `d8e9c8a` or later was deployed at some point on 2026-09-22. The exact SHA on the server has not been read; check with `git -C <app> log --oneline -1`. Still to ship: the `deploy.sh` queue check and the `deploy/` scripts (4 commits, unpushed). Run `./deploy.sh --branch main` after pushing, and remove the stray `deploy.sh.replaced-*` file first.
 - [ ] **Hand the Postman collection to whoever tests the API.** `TimeVault_Complete_Postman_Collection.json` plus one of the two environment files. Import both, pick the environment, run Signup → Verify OTP (or Login); the token is captured automatically.
 
 - [ ] **Update the stored privacy policy contact address.** The active row still reads `support@timevaultapp.com` (`.com`, not `.co`) from the original seed. `PrivacyPolicySeeder` now pulls from `SUPPORT_EMAIL`, but it only runs on a fresh seed — fix the live row at `/admin/privacy-policy`.
 - [ ] **Check that `admin@timevaultapp.co` and `support@timevaultapp.co` receive mail.** Sending is verified; mailbox existence on that domain is not. A bounce lands in `MAIL_USERNAME` (`tauseefchoohan0401@gmail.com`).
 - [ ] **Set `ADMIN_EMAIL` and `SUPPORT_EMAIL` in the production `.env`** before deploying. Missing keys mean the jobs log a warning and send nothing — deploy will still look green.
 - [ ] **Point the Flutter support screen at `POST /api/profile/support`.** Body: `subject` (max 150) + `message` (max 2000), Sanctum bearer token, `throttle:10,1`. Success returns `data.support_request`. No client calls it yet.
-- [ ] **Push `development` and `main`, then re-run the deploy.** The 2026-09-17 production deploy shipped `28087e6` — tranche 1 only. Feedback is committed and merged locally but was never pushed; support is not committed at all. Neither is on origin or on the server.
+- [ ] **Push `development` and `main`.** Superseded in part: feedback and support are committed, merged and on origin as of `e25dc2a`, and the API probe shows support live in production. What is *not* pushed is the 2026-09-22 tooling work — `f252a74`, `cdf24b7`, `b772e70`, `2f24292` (deploy.sh queue check, `deploy/` scripts, Postman collection). `main` is still at `e25dc2a`.
 - [ ] **Set `APP_ENV=production` in the production `.env`**, then `php artisan config:cache`. Beyond the usual reasons, `local` breaks the deploy script's own error gate: it greps for `production.ERROR` and the log says `local.ERROR`, so it reports 0 errors unconditionally.
 - [ ] **Fix the nightly `CleanupUnverifiedAccounts` failure** — user 1 is undecryptable under the current `APP_KEY` (`The MAC is invalid.`). See `DEPLOYMENT_STATUS.md` -> FIRST SUCCESSFUL DEPLOY.
 - [x] ~~Diagnose `verify:pending-transfers` exit code 1~~ — resolved. `Table 'time-vault-app-db.transfers' doesn't exist`, confined to 2026-09-14 22:20-22:50, nothing since. Production DB is `time-vault-app-db`. See `DEPLOYMENT_STATUS.md` -> finding 3.

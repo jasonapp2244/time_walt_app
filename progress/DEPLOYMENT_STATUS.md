@@ -9,6 +9,19 @@
 > **which still has to be run once on the server** — until then, mail only sends when
 > someone runs `php artisan queue:work` manually. `deploy.sh` now fails loudly instead of
 > quietly if no worker is up.
+>
+> **Resolved on the server the same day.** `timevault-queue` is installed and verified:
+> `active (running)`, `enabled` at boot, `User=timevaultapp-api` (never root, which would
+> leave root-owned files PHP-FPM cannot write), and it comes back `active` after
+> `queue:restart`, so a deploy cannot orphan it. The scheduler cron was missing too and was
+> installed in the same user's crontab — without it `check:payment-holds` never flips a
+> matured hold to `ready_for_transfer`, which strands a user's money rather than an email.
+> `schedule:run` exits 0 and both money-path commands appear in `schedule:list`.
+>
+> Still unconfirmed: that the **cron daemon** is running (an entry in a crontab does nothing
+> if `cron` is stopped), the production `jobs`/`failed_jobs` counts, and one real app
+> submission delivering email with no command run. Until that last one, automatic delivery
+> is inferred, not proven.
 
 A command completing is not a successful deployment. Nothing goes in the VERIFIED column below without evidence.
 
