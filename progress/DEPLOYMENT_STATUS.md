@@ -2,6 +2,14 @@
 
 **Last updated:** 2026-09-22
 
+> **2026-09-22 — production email outage, resolved.** Support and feedback submissions
+> returned success but sent no mail, because no queue worker had ever been running on
+> `api.timevaultapp.co`. Draining the queue by hand delivered all four pending emails.
+> The permanent fix is `deploy/install-queue-worker.sh` (systemd service `timevault-queue`),
+> **which still has to be run once on the server** — until then, mail only sends when
+> someone runs `php artisan queue:work` manually. `deploy.sh` now fails loudly instead of
+> quietly if no worker is up.
+
 A command completing is not a successful deployment. Nothing goes in the VERIFIED column below without evidence.
 
 ---

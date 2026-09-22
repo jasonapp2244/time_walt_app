@@ -404,7 +404,43 @@ run chmod -R ug+rw storage bootstrap/cache
 # ----------------------------------------------------------------- queue ----
 step "Restarting queue workers"
 run "$PHP_BIN" artisan queue:restart
-ok "restart signal sent (Supervisor respawns the workers)"
+ok "restart signal sent"
+
+# queue:restart only tells workers that ALREADY EXIST to pick up the new code.
+# It starts nothing. With no worker running, every queued notification email is
+# dropped in silence - no exception, no failed_jobs row, and this script still
+# prints DEPLOY COMPLETE. That is exactly how the support and feedback mail went
+# missing on 2026-09-22, so the deploy now checks instead of assuming.
+QUEUE_WORKERS=0
+if [ "$DRY_RUN" -eq 1 ]; then
+    printf '       [dry-run] verify a queue worker is running\n'
+else
+    sleep 2
+    QUEUE_WORKERS="$(pgrep -fc 'artisan queue:(work|listen)' 2>/dev/null || true)"
+    QUEUE_WORKERS="${QUEUE_WORKERS:-0}"
+    if [ "$QUEUE_WORKERS" -gt 0 ]; then
+        ok "$QUEUE_WORKERS queue worker(s) running"
+    else
+        warn "NO QUEUE WORKER IS RUNNING"
+        warn "  Queued email (support, feedback, OTP, payout alerts) will never send."
+        warn "  Install one permanently:  sudo $APP_DIR/deploy/install-queue-worker.sh"
+        warn "  Drain the backlog now:    $PHP_BIN artisan queue:work --stop-when-empty"
+    fi
+fi
+
+# A backlog that survived the restart usually means the worker died mid-queue.
+if [ "$DRY_RUN" -ne 1 ]; then
+    PENDING_JOBS="$("$PHP_BIN" artisan tinker --execute="echo DB::table('jobs')->count();" 2>/dev/null | tr -cd '0-9' || true)"
+    FAILED_JOBS="$("$PHP_BIN" artisan tinker --execute="echo DB::table('failed_jobs')->count();" 2>/dev/null | tr -cd '0-9' || true)"
+    PENDING_JOBS="${PENDING_JOBS:-?}"
+    FAILED_JOBS="${FAILED_JOBS:-?}"
+    if [ "$PENDING_JOBS" != "0" ] && [ "$PENDING_JOBS" != "?" ]; then
+        warn "$PENDING_JOBS job(s) still queued - they should drain within seconds if a worker is up"
+    fi
+    if [ "$FAILED_JOBS" != "0" ] && [ "$FAILED_JOBS" != "?" ]; then
+        warn "$FAILED_JOBS job(s) in failed_jobs - inspect with: $PHP_BIN artisan queue:failed"
+    fi
+fi
 
 # -------------------------------------------------------------------- up ----
 step "Maintenance mode off"
@@ -451,5 +487,11 @@ printf '    to          %s  %s\n' "$(git rev-parse --short HEAD)" "$(git log -1 
 printf '    ran as      %s\n' "$(id -un)"
 printf '    health      %s%s\n' "$APP_URL_VAL" "$HEALTH_PATH"
 printf '    log errors  %s lines match production.ERROR (check whether this grew)\n' "$ERR_COUNT"
+if [ "$DRY_RUN" -ne 1 ] && [ "${QUEUE_WORKERS:-0}" -eq 0 ]; then
+    printf '%s    queue       NO WORKER RUNNING - queued email will not send%s\n' "$C_RED" "$C_OFF"
+    printf '                sudo %s/deploy/install-queue-worker.sh\n' "$APP_DIR"
+else
+    printf '    queue       %s worker(s), %s pending, %s failed\n' "${QUEUE_WORKERS:-?}" "${PENDING_JOBS:-?}" "${FAILED_JOBS:-?}"
+fi
 printf '    rollback    ./deploy.sh --rollback\n'
 printf '%s----------------------------------------------------%s\n\n' "$C_BLD" "$C_OFF"

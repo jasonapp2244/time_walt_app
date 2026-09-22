@@ -45,7 +45,13 @@ PII fields (email, phone, full_name, provider_id, fcm_token, device_id, otp_code
 **Critical:** Never regenerate `APP_KEY` after data has been seeded/created — it will corrupt all encrypted fields.
 
 ### Async Notifications
-12 queued jobs in `app/Jobs/` handle email notifications asynchronously via database-backed queue. The queue worker runs as part of `composer dev` or via Supervisor in production.
+12 queued jobs in `app/Jobs/` handle email notifications asynchronously via database-backed queue. Locally the worker runs as part of `composer dev`.
+
+**In production the worker is a systemd service, `timevault-queue`**, installed once by `deploy/install-queue-worker.sh`. This is not optional plumbing: the API writes its row and dispatches the job, then returns `success: true` immediately. With no worker consuming the `jobs` table the email is never sent and **nothing reports an error** — no exception, no `failed_jobs` row, no bounce. Production ran that way from the 2026-09-22 deploy until the service was installed, and every support and feedback email was silently stuck in the queue.
+
+`php artisan queue:restart` only signals workers that already exist; it starts nothing. `deploy.sh` therefore verifies a worker is alive after every deploy and prints a red warning in the summary when none is.
+
+Check it with `systemctl status timevault-queue`, or drain a backlog by hand with `php artisan queue:work --stop-when-empty`.
 
 ### Payment Flow
 Stripe Payment Sheet flow: create Customer → create EphemeralKey → create PaymentIntent → confirm on device → webhook confirms → create PaymentHold with configurable hold duration. Users manually request withdrawals when holds mature (no auto-transfer).
@@ -157,7 +163,7 @@ Controller loads paginated queries separately; amount summaries use `COALESCE(re
 - **Nginx:** Uses `location ^~ /storage/` with `alias` to serve files from `storage/app/public/` — do NOT use `php artisan storage:link` (symlinks cause "Too many levels" error on this VPS)
 - **PHP-FPM** runs as user `devonlinetestserver-time-vault` (not `www-data`) — profiles directory needs `chmod 777`
 - **Cron:** `* * * * * cd /path && php artisan schedule:run >> /dev/null 2>&1`
-- **Queue:** Needs a persistent worker or cron-based queue processing
+- **Queue:** persistent worker required — see Async Notifications above
 
 ## Key Config
 
