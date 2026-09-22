@@ -1,7 +1,9 @@
 # PROJECT STATE — Time Vault
 
-**Last updated:** 2026-09-22 (third session)
-**Git:** all of the 2026-09-22 work (support feature, mail routing, user acknowledgements, env-driven addresses) is committed on **`feature/user-support`**, branched from `development` at `60e0cc2` and pushed to origin. It is **not merged** into `development` or `main`, and not deployed. `development` and `main` are both at `60e0cc2` and in sync with origin.
+**Last updated:** 2026-09-22 (fifth session)
+**Git:** `development` and `main` are both at **`e25dc2a`** and pushed to origin. The 2026-09-22 work landed in two commits: `d8e9c8a` (support feature, mail routing, user acknowledgements, env-driven addresses) and `e25dc2a` (removed the stale dev documentation, duplicate Postman collections and editor tooling config). `feature/user-support` still exists at `d8e9c8a`; it is fully merged and can be deleted.
+
+**Not deployed.** Production is still at `60e0cc2`, two commits behind — see NEXT TASK.
 
 This file is the handover document. Read it first at the start of every session, and update it before finishing one. It must let another engineer continue tomorrow without reading any conversation history.
 
@@ -79,6 +81,48 @@ Credentials are deliberately *not* in `phpunit.xml` — only `DB_CONNECTION` and
 - 2026-09-07 — Installed the production engineering rules and this progress folder.
 
 ## FILES CHANGED (most recent session)
+
+Queue worker — the production email outage, 2026-09-22 (fifth session), **uncommitted**:
+
+**What happened.** The user submitted support and feedback from the mobile app against
+production. Both returned `success: true`. No email arrived at `admin@timevaultapp.co`,
+`support@timevaultapp.co`, or the user's own address.
+
+**Root cause, confirmed on the server.** No queue worker was running. `QUEUE_CONNECTION=database`,
+so the controller writes its row, dispatches the job and returns 200 before any mail is
+attempted. The four jobs sat in the `jobs` table. Running `php artisan queue:work --stop-when-empty`
+processed all four (`SendFeedbackNotification`, `SendFeedbackAcknowledgement`, `SendSupportNotification`,
+`SendSupportAcknowledgement`, all DONE, sub-second) and every email arrived. The code was never
+at fault — `deploy.sh` ran `queue:restart`, which only signals workers that already exist, and
+no Supervisor or systemd service had ever been set up on this box.
+
+| File | Change |
+|---|---|
+| `deploy/install-queue-worker.sh` | New. Installs `timevault-queue` as a systemd service — `Restart=always`, enabled at boot, runs as the code owner rather than root, `--max-time=3600` to recycle hourly. Auto-detects app dir, user and php binary; refuses to run as non-root; verifies the queue config is readable before writing the unit; then dispatches a real test job and confirms the worker executed it. Idempotent |
+| `deploy/timevault-worker.conf` | New. Supervisor equivalent, for a box without systemd |
+| `deploy.sh` | The queue step claimed "Supervisor respawns the workers" — an assumption that was false and hid this outage behind a green deploy. It now counts live workers with `pgrep` after the restart, reports pending and failed job counts, and prints a red `NO WORKER RUNNING` line in the summary with the install command. Verified it cannot abort a deploy: tested under `set -Eeuo pipefail` with the ERR trap for pgrep-missing, pgrep-no-match and workers-found |
+| `CLAUDE.md` | Async Notifications section rewritten to state the failure mode explicitly, so the next engineer does not rediscover it |
+
+API testing artifacts, 2026-09-22 (fourth session), **uncommitted**:
+
+| File | Change |
+|---|---|
+| `TimeVault_Complete_Postman_Collection.json` | Regenerated from `routes/api.php`. The old one pointed at the retired `time-vault.devonlinetestserver.com` box, had 36 requests, no feedback or support endpoints, and no token capture. Now 40 requests covering all 37 API routes plus the `/up` health check, with collection-level bearer auth, automatic token capture, a pre-request script that keeps the hold dates valid, and every validation rule written into the request descriptions |
+| `TimeVault_Postman_Environment.Production.json` | New — `api.timevaultapp.co` |
+| `TimeVault_Postman_Environment.Local.json` | New — `127.0.0.1:8000` |
+| `docs/FLUTTER_SUPPORT_FEEDBACK_BRIEF.md` | New, untracked — the Flutter implementation brief for the support and feedback screens (endpoint contracts, Dart models and client, screen states, acceptance checklist) |
+
+Coverage was verified mechanically, not by eye. Both scripts live in `docs/postman/`
+(untracked, so they never ship to the server):
+
+```bash
+php docs/postman/build_collection.php                       # regenerate the three JSON files
+php artisan route:list --json > /tmp/routes.json
+php docs/postman/verify_coverage.php /tmp/routes.json       # diff collection vs route table
+```
+
+The verifier reported 37 API routes in code, 0 missing from the collection. Re-run both
+after adding or renaming any route — the collection does not update itself.
 
 Everything env-driven, 2026-09-22 (third session), on `feature/user-support`:
 

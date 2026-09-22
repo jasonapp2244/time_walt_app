@@ -8,7 +8,15 @@ One line per item. Keep it honest: an item is only done when it has been verifie
 
 ## IN PROGRESS
 
-- [ ] **Commit the support feature.** Built and verified on 2026-09-22 but left uncommitted — 16 new files, 6 modified, all in the working tree on `development`. Nothing is recorded in git history yet.
+- [ ] **Install the production queue worker.** One command, as root on the server:
+      `sudo /home/timevaultapp-api/htdocs/api.timevaultapp.co/deploy/install-queue-worker.sh`
+      Until this runs, support/feedback/OTP email only sends when someone runs
+      `php artisan queue:work` by hand. The script self-verifies by dispatching a test job.
+      Requires the branch carrying `deploy/` to be on the server first.
+
+- [ ] **Deploy to production.** `development` and `main` are at `e25dc2a`; the server is still at `60e0cc2`, two commits behind. Run on the server: check `ADMIN_EMAIL`/`SUPPORT_EMAIL` are in `.env`, remove the stray `deploy.sh.replaced-*` file, then `./deploy.sh --branch main`. Verify with `php artisan migrate:status | grep support_requests`, `curl .../up`, and `ps aux | grep -c '[q]ueue:work'`.
+- [ ] **Hand the Postman collection to whoever tests the API.** `TimeVault_Complete_Postman_Collection.json` plus one of the two environment files. Import both, pick the environment, run Signup → Verify OTP (or Login); the token is captured automatically.
+
 - [ ] **Update the stored privacy policy contact address.** The active row still reads `support@timevaultapp.com` (`.com`, not `.co`) from the original seed. `PrivacyPolicySeeder` now pulls from `SUPPORT_EMAIL`, but it only runs on a fresh seed — fix the live row at `/admin/privacy-policy`.
 - [ ] **Check that `admin@timevaultapp.co` and `support@timevaultapp.co` receive mail.** Sending is verified; mailbox existence on that domain is not. A bounce lands in `MAIL_USERNAME` (`tauseefchoohan0401@gmail.com`).
 - [ ] **Set `ADMIN_EMAIL` and `SUPPORT_EMAIL` in the production `.env`** before deploying. Missing keys mean the jobs log a warning and send nothing — deploy will still look green.

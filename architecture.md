@@ -1048,7 +1048,10 @@ composer test
 
 ### Testing Resources
 
-- **Postman Collection**: `TimeVault_Complete_Postman_Collection.json` (all API endpoints)
+- **Postman Collection**: `TimeVault_Complete_Postman_Collection.json` — all 37 API routes, regenerated from `routes/api.php` on 2026-09-22
+- **Postman Environments**: `TimeVault_Postman_Environment.Production.json` (api.timevaultapp.co) and `TimeVault_Postman_Environment.Local.json` (127.0.0.1:8000)
+
+The collection sets bearer auth once at the collection level and writes the token into `{{token}}` from the login/signup/verify-otp responses, so no token is ever pasted by hand. Public routes override the auth with No Auth. `6.1 Create payment intent` has a pre-request script that rewrites `hold_start_at`/`hold_end_at` to now and now+1 day, because `after_or_equal:today` would otherwise make a hardcoded date rot.
 
 > The narrower Stripe collection, the Postman testing guide, the PaymentSheet flow document and the Flutter integration guides were removed from the repository on 2026-09-22 to keep dev material off the production server. They remain in git history.
 - **PHPUnit**: `phpunit.xml` configuration with `tests/` directory

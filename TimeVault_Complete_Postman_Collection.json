@@ -1,669 +1,1754 @@
 {
-	"info": {
-		"name": "Time Vault - Complete API Collection",
-		"description": "Complete API testing collection for Time Vault app.\n\nBase URL: https://time-vault.devonlinetestserver.com/api\n\nFlow: Signup -> Verify OTP -> Login -> Profile -> Bank Account -> Payment -> Hold -> Withdraw",
-		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-	},
-	"variable": [
-		{
-			"key": "base_url",
-			"value": "https://time-vault.devonlinetestserver.com/api"
-		},
-		{
-			"key": "token",
-			"value": ""
-		}
-	],
-	"item": [
-		{
-			"name": "1. Auth",
-			"item": [
-				{
-					"name": "1.1 Check Email",
-					"request": {
-						"method": "POST",
-						"header": [
-							{"key": "Content-Type", "value": "application/json"},
-							{"key": "Accept", "value": "application/json"}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"email\": \"testuser@example.com\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/auth/check-email",
-							"host": ["{{base_url}}"],
-							"path": ["auth", "check-email"]
-						}
-					}
-				},
-				{
-					"name": "1.2 Signup",
-					"request": {
-						"method": "POST",
-						"header": [
-							{"key": "Content-Type", "value": "application/json"},
-							{"key": "Accept", "value": "application/json"}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"full_name\": \"Test User\",\n    \"email\": \"testuser@example.com\",\n    \"phone\": \"1234567890\",\n    \"password\": \"Test@1234\",\n    \"password_confirmation\": \"Test@1234\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/auth/signup",
-							"host": ["{{base_url}}"],
-							"path": ["auth", "signup"]
-						}
-					}
-				},
-				{
-					"name": "1.3 Verify OTP",
-					"request": {
-						"method": "POST",
-						"header": [
-							{"key": "Content-Type", "value": "application/json"},
-							{"key": "Accept", "value": "application/json"}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"email\": \"testuser@example.com\",\n    \"otp_code\": \"1234\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/auth/verify-otp",
-							"host": ["{{base_url}}"],
-							"path": ["auth", "verify-otp"]
-						}
-					}
-				},
-				{
-					"name": "1.4 Resend OTP",
-					"request": {
-						"method": "POST",
-						"header": [
-							{"key": "Content-Type", "value": "application/json"},
-							{"key": "Accept", "value": "application/json"}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"email\": \"testuser@example.com\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/auth/resend-otp",
-							"host": ["{{base_url}}"],
-							"path": ["auth", "resend-otp"]
-						}
-					}
-				},
-				{
-					"name": "1.5 Login",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"type": "text/javascript",
-								"exec": [
-									"var jsonData = pm.response.json();",
-									"if (jsonData.data && jsonData.data.token) {",
-									"    pm.collectionVariables.set('token', jsonData.data.token);",
-									"    console.log('Token saved: ' + jsonData.data.token);",
-									"}"
-								]
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [
-							{"key": "Content-Type", "value": "application/json"},
-							{"key": "Accept", "value": "application/json"}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"email\": \"testuser@example.com\",\n    \"password\": \"Test@1234\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/auth/login",
-							"host": ["{{base_url}}"],
-							"path": ["auth", "login"]
-						}
-					}
-				},
-				{
-					"name": "1.6 Forgot Password",
-					"request": {
-						"method": "POST",
-						"header": [
-							{"key": "Content-Type", "value": "application/json"},
-							{"key": "Accept", "value": "application/json"}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"email\": \"testuser@example.com\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/auth/forgot-password",
-							"host": ["{{base_url}}"],
-							"path": ["auth", "forgot-password"]
-						}
-					}
-				},
-				{
-					"name": "1.7 Reset Password",
-					"request": {
-						"method": "POST",
-						"header": [
-							{"key": "Content-Type", "value": "application/json"},
-							{"key": "Accept", "value": "application/json"}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"email\": \"testuser@example.com\",\n    \"otp_code\": \"1234\",\n    \"password\": \"NewTest@1234\",\n    \"password_confirmation\": \"NewTest@1234\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/auth/reset-password",
-							"host": ["{{base_url}}"],
-							"path": ["auth", "reset-password"]
-						}
-					}
-				},
-				{
-					"name": "1.8 Logout",
-					"request": {
-						"method": "POST",
-						"header": [
-							{"key": "Content-Type", "value": "application/json"},
-							{"key": "Accept", "value": "application/json"},
-							{"key": "Authorization", "value": "Bearer {{token}}"}
-						],
-						"url": {
-							"raw": "{{base_url}}/auth/logout",
-							"host": ["{{base_url}}"],
-							"path": ["auth", "logout"]
-						}
-					}
-				},
-				{
-					"name": "1.9 Delete Account",
-					"request": {
-						"method": "POST",
-						"header": [
-							{"key": "Content-Type", "value": "application/json"},
-							{"key": "Accept", "value": "application/json"},
-							{"key": "Authorization", "value": "Bearer {{token}}"}
-						],
-						"url": {
-							"raw": "{{base_url}}/auth/delete-account",
-							"host": ["{{base_url}}"],
-							"path": ["auth", "delete-account"]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "2. Profile",
-			"item": [
-				{
-					"name": "2.1 Get Profile",
-					"request": {
-						"method": "GET",
-						"header": [
-							{"key": "Accept", "value": "application/json"},
-							{"key": "Authorization", "value": "Bearer {{token}}"}
-						],
-						"url": {
-							"raw": "{{base_url}}/profile",
-							"host": ["{{base_url}}"],
-							"path": ["profile"]
-						}
-					}
-				},
-				{
-					"name": "2.2 Update Profile",
-					"request": {
-						"method": "POST",
-						"header": [
-							{"key": "Accept", "value": "application/json"},
-							{"key": "Authorization", "value": "Bearer {{token}}"}
-						],
-						"body": {
-							"mode": "formdata",
-							"formdata": [
-								{"key": "full_name", "value": "Updated Name", "type": "text"},
-								{"key": "phone", "value": "9876543210", "type": "text"},
-								{"key": "profile_image", "type": "file", "src": "", "disabled": true}
-							]
-						},
-						"url": {
-							"raw": "{{base_url}}/profile/update",
-							"host": ["{{base_url}}"],
-							"path": ["profile", "update"]
-						}
-					}
-				},
-				{
-					"name": "2.3 Change Password",
-					"request": {
-						"method": "POST",
-						"header": [
-							{"key": "Content-Type", "value": "application/json"},
-							{"key": "Accept", "value": "application/json"},
-							{"key": "Authorization", "value": "Bearer {{token}}"}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"current_password\": \"Test@1234\",\n    \"new_password\": \"NewTest@1234\",\n    \"new_password_confirmation\": \"NewTest@1234\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/profile/change-password",
-							"host": ["{{base_url}}"],
-							"path": ["profile", "change-password"]
-						}
-					}
-				},
-				{
-					"name": "2.4 Update Language",
-					"request": {
-						"method": "POST",
-						"header": [
-							{"key": "Content-Type", "value": "application/json"},
-							{"key": "Accept", "value": "application/json"},
-							{"key": "Authorization", "value": "Bearer {{token}}"}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"language\": \"en\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/profile/language",
-							"host": ["{{base_url}}"],
-							"path": ["profile", "language"]
-						}
-					}
-				},
-				{
-					"name": "2.5 Update Timezone",
-					"request": {
-						"method": "POST",
-						"header": [
-							{"key": "Content-Type", "value": "application/json"},
-							{"key": "Accept", "value": "application/json"},
-							{"key": "Authorization", "value": "Bearer {{token}}"}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"timezone\": \"America/New_York\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/profile/timezone",
-							"host": ["{{base_url}}"],
-							"path": ["profile", "timezone"]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "3. Notification Settings",
-			"item": [
-				{
-					"name": "3.1 Get Notification Settings",
-					"request": {
-						"method": "GET",
-						"header": [
-							{"key": "Accept", "value": "application/json"},
-							{"key": "Authorization", "value": "Bearer {{token}}"}
-						],
-						"url": {
-							"raw": "{{base_url}}/notification-settings",
-							"host": ["{{base_url}}"],
-							"path": ["notification-settings"]
-						}
-					}
-				},
-				{
-					"name": "3.2 Update Notification Settings",
-					"request": {
-						"method": "POST",
-						"header": [
-							{"key": "Content-Type", "value": "application/json"},
-							{"key": "Accept", "value": "application/json"},
-							{"key": "Authorization", "value": "Bearer {{token}}"}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"password_alert\": true,\n    \"transaction_alert\": true,\n    \"push_notification_alert\": true,\n    \"email_alert\": true,\n    \"lock_alert\": true,\n    \"unlock_alert\": true\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/notification-settings/update",
-							"host": ["{{base_url}}"],
-							"path": ["notification-settings", "update"]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "4. Bank Account",
-			"item": [
-				{
-					"name": "4.1 Add Bank Account (US)",
-					"request": {
-						"method": "POST",
-						"header": [
-							{"key": "Content-Type", "value": "application/json"},
-							{"key": "Accept", "value": "application/json"},
-							{"key": "Authorization", "value": "Bearer {{token}}"}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"dob\": \"1990-01-15\",\n    \"account_number\": \"000123456789\",\n    \"bank_name\": \"Test Bank\",\n    \"routing_number\": \"110000000\",\n    \"account_type\": \"checking\",\n    \"country\": \"US\",\n    \"currency\": \"usd\",\n    \"address_line1\": \"123 Main Street\",\n    \"city\": \"New York\",\n    \"state\": \"NY\",\n    \"postal_code\": \"10001\",\n    \"phone\": \"1234567890\",\n    \"ssn_last_4\": \"0000\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/bank-account",
-							"host": ["{{base_url}}"],
-							"path": ["bank-account"]
-						}
-					}
-				},
-				{
-					"name": "4.2 Get Bank Accounts",
-					"request": {
-						"method": "GET",
-						"header": [
-							{"key": "Accept", "value": "application/json"},
-							{"key": "Authorization", "value": "Bearer {{token}}"}
-						],
-						"url": {
-							"raw": "{{base_url}}/bank-account",
-							"host": ["{{base_url}}"],
-							"path": ["bank-account"]
-						}
-					}
-				},
-				{
-					"name": "4.3 Set Primary Bank",
-					"request": {
-						"method": "POST",
-						"header": [
-							{"key": "Content-Type", "value": "application/json"},
-							{"key": "Accept", "value": "application/json"},
-							{"key": "Authorization", "value": "Bearer {{token}}"}
-						],
-						"url": {
-							"raw": "{{base_url}}/bank-account/1/set-primary",
-							"host": ["{{base_url}}"],
-							"path": ["bank-account", "1", "set-primary"]
-						}
-					}
-				},
-				{
-					"name": "4.4 Delete Bank Account",
-					"request": {
-						"method": "DELETE",
-						"header": [
-							{"key": "Accept", "value": "application/json"},
-							{"key": "Authorization", "value": "Bearer {{token}}"}
-						],
-						"url": {
-							"raw": "{{base_url}}/bank-account/1",
-							"host": ["{{base_url}}"],
-							"path": ["bank-account", "1"]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "5. Stripe Payments",
-			"item": [
-				{
-					"name": "5.1 Create Payment Intent",
-					"request": {
-						"method": "POST",
-						"header": [
-							{"key": "Content-Type", "value": "application/json"},
-							{"key": "Accept", "value": "application/json"},
-							{"key": "Authorization", "value": "Bearer {{token}}"}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"amount\": 50.00,\n    \"currency\": \"usd\",\n    \"title\": \"My Savings Vault\",\n    \"hold_period_type\": \"custom\",\n    \"hold_start_at\": \"2026-05-23\",\n    \"hold_end_at\": \"2026-06-23\",\n    \"hold_hours\": 0,\n    \"hold_minutes\": 0\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/stripe/create-payment-intent",
-							"host": ["{{base_url}}"],
-							"path": ["stripe", "create-payment-intent"]
-						}
-					}
-				},
-				{
-					"name": "5.2 Confirm Payment",
-					"request": {
-						"method": "POST",
-						"header": [
-							{"key": "Content-Type", "value": "application/json"},
-							{"key": "Accept", "value": "application/json"},
-							{"key": "Authorization", "value": "Bearer {{token}}"}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"payment_intent_id\": \"pi_xxxxxxxxxxxxxxx\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/stripe/confirm-payment",
-							"host": ["{{base_url}}"],
-							"path": ["stripe", "confirm-payment"]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "6. Payment Holds",
-			"item": [
-				{
-					"name": "6.1 List Payment Holds",
-					"request": {
-						"method": "GET",
-						"header": [
-							{"key": "Accept", "value": "application/json"},
-							{"key": "Authorization", "value": "Bearer {{token}}"}
-						],
-						"url": {
-							"raw": "{{base_url}}/payment-holds",
-							"host": ["{{base_url}}"],
-							"path": ["payment-holds"]
-						}
-					}
-				},
-				{
-					"name": "6.2 Balance Summary",
-					"request": {
-						"method": "GET",
-						"header": [
-							{"key": "Accept", "value": "application/json"},
-							{"key": "Authorization", "value": "Bearer {{token}}"}
-						],
-						"url": {
-							"raw": "{{base_url}}/payment-holds/summary",
-							"host": ["{{base_url}}"],
-							"path": ["payment-holds", "summary"]
-						}
-					}
-				},
-				{
-					"name": "6.3 Request Payout (Single Hold)",
-					"request": {
-						"method": "POST",
-						"header": [
-							{"key": "Content-Type", "value": "application/json"},
-							{"key": "Accept", "value": "application/json"},
-							{"key": "Authorization", "value": "Bearer {{token}}"}
-						],
-						"url": {
-							"raw": "{{base_url}}/payment-holds/1/request-payout",
-							"host": ["{{base_url}}"],
-							"path": ["payment-holds", "1", "request-payout"]
-						}
-					}
-				},
-				{
-					"name": "6.4 Withdraw Amount",
-					"request": {
-						"method": "POST",
-						"header": [
-							{"key": "Content-Type", "value": "application/json"},
-							{"key": "Accept", "value": "application/json"},
-							{"key": "Authorization", "value": "Bearer {{token}}"}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"amount\": 25.00\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/payment-holds/withdraw",
-							"host": ["{{base_url}}"],
-							"path": ["payment-holds", "withdraw"]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "7. Transaction History",
-			"item": [
-				{
-					"name": "7.1 All Transactions",
-					"request": {
-						"method": "GET",
-						"header": [
-							{"key": "Accept", "value": "application/json"},
-							{"key": "Authorization", "value": "Bearer {{token}}"}
-						],
-						"url": {
-							"raw": "{{base_url}}/transactions/all",
-							"host": ["{{base_url}}"],
-							"path": ["transactions", "all"]
-						}
-					}
-				},
-				{
-					"name": "7.2 Checkouts Only",
-					"request": {
-						"method": "GET",
-						"header": [
-							{"key": "Accept", "value": "application/json"},
-							{"key": "Authorization", "value": "Bearer {{token}}"}
-						],
-						"url": {
-							"raw": "{{base_url}}/transactions/checkouts",
-							"host": ["{{base_url}}"],
-							"path": ["transactions", "checkouts"]
-						}
-					}
-				},
-				{
-					"name": "7.3 Withdrawals Only",
-					"request": {
-						"method": "GET",
-						"header": [
-							{"key": "Accept", "value": "application/json"},
-							{"key": "Authorization", "value": "Bearer {{token}}"}
-						],
-						"url": {
-							"raw": "{{base_url}}/transactions/withdraws",
-							"host": ["{{base_url}}"],
-							"path": ["transactions", "withdraws"]
-						}
-					}
-				},
-				{
-					"name": "7.4 Hold Amounts",
-					"request": {
-						"method": "GET",
-						"header": [
-							{"key": "Accept", "value": "application/json"},
-							{"key": "Authorization", "value": "Bearer {{token}}"}
-						],
-						"url": {
-							"raw": "{{base_url}}/transactions/hold-amounts",
-							"host": ["{{base_url}}"],
-							"path": ["transactions", "hold-amounts"]
-						}
-					}
-				},
-				{
-					"name": "7.5 Ready for Transfer",
-					"request": {
-						"method": "GET",
-						"header": [
-							{"key": "Accept", "value": "application/json"},
-							{"key": "Authorization", "value": "Bearer {{token}}"}
-						],
-						"url": {
-							"raw": "{{base_url}}/transactions/ready-for-transfer",
-							"host": ["{{base_url}}"],
-							"path": ["transactions", "ready-for-transfer"]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "8. Admin API",
-			"item": [
-				{
-					"name": "8.1 Admin Transfer (Execute)",
-					"request": {
-						"method": "POST",
-						"header": [
-							{"key": "Content-Type", "value": "application/json"},
-							{"key": "Accept", "value": "application/json"},
-							{"key": "Authorization", "value": "Bearer {{token}}"}
-						],
-						"url": {
-							"raw": "{{base_url}}/admin/transfer/1",
-							"host": ["{{base_url}}"],
-							"path": ["admin", "transfer", "1"]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "9. Other",
-			"item": [
-				{
-					"name": "9.1 Privacy Policy",
-					"request": {
-						"method": "GET",
-						"header": [
-							{"key": "Accept", "value": "application/json"}
-						],
-						"url": {
-							"raw": "{{base_url}}/privacy-policy",
-							"host": ["{{base_url}}"],
-							"path": ["privacy-policy"]
-						}
-					}
-				},
-				{
-					"name": "9.2 Refer Friend URL",
-					"request": {
-						"method": "GET",
-						"header": [
-							{"key": "Accept", "value": "application/json"},
-							{"key": "Authorization", "value": "Bearer {{token}}"}
-						],
-						"url": {
-							"raw": "{{base_url}}/refer-friend-url",
-							"host": ["{{base_url}}"],
-							"path": ["refer-friend-url"]
-						}
-					}
-				}
-			]
-		}
-	]
+    "info": {
+        "_postman_id": "9f1c4d2a-7b3e-4a58-9c10-timevault0001",
+        "name": "Time Vault - Complete API",
+        "description": "Every route in routes/api.php, generated from the code on 2026-09-22.\n\n## Setup (60 seconds)\n\n1. Import this file and one environment file (Production or Local).\n2. Select the environment in the top-right dropdown.\n3. Open \"01. Auth (public)\" and run Signup -> Verify OTP, or Login if the account\n   already exists. The bearer token is captured automatically.\n4. Run anything else.\n\n## How auth works here\n\nThe collection sets `Authorization: Bearer {{token}}` once, at the top level. Public\nrequests (signup, login, privacy policy, webhook, health) override it with No Auth,\nso a stale token can never break them. Login, signup and verify-otp write the token\nback into the collection variable - you never copy-paste it.\n\nTokens do not expire on their own: SANCTUM_TOKEN_EXPIRATION is unset, so a token is\nvalid until logout or account deletion. A 401 means the token was revoked, not aged.\n\n## Things that will bite you\n\n- `Accept: application/json` is set on every request and must stay. Without it\n  Laravel answers a validation failure with an HTML redirect instead of 422 JSON.\n- Rate limits are real: 5/min on signup, login, verify-otp and reset-password, 3/min\n  on resend-otp and forgot-password, 10/min on feedback and support. A 429 is the\n  limiter, not bad input.\n- Emails (OTP, feedback, support) go through a database queue. No queue worker\n  running means no email and no error - check `php artisan queue:work`.\n- Dates come back in the USER'S timezone, taken from their profile, not UTC.\n- Stripe endpoints need test keys and a real device for the Payment Sheet step.\n\nRate limit on protected routes overall: 1000/min per user.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "auth": {
+        "type": "bearer",
+        "bearer": [
+            {
+                "key": "token",
+                "value": "{{token}}",
+                "type": "string"
+            }
+        ]
+    },
+    "event": [
+        {
+            "listen": "test",
+            "script": {
+                "type": "text/javascript",
+                "exec": [
+                    "// Runs after every request in this collection.",
+                    "pm.test(\"No server error (5xx)\", function () {",
+                    "    pm.expect(pm.response.code, \"HTTP status\").to.be.below(500);",
+                    "});",
+                    "",
+                    "// Surfaces Laravel's validation errors in the Postman console instead of",
+                    "// making you dig through the response body.",
+                    "if (pm.response.code === 422) {",
+                    "    try {",
+                    "        const errors = pm.response.json().errors || {};",
+                    "        Object.keys(errors).forEach((field) => console.log(\"422 \" + field + \": \" + errors[field][0]));",
+                    "    } catch (e) { /* non-JSON body */ }",
+                    "}"
+                ]
+            }
+        }
+    ],
+    "item": [
+        {
+            "name": "00. Start here",
+            "description": "Read this first.\n\n1. Import this collection AND one of the environment files, then pick the environment\n   in the top-right selector.\n2. Run \"1.2 Signup\" -> \"1.3 Verify OTP\" (or \"1.5 Login\" with an existing account).\n   The token is saved automatically into the {{token}} collection variable; every\n   protected request picks it up. You never paste a token by hand.\n3. Everything else can be run in any order.\n\nVariables worth knowing: {{base_url}} (API root, ends in /api), {{host}} (no /api,\nused only by the health check), {{token}}, {{email}}, {{password}}, {{otp_code}},\n{{hold_id}}, {{bank_account_id}}, {{payment_intent_id}}.\n\nAuth is set once on the collection (Bearer {{token}}). Public endpoints override it\nwith \"No Auth\", so a stale token cannot break signup or login.",
+            "item": [
+                {
+                    "name": "0.1 Health check",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{host}}/up",
+                            "host": [
+                                "{{host}}"
+                            ],
+                            "path": [
+                                "up"
+                            ]
+                        },
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "description": "Laravel health endpoint. Lives at the domain root, NOT under /api. Returns 200 and an HTML page when the app boots and the database is reachable."
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test(\"App is up\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "0.2 Privacy policy (public)",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/privacy-policy",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "privacy-policy"
+                            ]
+                        },
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "description": "The active privacy policy for the in-app viewer. No auth. Rate limit 60/min."
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "01. Auth (public)",
+            "description": "Unauthenticated endpoints. Rate limits are per IP and tight: signup/login/verify/reset 5/min, resend-otp and forgot-password 3/min, check-email 10/min. A 429 here means you hit that ceiling, not that the credentials were wrong.",
+            "item": [
+                {
+                    "name": "1.1 Check email",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/auth/check-email",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "check-email"
+                            ]
+                        },
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"{{email}}\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "Tells the app whether an address is already registered before showing the signup form.\n\nRules: email required, valid, max 255.\nReturns success:true with an `exists` boolean - it is never a 404."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "1.2 Signup",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/auth/signup",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "signup"
+                            ]
+                        },
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"full_name\": \"Test User\",\n    \"email\": \"{{email}}\",\n    \"phone\": \"+12025550147\",\n    \"password\": \"{{password}}\",\n    \"password_confirmation\": \"{{password}}\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "Creates an unverified account and emails a 4-digit OTP.\n\nRules:\n  full_name             required, max 255\n  email                 required, valid, max 255, unique (checked via blind index)\n  phone                 optional, max 20, unique\n  password              required, 8-128, confirmed, and must contain a lowercase\n                        letter, an uppercase letter, a digit and a symbol\n  password_confirmation required, must match password\n\nSocial signup: send provider (google|apple|facebook) and provider_id instead.\n\nThe account cannot log in until \"1.3 Verify OTP\" succeeds. Unverified accounts are\nhard-deleted after 24 hours by the users:cleanup-unverified command."
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "const body = pm.response.json();",
+                                    "const token = body && body.data ? body.data.token : null;",
+                                    "",
+                                    "if (token) {",
+                                    "    pm.collectionVariables.set(\"token\", token);",
+                                    "    console.log(\"Saved token to collection variable {{token}}\");",
+                                    "} else {",
+                                    "    console.log(\"No token in response - check the message field:\", body && body.message);",
+                                    "}",
+                                    "",
+                                    "pm.test(\"Request succeeded\", function () {",
+                                    "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                                    "});"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "1.3 Verify OTP",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/auth/verify-otp",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "verify-otp"
+                            ]
+                        },
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"{{email}}\",\n    \"otp_code\": \"{{otp_code}}\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "Confirms the signup OTP and returns the bearer token.\n\nRules: email (or phone) required, otp_code required and exactly 4 characters.\nThe code is in the signup email. On a local box with MAIL_MAILER=log, read it from storage/logs/laravel.log."
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "const body = pm.response.json();",
+                                    "const token = body && body.data ? body.data.token : null;",
+                                    "",
+                                    "if (token) {",
+                                    "    pm.collectionVariables.set(\"token\", token);",
+                                    "    console.log(\"Saved token to collection variable {{token}}\");",
+                                    "} else {",
+                                    "    console.log(\"No token in response - check the message field:\", body && body.message);",
+                                    "}",
+                                    "",
+                                    "pm.test(\"Request succeeded\", function () {",
+                                    "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                                    "});"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "1.4 Resend OTP",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/auth/resend-otp",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "resend-otp"
+                            ]
+                        },
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"{{email}}\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "Issues a fresh OTP. Rate limit 3/min - the tightest in the API."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "1.5 Login",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/auth/login",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "login"
+                            ]
+                        },
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"{{email}}\",\n    \"password\": \"{{password}}\",\n    \"device_id\": \"postman-device-001\",\n    \"device_type\": \"android\",\n    \"fcm_token\": \"\",\n    \"timezone\": \"America/New_York\",\n    \"language\": \"en\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "Email/password login. Saves data.token into {{token}} automatically.\n\nRules:\n  email        required without phone, valid email\n  phone        required without email\n  password     required (omit only for social login)\n  otp_code     optional, exactly 4 chars - only when the account has 2FA pending\n  device_type  optional, one of ios|android|web\n  timezone     optional - stored on the user and used to render every date the API\n               returns, so send the device timezone\n\nIf the response has data.token = null, read the message: the account needs OTP\nverification first."
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "const body = pm.response.json();",
+                                    "const token = body && body.data ? body.data.token : null;",
+                                    "",
+                                    "if (token) {",
+                                    "    pm.collectionVariables.set(\"token\", token);",
+                                    "    console.log(\"Saved token to collection variable {{token}}\");",
+                                    "} else {",
+                                    "    console.log(\"No token in response - check the message field:\", body && body.message);",
+                                    "}",
+                                    "",
+                                    "pm.test(\"Request succeeded\", function () {",
+                                    "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                                    "});"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "1.6 Login (social)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/auth/login",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "login"
+                            ]
+                        },
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"{{email}}\",\n    \"provider\": \"google\",\n    \"provider_id\": \"104729384756102938475\",\n    \"provider_token\": \"ya29.a0AfB_byC...\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "Google/Apple/Facebook login. When provider and provider_id are both present the\npassword becomes optional and provider_token becomes required.\n\nprovider must be one of: google, apple, facebook."
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "const body = pm.response.json();",
+                                    "const token = body && body.data ? body.data.token : null;",
+                                    "",
+                                    "if (token) {",
+                                    "    pm.collectionVariables.set(\"token\", token);",
+                                    "    console.log(\"Saved token to collection variable {{token}}\");",
+                                    "} else {",
+                                    "    console.log(\"No token in response - check the message field:\", body && body.message);",
+                                    "}",
+                                    "",
+                                    "pm.test(\"Request succeeded\", function () {",
+                                    "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                                    "});"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "1.7 Forgot password",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/auth/forgot-password",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "forgot-password"
+                            ]
+                        },
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"{{email}}\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "Emails a 4-digit reset OTP. Send either email or phone. Rate limit 3/min."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "1.8 Reset password",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/auth/reset-password",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "reset-password"
+                            ]
+                        },
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"{{email}}\",\n    \"otp_code\": \"{{otp_code}}\",\n    \"password\": \"NewPass@123\",\n    \"password_confirmation\": \"NewPass@123\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "Completes the reset with the OTP from 1.7.\n\nRules: otp_code required and exactly 4 chars; password 8-128, confirmed, and must\ncontain lower + upper + digit + symbol. Same policy as signup."
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "02. Auth (token required)",
+            "description": "Both need a valid bearer token.",
+            "item": [
+                {
+                    "name": "2.1 Logout",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/auth/logout",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "logout"
+                            ]
+                        },
+                        "description": "Revokes the current access token only - other devices stay signed in. No body."
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.collectionVariables.set(\"token\", \"\");",
+                                    "console.log(\"Cleared {{token}}\");"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "2.2 Delete account",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/auth/delete-account",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "delete-account"
+                            ]
+                        },
+                        "description": "DESTRUCTIVE. Do not fire this against an account you still need.\n\nWhat it does, in one transaction: sweeps any remaining balance to the admin account,\nmarks every payment hold and transfer as abandoned, revokes all tokens, then\nanonymises the row (email, phone and name are overwritten, status becomes 'deleted').\nThe user's email address is freed for re-registration.\n\nThe account cannot be recovered afterwards. Rate limit 5 per hour."
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "03. Profile",
+            "description": "Everything under /api/profile. All token-protected.",
+            "item": [
+                {
+                    "name": "3.1 Get profile",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/profile",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "profile"
+                            ]
+                        },
+                        "description": "Returns the signed-in user: name, email, phone, profile image URL, timezone, language, verification state."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "3.2 Update profile",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/profile/update",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "profile",
+                                "update"
+                            ]
+                        },
+                        "body": {
+                            "mode": "formdata",
+                            "formdata": [
+                                {
+                                    "key": "full_name",
+                                    "type": "text",
+                                    "value": "Test User",
+                                    "description": "optional, max 255"
+                                },
+                                {
+                                    "key": "phone",
+                                    "type": "text",
+                                    "value": "+12025550147",
+                                    "description": "optional, max 20, unique"
+                                },
+                                {
+                                    "key": "timezone",
+                                    "type": "text",
+                                    "value": "America/New_York",
+                                    "description": "optional, max 100"
+                                },
+                                {
+                                    "key": "language",
+                                    "type": "text",
+                                    "value": "en",
+                                    "description": "optional, max 10"
+                                },
+                                {
+                                    "key": "profile_image",
+                                    "type": "file",
+                                    "src": [],
+                                    "disabled": true,
+                                    "description": "optional - jpeg/jpg/png/gif, max 2 MB"
+                                }
+                            ]
+                        },
+                        "description": "POST, not PUT - the route uses POST so multipart file uploads work.\n\nSend as form-data (already configured). Every field is optional; send only what\nchanged. Tick the profile_image row and pick a file to test the upload; leave it\nunticked otherwise.\n\nprofile_image: image only, jpeg/jpg/png/gif, max 2048 KB."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "3.3 Change password",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/profile/change-password",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "profile",
+                                "change-password"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"current_password\": \"{{password}}\",\n    \"new_password\": \"NewPass@123\",\n    \"new_password_confirmation\": \"NewPass@123\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "Rules: current_password required; new_password 8-128, confirmed, and must contain\nlower + upper + digit + symbol. Rate limit 5/min."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "3.4 Update language",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/profile/language",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "profile",
+                                "language"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"language\": \"en\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "Allowed values: en, es, fr, de, it, pt, zh, ja, ko, ar, hi. Anything else is a 422."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "3.5 Update timezone",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/profile/timezone",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "profile",
+                                "timezone"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"timezone\": \"America/New_York\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "Must be a real IANA identifier (America/New_York, Europe/London, Asia/Karachi).\nAbbreviations like EST are rejected.\n\nThis matters: the stored timezone decides how hold dates are interpreted on create\nand how every date in the API is rendered back."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "3.6 Submit feedback",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/profile/feedback",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "profile",
+                                "feedback"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"rating\": 5,\n    \"feedback\": \"The hold timer is clear and payouts arrive on time.\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "Stores the feedback, emails ADMIN_EMAIL, and emails a confirmation to the user.\n\nRules: rating required, integer 1-5. feedback required, max 1000 chars.\nWhitespace is trimmed server-side, so the stored text can differ from what you sent.\n\nQuirk: the endpoint also accepts the misspelled key `ratting` for old app builds.\nSend `rating`. On a validation failure BOTH keys come back in `errors`, and the\ntop-level `message` carries a \"(and 1 more error)\" suffix - bind to errors.rating\nand ignore the rest.\n\nRate limit 10/min. No email arrives if the queue worker is not running."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "3.7 Submit support request",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/profile/support",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "profile",
+                                "support"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"subject\": \"Withdrawal not received\",\n    \"message\": \"I requested a withdrawal three days ago and my bank shows nothing.\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "Stores the request, emails SUPPORT_EMAIL, and emails a confirmation to the user.\nVisible to staff at /admin/support.\n\nRules: subject required, max 150. message required, max 2000. Both trimmed.\n\nThe returned data.support_request.id is the reference number the user sees in their\nconfirmation email, zero-padded to five digits (id 2 -> #00002).\n\nRate limit 10/min."
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "04. Notification settings",
+            "description": "Per-user alert toggles.",
+            "item": [
+                {
+                    "name": "4.1 Get settings",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/notification-settings",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "notification-settings"
+                            ]
+                        },
+                        "description": "Returns the six boolean toggles for the signed-in user."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "4.2 Update settings",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/notification-settings/update",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "notification-settings",
+                                "update"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"password_alert\": true,\n    \"transaction_alert\": true,\n    \"push_notification_alert\": true,\n    \"email_alert\": true,\n    \"lock_alert\": true,\n    \"unlock_alert\": true\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "Every field is `sometimes|boolean` - send only the toggles you are changing and the\nrest keep their current value."
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "05. App config",
+            "description": "Static URLs the app reads at startup.",
+            "item": [
+                {
+                    "name": "5.1 Refer-a-friend + store URLs",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/refer-friend-url",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "refer-friend-url"
+                            ]
+                        },
+                        "description": "Returns refer_friend_url, android_app_url and ios_app_url, all from config/env. Empty values mean the keys are unset on the server."
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "06. Stripe payments",
+            "description": "Payment Sheet flow. The order is fixed:\n\n  create-payment-intent -> present the Payment Sheet on the device ->\n  confirm-payment -> a PaymentHold row exists\n\nFrom Postman you can only run step 1 and step 3; the card is collected by the Stripe\nSDK on the device. To test step 3 without a device, confirm the intent with a test\ncard through the Stripe CLI or dashboard first, then call confirm-payment.\n\nUse test keys. A 200 from Stripe is not proof a charge settled - check the hold.",
+            "item": [
+                {
+                    "name": "6.1 Create payment intent",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/stripe/create-payment-intent",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "stripe",
+                                "create-payment-intent"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"amount\": 25,\n    \"currency\": \"usd\",\n    \"title\": \"Vacation fund\",\n    \"hold_period_type\": \"custom\",\n    \"hold_start_at\": \"{{hold_start_at}}\",\n    \"hold_end_at\": \"{{hold_end_at}}\",\n    \"hold_hours\": 0,\n    \"hold_minutes\": 0\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "Creates the Stripe Customer, EphemeralKey and PaymentIntent in one call and returns\neverything the Payment Sheet needs: payment_intent_id, client_secret, customer_id,\nephemeral_key, publishable_key.\n\nRules:\n  amount           required, numeric, min 1\n  currency         required, 3 chars, must be in services.stripe.supported_currencies\n  title            optional, max 255\n  hold_period_type required, currently only \"custom\"\n  hold_start_at    required, date, not before today IN THE USER'S TIMEZONE\n  hold_end_at      required, date, after hold_start_at\n  hold_hours       optional, 0-23     hold_minutes optional, 0-59\n\nThe pre-request script rewrites hold_start_at/hold_end_at to now and now+1 day, so\nthis request never goes stale. Format: \"YYYY-MM-DD HH:MM:SS\".\n\npayment_intent_id and client_secret are saved to collection variables on success."
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "// Keeps hold_start_at valid forever: start = now, end = now + 1 day.",
+                                    "// The API rejects a start date before today (in the user's timezone).",
+                                    "const pad = (n) => String(n).padStart(2, \"0\");",
+                                    "const fmt = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;",
+                                    "",
+                                    "const start = new Date();",
+                                    "const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);",
+                                    "",
+                                    "pm.collectionVariables.set(\"hold_start_at\", fmt(start));",
+                                    "pm.collectionVariables.set(\"hold_end_at\", fmt(end));"
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "const body = pm.response.json();",
+                                    "",
+                                    "if (body && body.data && body.data.payment_intent_id) {",
+                                    "    pm.collectionVariables.set(\"payment_intent_id\", body.data.payment_intent_id);",
+                                    "    pm.collectionVariables.set(\"client_secret\", body.data.client_secret);",
+                                    "    console.log(\"Saved payment_intent_id:\", body.data.payment_intent_id);",
+                                    "}",
+                                    "",
+                                    "pm.test(\"Payment intent created\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "6.2 Confirm payment",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/stripe/confirm-payment",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "stripe",
+                                "confirm-payment"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"payment_intent_id\": \"{{payment_intent_id}}\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "Call this after the Payment Sheet succeeds. Writes the Payment row, the PaymentHold\nrow and the saved card details (brand, last4, expiry, funding, country).\n\nRules: payment_intent_id required, must start with \"pi_\".\n\nIdempotent - calling it twice returns \"Payment already recorded.\" rather than\nduplicating the hold.\n\n400 \"not completed yet\" means the intent was never confirmed on the device.\n403 means the intent belongs to a different user."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "6.3 Stripe webhook (reference only)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Stripe-Signature",
+                                "value": "t=0,v1=placeholder_will_be_rejected"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/stripe/webhook",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "stripe",
+                                "webhook"
+                            ]
+                        },
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"id\": \"evt_test_webhook\",\n    \"object\": \"event\",\n    \"type\": \"payment_intent.succeeded\",\n    \"data\": {\n        \"object\": {\n            \"id\": \"pi_xxx\",\n            \"object\": \"payment_intent\",\n            \"amount\": 2500,\n            \"currency\": \"usd\",\n            \"status\": \"succeeded\"\n        }\n    }\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "Stripe calls this, you normally do not. No auth, no CSRF.\n\nSending it from Postman returns a signature error: the handler verifies the\nStripe-Signature header against STRIPE_WEBHOOK_SECRET, and Postman cannot forge it.\nThat rejection is the endpoint working correctly.\n\nTo exercise it for real:\n    stripe listen --forward-to https://api.timevaultapp.co/api/stripe/webhook\n    stripe trigger payment_intent.succeeded\n\nKept here so the route table in Postman matches the one in the code."
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "07. Bank accounts",
+            "description": "Multiple banks per user; the first one added becomes primary automatically. Adding\nthe first bank silently creates the user's Stripe Custom Connect account, so the\nfirst POST is slower than the rest.\n\nStripe does not allow editing bank details - to change an account you delete it and\nadd a new one.",
+            "item": [
+                {
+                    "name": "7.1 Add bank account (US)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/bank-account",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "bank-account"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"dob\": \"1990-05-14\",\n    \"account_number\": \"000123456789\",\n    \"bank_name\": \"Chase\",\n    \"routing_number\": \"110000000\",\n    \"account_type\": \"checking\",\n    \"country\": \"US\",\n    \"currency\": \"usd\",\n    \"address_line1\": \"1600 Pennsylvania Ave NW\",\n    \"city\": \"Washington\",\n    \"state\": \"DC\",\n    \"postal_code\": \"20500\",\n    \"phone\": \"+12025550147\",\n    \"ssn_last_4\": \"0000\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "Rules:\n  dob             required, a real date, before today\n  account_number  required, 5-34 chars\n  bank_name       required, max 100\n  routing_number  REQUIRED when country is US, exactly 9 digits\n  iban            REQUIRED when country is NOT US, 15-34 chars\n  account_type    required, one of savings|checking|current\n  country         required, 2 letters, one of US GB CA AU DE FR IE NL AT BE ES IT\n                  PT DK FI NO SE CH NZ SG HK JP\n  currency        required, 3 letters, one of usd eur gbp cad aud nzd sgd hkd jpy\n                  chf dkk nok sek\n  address_line1, city, state, postal_code, phone   all required\n  ssn_last_4      REQUIRED when country is US, exactly 4 digits\n  id_number       optional, max 30\n\nThe values above are Stripe's US test bank numbers - safe to send against test keys."
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "const body = pm.response.json();",
+                                    "const bank = body && body.data ? (body.data.bank_account || body.data) : null;",
+                                    "",
+                                    "if (bank && bank.id) {",
+                                    "    pm.collectionVariables.set(\"bank_account_id\", bank.id);",
+                                    "    console.log(\"Saved bank_account_id:\", bank.id);",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "7.2 Add bank account (IBAN / non-US)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/bank-account",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "bank-account"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"dob\": \"1990-05-14\",\n    \"account_number\": \"GB82WEST12345698765432\",\n    \"iban\": \"GB82WEST12345698765432\",\n    \"bank_name\": \"Barclays\",\n    \"account_type\": \"checking\",\n    \"country\": \"GB\",\n    \"currency\": \"gbp\",\n    \"address_line1\": \"1 Churchill Place\",\n    \"city\": \"London\",\n    \"state\": \"Greater London\",\n    \"postal_code\": \"E14 5HP\",\n    \"phone\": \"+442071234567\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "Non-US variant: iban replaces routing_number, and ssn_last_4 is not required.\nSame endpoint, same rules - see 7.1."
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "const body = pm.response.json();",
+                                    "const bank = body && body.data ? (body.data.bank_account || body.data) : null;",
+                                    "",
+                                    "if (bank && bank.id) {",
+                                    "    pm.collectionVariables.set(\"bank_account_id\", bank.id);",
+                                    "    console.log(\"Saved bank_account_id:\", bank.id);",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "7.3 List bank accounts",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/bank-account",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "bank-account"
+                            ]
+                        },
+                        "description": "All banks for the signed-in user. Account numbers come back masked (****6789); the full number is never returned."
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "const body = pm.response.json();",
+                                    "const bank = body && body.data ? (body.data.bank_account || body.data) : null;",
+                                    "",
+                                    "if (bank && bank.id) {",
+                                    "    pm.collectionVariables.set(\"bank_account_id\", bank.id);",
+                                    "    console.log(\"Saved bank_account_id:\", bank.id);",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "7.4 Set primary",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/bank-account/{{bank_account_id}}/set-primary",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "bank-account",
+                                "{{bank_account_id}}",
+                                "set-primary"
+                            ]
+                        },
+                        "description": "Makes this bank the payout destination and syncs Stripe's default_for_currency.\nWithout that sync the money would go to the old bank even though the app shows the new one."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "7.5 Delete bank account",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/bank-account/{{bank_account_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "bank-account",
+                                "{{bank_account_id}}"
+                            ]
+                        },
+                        "description": "Removes the bank. If the deleted one was primary, the next remaining bank is promoted\nand Stripe's default is updated to match."
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "08. Payment holds",
+            "description": "Funds locked until maturity, then withdrawable. Statuses: holding -> ready_for_transfer -> transferred (or partial_transferred, abandoned, canceled). A cron marks matured holds every 5 minutes.",
+            "item": [
+                {
+                    "name": "8.1 List holds",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/payment-holds?per_page=15",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "payment-holds"
+                            ],
+                            "query": [
+                                {
+                                    "key": "per_page",
+                                    "value": "15",
+                                    "description": "optional, clamped to 1-100, default 15"
+                                },
+                                {
+                                    "key": "page",
+                                    "value": "1",
+                                    "description": "optional",
+                                    "disabled": true
+                                }
+                            ]
+                        },
+                        "description": "Paginated holds, newest first, with the related payment and transfers. Saves the first hold id into {{hold_id}}."
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "const body = pm.response.json();",
+                                    "const rows = body && body.data ? (body.data.data || body.data.transactions || body.data) : null;",
+                                    "",
+                                    "if (Array.isArray(rows) && rows.length) {",
+                                    "    const id = rows[0].hold_id || rows[0].id;",
+                                    "    if (id) {",
+                                    "        pm.collectionVariables.set(\"hold_id\", id);",
+                                    "        console.log(\"Saved hold_id:\", id);",
+                                    "    }",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "8.2 Balance summary",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/payment-holds/summary",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "payment-holds",
+                                "summary"
+                            ]
+                        },
+                        "description": "Totals for the wallet screen: amount held, amount ready for transfer, amount already withdrawn."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "8.3 Request payout (one hold)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/payment-holds/{{hold_id}}/request-payout",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "payment-holds",
+                                "{{hold_id}}",
+                                "request-payout"
+                            ]
+                        },
+                        "description": "Withdraws a single matured hold in full. No body - the hold id comes from the URL.\n\n404 means the hold does not exist or belongs to another user; the API never reveals\nwhich."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "8.4 Withdraw an amount",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/payment-holds/withdraw",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "payment-holds",
+                                "withdraw"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"amount\": 10\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "The normal withdrawal path. Takes an amount, not a hold id, and spreads it across\nevery eligible hold oldest-first, creating one Transfer per hold touched.\n\nRules: amount required, numeric, min 0.50, max 999999.99.\n\nA partly-consumed hold becomes partial_transferred. remaining_amount is deducted\nhere for both completed and pending transfers; if a pending transfer later fails,\nverify:pending-transfers restores it.\n\nMoney goes to the primary bank account, so set that first (7.4)."
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "09. Transaction history",
+            "description": "Five read-only views over the same data. Every item carries hold_start, hold_end, total_days, days_remaining, hours_remaining and minutes_remaining; withdraw rows have those set to null.",
+            "item": [
+                {
+                    "name": "9.1 All (with summary)",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/transactions/all?per_page=15",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "transactions",
+                                "all"
+                            ],
+                            "query": [
+                                {
+                                    "key": "per_page",
+                                    "value": "15",
+                                    "description": "optional, 1-100"
+                                },
+                                {
+                                    "key": "page",
+                                    "value": "1",
+                                    "disabled": true
+                                }
+                            ]
+                        },
+                        "description": "Everything plus a summary block: checkout, withdraw, hold_amount, ready_for_transfer, transferred. This is what the history screen loads first."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "9.2 Checkouts",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/transactions/checkouts?per_page=15",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "transactions",
+                                "checkouts"
+                            ],
+                            "query": [
+                                {
+                                    "key": "per_page",
+                                    "value": "15"
+                                },
+                                {
+                                    "key": "page",
+                                    "value": "1",
+                                    "disabled": true
+                                }
+                            ]
+                        },
+                        "description": "Money in. Paginated."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "9.3 Withdrawals",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/transactions/withdraws?per_page=15",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "transactions",
+                                "withdraws"
+                            ],
+                            "query": [
+                                {
+                                    "key": "per_page",
+                                    "value": "15"
+                                },
+                                {
+                                    "key": "page",
+                                    "value": "1",
+                                    "disabled": true
+                                }
+                            ]
+                        },
+                        "description": "Money out, grouped by withdrawal request - one row per request even when it spanned several holds."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "9.4 Hold amounts (locked)",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/transactions/hold-amounts?per_page=15",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "transactions",
+                                "hold-amounts"
+                            ],
+                            "query": [
+                                {
+                                    "key": "per_page",
+                                    "value": "15"
+                                },
+                                {
+                                    "key": "page",
+                                    "value": "1",
+                                    "disabled": true
+                                }
+                            ]
+                        },
+                        "description": "Holds still inside their lock period."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "9.5 Ready for transfer",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/transactions/ready-for-transfer?per_page=15",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "transactions",
+                                "ready-for-transfer"
+                            ],
+                            "query": [
+                                {
+                                    "key": "per_page",
+                                    "value": "15"
+                                },
+                                {
+                                    "key": "page",
+                                    "value": "1",
+                                    "disabled": true
+                                }
+                            ]
+                        },
+                        "description": "Matured holds the user can withdraw right now."
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "10. Admin API",
+            "description": "One endpoint. It sits behind auth:sanctum like everything else, so the token must belong to an admin user.",
+            "item": [
+                {
+                    "name": "10.1 Execute transfer for a hold",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/admin/transfer/{{hold_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "admin",
+                                "transfer",
+                                "{{hold_id}}"
+                            ]
+                        },
+                        "description": "Pushes a matured hold to the user's bank through Stripe. No body - the hold id is the\nroute parameter.\n\nThis moves real money on live keys. Check the hold status and the destination bank\nbefore firing it."
+                    },
+                    "response": []
+                }
+            ]
+        }
+    ],
+    "variable": [
+        {
+            "key": "host",
+            "value": "https://api.timevaultapp.co",
+            "type": "string"
+        },
+        {
+            "key": "base_url",
+            "value": "https://api.timevaultapp.co/api",
+            "type": "string"
+        },
+        {
+            "key": "token",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "email",
+            "value": "tauseefchoohan0401@gmail.com",
+            "type": "string"
+        },
+        {
+            "key": "password",
+            "value": "Test@1234",
+            "type": "string"
+        },
+        {
+            "key": "otp_code",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "hold_id",
+            "value": "1",
+            "type": "string"
+        },
+        {
+            "key": "bank_account_id",
+            "value": "1",
+            "type": "string"
+        },
+        {
+            "key": "payment_intent_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "client_secret",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "hold_start_at",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "hold_end_at",
+            "value": "",
+            "type": "string"
+        }
+    ]
 }
