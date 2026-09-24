@@ -514,7 +514,7 @@ class PaymentHoldController extends Controller
                     $currency = strtolower($payment->currency);
 
                     // Create Stripe transfer for this amount
-                    $transfer = \Stripe\Transfer::create([
+                    $transfer = \Stripe\Transfer::create($this->stripeService->withSourceTransaction([
                         'amount' => (int) round($amountFromThisHold * 100),
                         'currency' => $currency,
                         'destination' => $connectAccount->connect_account_id,
@@ -525,7 +525,7 @@ class PaymentHoldController extends Controller
                             'payment_id' => $payment ? $payment->id : null,
                             'withdrawal_type' => $amountFromThisHold < $availableInHold ? 'partial' : 'full',
                         ],
-                    ]);
+                    ], $payment));
 
                     // Determine transfer status - Stripe transfers are usually instant
                     $transferStatus = 'pending';

@@ -52,6 +52,8 @@ Everything outside the feedback feature is still unverified by tests. A green su
 
 ## LAST RUN
 
+**2026-09-24:** `php artisan test` → **115 passed / 307 assertions** (110 + 5 new in `tests/Feature/Stripe/TransferSourceTransactionTest.php`). Pint clean on changed files.
+
 **Date:** 2026-09-17
 **Command:** `php artisan test` / `php artisan route:list` / `vendor/bin/pint --test`
 **Result:**
@@ -78,6 +80,7 @@ When a test fails: find the root cause, fix the root cause, re-run the failing t
 
 ## MANUAL VERIFICATION LOG
 
+- 2026-09-24 — Stripe **test mode**: created a $1,000 PaymentIntent with `pm_card_visa` (funds pending), then `Transfer::create(withSourceTransaction(...))` of $900 to a test connected account → accepted immediately (`tr_3UJ0skBFi9L3amxX1SproDig`, `source_transaction=ch_3UJ0skBFi9L3amxX1rxyQMu0`). Fallback lookup via `PaymentIntent::retrieve` resolved the same charge. The failure without `source_transaction` was not reproduced locally because the local test platform has $72k available; it was seen on production's test account ($0 available).
 - 2026-09-17 — Feedback feature verified locally. `php artisan serve --port=8078`: `GET /up` → 200; `GET /admin/feedback` as a guest → 302 to `/admin/login` (no fatal); `GET /api/profile/feedback` → 405 (POST-only route resolves). Authenticated admin rendering of `/admin/feedback`, including the sidebar entry, is covered by `AdminFeedbackIndexTest`. Route middleware confirmed via `route:list -v`: `auth:sanctum` + `throttle:1000,1` + `throttle:10,1`. `feedbacks` table indexes confirmed in MySQL: PRIMARY, `feedbacks_user_id_created_at_index`, `feedbacks_rating_index`.
 - 2026-09-17 — **Not verified:** real SMTP delivery of the feedback email. `Mail::fake()` proves the recipient, reply-to and body; it does not prove Gmail SMTP accepts it. `QUEUE_CONNECTION=database` locally, so a `queue:work` worker must be running for the email to leave at all.
 - 2026-09-12 — Verified locally only: suite green, route table resolves, style check fails as above. **No production verification performed** — the deploy to `api.timevaultapp.co` has not been run from this machine (no SSH access). `GET https://api.timevaultapp.co/up` has not been checked post-deploy; record it here once it has.

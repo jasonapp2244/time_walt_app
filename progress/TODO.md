@@ -8,6 +8,7 @@ One line per item. Keep it honest: an item is only done when it has been verifie
 
 ## IN PROGRESS
 
+- [ ] **Deploy the withdrawal `source_transaction` fix (2026-09-24, uncommitted).** Verified locally in Stripe test mode; not yet on production. After deploy: deposit with 4242 and withdraw immediately; it must succeed.
 - [x] ~~**Install the production queue worker.**~~ Done 2026-09-22. systemd service
       `timevault-queue`, installed by hand rather than via the script (the branch carrying
       `deploy/` is still unpushed). Verified on the server: `active (running)`, `enabled`

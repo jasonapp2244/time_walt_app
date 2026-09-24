@@ -37,6 +37,8 @@ A command completing is not a successful deployment. Nothing goes in the VERIFIE
 
 ## PENDING RELEASE
 
+- 2026-09-24 — withdrawal `source_transaction` fix (code only, no migration, no `.env` change). Not deployed.
+
 Two tranches now sit between production and `main`.
 
 ### Tranche 1 — pushed 2026-09-12, not yet pulled

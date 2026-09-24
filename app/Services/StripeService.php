@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Payment;
 use App\Models\PaymentHold;
 use App\Models\StripeConnectAccount;
 use App\Models\Transfer;
@@ -338,7 +339,7 @@ class StripeService
             $transferAmount = $hold->remaining_amount ?? $hold->amount;
 
             // Create transfer in Stripe (real API call - no simulation)
-            $transfer = \Stripe\Transfer::create([
+            $transfer = \Stripe\Transfer::create($this->withSourceTransaction([
                 'amount' => (int) round($transferAmount * 100), // Convert to cents
                 'currency' => $currency,
                 'destination' => $connectAccount->connect_account_id,
@@ -348,7 +349,7 @@ class StripeService
                     'user_id' => $hold->user_id,
                     'payment_id' => $payment ? $payment->id : null,
                 ],
-            ]);
+            ], $payment));
 
             // Create transfer record
             $adminId = null;
@@ -395,6 +396,78 @@ class StripeService
             ]);
             throw $e;
         }
+    }
+
+    /**
+     * Link a transfer to the deposit's charge via source_transaction.
+     *
+     * Without it Stripe draws the transfer from the platform's *available*
+     * balance, so a withdrawal made before the deposit settles (~2 days for
+     * cards) fails with "insufficient available funds". With it Stripe accepts
+     * the transfer immediately and releases the funds once the charge clears.
+     * When no charge can be resolved the params are returned unchanged, which
+     * keeps the previous behaviour.
+     */
+    public function withSourceTransaction(array $params, ?Payment $payment): array
+    {
+        $chargeId = $this->resolveSourceChargeId($payment);
+
+        if ($chargeId !== null) {
+            $params['source_transaction'] = $chargeId;
+        }
+
+        return $params;
+    }
+
+    /**
+     * Resolve the charge ID (ch_… / py_…) behind a payment: first from the
+     * PaymentIntent snapshot stored in stripe_data, then from Stripe.
+     */
+    public function resolveSourceChargeId(?Payment $payment): ?string
+    {
+        if (! $payment) {
+            return null;
+        }
+
+        $chargeId = $this->extractChargeId(data_get($payment->stripe_data, 'latest_charge'));
+
+        if ($chargeId !== null) {
+            return $chargeId;
+        }
+
+        $paymentIntentId = $payment->payment_intent_id;
+
+        if (! is_string($paymentIntentId) || ! str_starts_with($paymentIntentId, 'pi_')) {
+            return null;
+        }
+
+        try {
+            $paymentIntent = \Stripe\PaymentIntent::retrieve($paymentIntentId);
+
+            return $this->extractChargeId($paymentIntent->latest_charge ?? null);
+        } catch (\Exception $e) {
+            Log::warning('Could not resolve source charge for transfer: '.$e->getMessage(), [
+                'payment_id' => $payment->id,
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
+     * latest_charge is either the charge ID or, when expanded, the charge object.
+     */
+    private function extractChargeId(mixed $latestCharge): ?string
+    {
+        if (is_array($latestCharge) || is_object($latestCharge)) {
+            $latestCharge = data_get($latestCharge, 'id');
+        }
+
+        if (is_string($latestCharge) && (str_starts_with($latestCharge, 'ch_') || str_starts_with($latestCharge, 'py_'))) {
+            return $latestCharge;
+        }
+
+        return null;
     }
 
     /**

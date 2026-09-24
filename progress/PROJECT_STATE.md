@@ -45,6 +45,7 @@ Credentials are deliberately *not* in `phpunit.xml` — only `DB_CONNECTION` and
 
 ## COMPLETED
 
+- 2026-09-24 — **Withdrawals no longer fail while the deposit is still pending in Stripe.** Every `StripeTransfer::create` (user withdraw loop in `ApiPaymentHoldController::withdraw()` and `StripeService::createTransfer()` for cron/admin) now passes `source_transaction` = the deposit charge (`latest_charge`). Before this a withdrawal made before the card funds settled (~2 days) failed with "insufficient available funds" (seen on hold #75, same-day hold). The charge ID is resolved by `StripeService::resolveSourceChargeId()`: from the PaymentIntent snapshot in `payments.stripe_data`, falling back to `PaymentIntent::retrieve`. If neither yields an ID the transfer is sent exactly as before. No migration, no schema change. **Uncommitted.**
 - 2026-09-22 (3rd) — Removed every hardcoded email address from the codebase: `config/mail.php` no longer falls back to `admin@example.com`, the account-deletion email and the privacy-policy seeder read `mail.support_email`, and `AdminSeeder` refuses to seed a known-credential admin. `.env` mail keys grouped and documented.
 - 2026-09-22 (2nd) — Split the notification recipients (`ADMIN_EMAIL` = feedback, `SUPPORT_EMAIL` = support) and added a confirmation email back to the submitting user for both features. 15 new tests; suite now 104.
 - 2026-09-22 — Built the user support feature end to end (API + admin page + queued admin email), mirroring the feedback stack, and fixed a crash that stopped BOTH notification mails reaching the admin when the submitting user's row could not be decrypted. 32 new tests.
@@ -203,5 +204,7 @@ Previous session — feedback feature, commit `bff4900`:
 Unchanged but reviewed and found correct: `resources/views/emails/feedback-received.blade.php`, `resources/views/layouts/partials/sidebar.blade.php`.
 
 ## EXACT NEXT TASK
+
+**First (2026-09-24):** review and commit the `source_transaction` withdrawal fix (`app/Services/StripeService.php`, `app/Http/Controllers/Api/PaymentHoldController.php`, `tests/Feature/Stripe/TransferSourceTransactionTest.php`), deploy it, then withdraw from the app right after a normal `4242` card deposit to confirm it goes through.
 
 Review and merge `feature/user-support` into `development` (and `main`), then run the production deploy on `api.timevaultapp.co` per `TODO.md` → IN PROGRESS. The release now carries **two** migrations (`create_feedbacks_table`, `create_support_requests_table`), so confirm the `mysqldump` step runs before `migrate --force`, and set `ADMIN_EMAIL` plus `APP_ENV=production` in the server `.env` first. A queue worker must be running on the server or neither the feedback nor the support email is ever sent.
