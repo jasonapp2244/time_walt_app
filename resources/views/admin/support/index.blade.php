@@ -50,6 +50,9 @@
             @endif
         </form>
 
+        @include('admin.partials.auto-refresh', ['statsRoute' => 'admin.support.stats', 'label' => 'New support request'])
+        @include('admin.partials.list-toolbar', ['exportRoute' => 'admin.support.export'])
+
         <div class="card">
             <div class="card-body p-0">
                 <div class="table-responsive">

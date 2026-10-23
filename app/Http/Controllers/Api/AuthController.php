@@ -915,6 +915,9 @@ class AuthController extends Controller
 
                 DB::commit();
 
+                // Step 6b: Stop billing. A deleted account must not keep renewing.
+                $this->cancelSubscriptionsOf($userId);
+
                 // Step 7: Send email notifications (after successful deletion)
                 try {
                     // Send confirmation email to user
@@ -1006,6 +1009,30 @@ class AuthController extends Controller
         }
 
         return $totalBalance;
+    }
+
+    /**
+     * End any live subscription of a deleted account in Stripe, so it is never
+     * charged again. Runs after the deletion has committed: a Stripe outage must
+     * not undo the deletion, so a failure is logged for manual follow-up.
+     */
+    protected function cancelSubscriptionsOf(int $userId): void
+    {
+        $subscriptions = \App\Models\Subscription::where('user_id', $userId)
+            ->whereIn('status', ['active', 'trialing', 'past_due', 'incomplete', 'unpaid'])
+            ->get();
+
+        foreach ($subscriptions as $subscription) {
+            try {
+                app(\App\Services\SubscriptionService::class)->cancelNow($subscription);
+            } catch (\Throwable $e) {
+                Log::error('Could not cancel the subscription of a deleted account; cancel it in Stripe by hand', [
+                    'user_id' => $userId,
+                    'subscription_id' => $subscription->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
     }
 
     /**

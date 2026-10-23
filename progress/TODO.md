@@ -1,6 +1,6 @@
 # TODO — Time Vault
 
-**Last updated:** 2026-09-22
+**Last updated:** 2026-10-23
 
 One line per item. Keep it honest: an item is only done when it has been verified working, not when it compiles.
 
@@ -8,7 +8,47 @@ One line per item. Keep it honest: an item is only done when it has been verifie
 
 ## IN PROGRESS
 
-- [ ] **Deploy the withdrawal `source_transaction` fix (2026-09-24, uncommitted).** Verified locally in Stripe test mode; not yet on production. After deploy: deposit with 4242 and withdraw immediately; it must succeed.
+- [ ] **BLOCKER, client: Stripe Connect platform profile.**
+  - On the new account Stripe refuses to create Custom Connect accounts with: "Please review the responsibilities of collecting requirements for connected accounts at https://dashboard.stripe.com/settings/connect/platform-profile".
+  - Until the client completes that page (test mode, then live), no user can add a bank, so **no withdrawal works**.
+  - Then re-test the bank add (routing 110000000 / account 000123456789) and 2 withdrawals → the 3rd returns 402.
+- [ ] **Client: Stripe Dashboard edits did not save** (read back over the API on 2026-10-23):
+  - Customer portal: privacy `https://timevaultapp.co/privacy-policy/`, terms `https://timevaultapp.co/terms-conditions/`, redirect `https://timevaultapp.co/`, "switch plans" off;
+  - Public details: name, support email, website;
+  - Billing: Smart Retries → cancel, 3-D Secure emails, renewal reminders;
+  - archive `one_month`.
+- [ ] **Server: switch `.env` to the new Stripe keys, deploy, seed the plans:** `php artisan db:seed --class=SubscriptionPlanSeeder --force`. Commands are in PROJECT_STATE → EXACT NEXT TASK.
+- [ ] **Client decision, recommended:** the new account offers redirect and pay-later methods (Klarna, Affirm, Afterpay, Cash App, Amazon Pay…) in the Payment Sheet.
+  - For deposits that are later withdrawn to a bank, cards + Apple Pay + Google Pay only is safer.
+  - Turn the others off in Settings → Payment methods. If any stay on, the Flutter Payment Sheet needs a `returnURL`.
+- [x] ~~Client plans~~: Monthly $4.99 + Yearly $49.99, auto-renewing, via `SubscriptionPlanSeeder` (2026-10-23).
+  - Verified with real Stripe test-mode renewals (test clocks) through the local API.
+  - Created on the new account with lookup keys `time_vault_monthly` / `time_vault_yearly`.
+- [x] ~~Commit the 2026-10-06…23 work~~: committed and pushed on 2026-10-23.
+- [x] ~~New Stripe account (2026-10-23): "The Gold Rose Agency llc", `acct_1TLqQzA6wBqKEqYq`, test mode~~
+  - The local `.env` was switched on 2026-10-23.
+  - Original note: the client sent its keys; the local `.env` is still on the old account (`acct_…TP4eCBFi9L3amxX`), so existing customers, Connect accounts and holds in the DB will not resolve on the new one. Checked over the API (read-only): `sk` + `pk` valid, `transfers` active, webhook endpoint `https://api.timevaultapp.co/api/stripe/webhook` enabled with all 6 subscription events + 3 `payment_intent.*` (version `2026-03-25.dahlia`; no field our handlers read changed vs clover), Customer Portal configured, card/Apple Pay/Google Pay on. `rk_test` cannot read Connect accounts, so it must not be used as `STRIPE_SECRET`. Still to do in the Dashboard: turn portal plan switching off, add portal privacy/terms links, fill Public details (business name, support email, URL), confirm Smart Retries → cancel and 3-D Secure emails (not readable by API). **Unverified:** whether this new platform may create `type=custom` accounts (the client's one connected account is Express-dashboard, created 2026-10-23). Test one bank add in test mode after switching keys. The `whsec_` secret can only be confirmed by a 200 delivery in the Dashboard after it is in the server `.env`. A hand-made product `one_month` ($4.99/mo) is not linked to any admin plan; create the plan in `/admin/subscription-plans` instead and archive it.
+
+- [ ] **Commit + deploy the 2026-10-12 deposit-webhook fixes** (`WebhookService::handlePaymentIntentSucceeded`, `StripeService::getHoldPeriodData`) and the 20 new tests (`tests/Feature/Stripe/PaymentSheetTest.php`, `DepositWebhookTest.php`). Fixes every deposit sending the user and the admin **two** receipts, and the lock title being lost when the webhook beats `/confirm-payment`. No migration. Verified locally: 251 tests, Pint pass.
+- [x] ~~Bank-account Connect creation untested~~ — 12 tests in `tests/Feature/Stripe/BankAccountStoreTest.php` (2026-10-13), uncommitted; commit with the 2026-10-12 work.
+- [x] ~~Orphaned Connect account on a failed first bank add~~ — fixed 2026-10-13 (2nd pass): `BankAccountController@store` deletes the Custom account it created if the request then fails. 3 new tests. Uncommitted; commit with the 2026-10-12/13 work.
+- [x] ~~`StripeService::createTransfer()` untested~~ — 14 tests in `tests/Feature/Stripe/CreateTransferTest.php` (2026-10-14), which found and fixed a double-payout race (stale hold model, no lock). Uncommitted; commit with the 2026-10-12/13 work.
+- [ ] **Still untested money path:** the dead Checkout code in `StripeController` (`verifyPayment`, `handlePaymentReturn`, `checkout.session.completed` handler — no routes point at the first two; decide whether to delete them).
+- [ ] **Commit + deploy the 2026-10-07 second pass:**
+  - subscription payment emails (user + admin), `subscription_invoices` table (5th migration);
+  - account deletion cancels the Stripe subscription;
+  - Excel/PDF export, pagination and auto-refresh on all 9 admin lists.
+  - Verified locally: 231 tests, every list and export 200 on the dev DB.
+- [ ] **Send one real test email pair** (subscription receipt + admin notice) over SMTP before go-live. All mail is faked in tests; nothing real was sent. Needs `ADMIN_EMAIL` to be a real inbox.
+- [ ] **Commit + deploy the 2026-10-10 dependency security update** (`composer.json` constraints unchanged, `composer.lock` only). `composer audit` 46 advisories / 15 packages → **0**: laravel/framework 12.45.2→12.69.3, guzzle 7.10.0→7.15.5, psr7 2.8.0→2.13.1, commonmark 2.8.0→2.10.3, flysystem 3.30.2→3.36.0, symfony/* 7.4.x patch releases, psysh, phpunit 11.5.57. Verified: 231 tests green, Pint pass, `/up` 200. On deploy, `deploy.sh` runs `composer install --no-dev` from the lock, so nothing else is needed. Majors deliberately not taken: stripe-php 19→22, tinker 2→3, boost 1→2.
+- [ ] **Commit + deploy the subscription / free-tier feature (2026-10-07).** Built and verified locally: 188 tests, Pint clean, 85 routes, admin pages 200 on the dev DB. Uncommitted. Plan and decisions: `docs/SUBSCRIPTION_PLAN.md`.
+- [ ] **Stripe Dashboard setup for subscriptions**, test mode then live: webhook events, Smart Retries → cancel, 3-D Secure emails, Customer Portal. Checklist in `docs/SUBSCRIPTION_PLAN.md` §6. Needs the client's Stripe login.
+- [ ] **Create the first plan** at `/admin/subscription-plans`. Until one exists, users who hit the limit see an empty plans screen.
+- [ ] **Client sign-off on the three decisions** in `docs/SUBSCRIPTION_PLAN.md` (Stripe on iOS vs Apple IAP, gating withdrawals, lifetime limit).
+- [ ] **Flutter:** build from `docs/FLUTTER_SUBSCRIPTION_BRIEF.md` (other repo).
+- [ ] **Flutter: show "No commitment. Cancel anytime." on the plans screen (paywall after the 2 free locks).** Client request 2026-10-13. Copy and placement in `docs/FLUTTER_SUBSCRIPTION_BRIEF.md` §2; no backend change needed.
+- [ ] **Commit + deploy the 2026-10-06 withdrawal double-payout fix** (`PaymentHoldController::withdraw()`), the 17 money-path tests and the Pint reformat. Uncommitted on `development`. Verified locally: 132 tests green, Pint clean.
+- [ ] **Deploy the withdrawal `source_transaction` fix (2026-09-24, committed `68d4a3c` on `development`, pushed; `main` one commit behind).** Verified locally in Stripe test mode; not yet on production. After deploy: deposit with 4242 and withdraw immediately; it must succeed.
 - [x] ~~**Install the production queue worker.**~~ Done 2026-09-22. systemd service
       `timevault-queue`, installed by hand rather than via the script (the branch carrying
       `deploy/` is still unpushed). Verified on the server: `active (running)`, `enabled`
@@ -67,14 +107,16 @@ Other modes:
 - [x] ~~Verify mail delivery over real SMTP end to end~~ — done 2026-09-22 locally, for all four mails: support → `SUPPORT_EMAIL`, feedback → `ADMIN_EMAIL`, and a confirmation back to the submitting user for each. `queue:work` drained all four, `failed_jobs` stayed at 0.
 
 - [ ] Record the deploy evidence (`/up` status, log tail, server-side SHA) in `DEPLOYMENT_STATUS.md`.
-- [ ] **Local database is 2 migrations behind** — `2026_05_22_000001_add_bank_account_id_to_transfers_table` and `2026_05_25_000001_convert_timestamps_from_et_to_utc` show as Pending on the dev machine. Confirm whether production has them; if not, the first `./deploy.sh` run will apply them (and will take a `mysqldump` first).
-- [ ] Run `vendor/bin/pint` to fix the 6 style failures, then re-run `php artisan test`.
+- [x] ~~**Local database is 2 migrations behind**~~ (2026-10-03: `migrate:status` shows none pending locally; production still unconfirmed) — `2026_05_22_000001_add_bank_account_id_to_transfers_table` and `2026_05_25_000001_convert_timestamps_from_et_to_utc` show as Pending on the dev machine. Confirm whether production has them; if not, the first `./deploy.sh` run will apply them (and will take a `mysqldump` first).
+- [x] ~~Run `vendor/bin/pint` to fix the 6 style failures~~ — done 2026-10-06, suite re-run green.
 - [x] ~~Rewrite `deployeement.md`~~ — deleted on 2026-09-22 instead. It targeted a branch that no longer exists and a server that is not the live one, and `deploy.sh` supersedes it. Recoverable from git history if ever needed.
 
 ## BACKLOG
 
-- [ ] Real test coverage for the payment → hold → withdrawal flow. Now unblocked: the MySQL harness added on 2026-09-17 makes `RefreshDatabase` usable. The tests under `tests/Feature/Feedback/` and `tests/Feature/Support/` are the pattern to follow.
-- [ ] Feature tests for the partial-withdrawal `remaining_amount` accounting, including the failed-transfer restore path in `VerifyPendingTransfers`.
+- [x] ~~Real test coverage for the hold → withdrawal flow~~ — done 2026-10-06 (`tests/Feature/Stripe/`).
+- [x] ~~Partial-withdrawal `remaining_amount` accounting + failed-transfer restore path~~ — done 2026-10-06.
+- [ ] Tests for the rest of the Stripe surface: Payment Sheet creation, webhooks (`WebhookService`), `StripeService::createTransfer()` (admin/cron), bank-account Connect creation. `tests/Fakes/FakeStripeHttpClient.php` is the seam to reuse.
+- [ ] Tell the Flutter team to compare `processed_amount` with `requested_amount` on a withdrawal response — a mid-withdrawal Stripe rejection now returns 200 with a shortfall instead of a 500.
 - [ ] Decide whether `.claude/settings.local.json` should stay tracked — it is machine-local permission state and creates a diff on every machine that opens the repo.
 
 ## BLOCKED (and what unblocks it)

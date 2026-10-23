@@ -27,3 +27,9 @@ Schedule::command('users:cleanup-unverified')
     ->timezone('America/New_York')
     ->withoutOverlapping()
     ->description('Delete unverified accounts older than 24 hours to keep database clean');
+
+// Cron 4: Re-read subscriptions at renewal time from Stripe, so a missed webhook never locks out a paying user
+Schedule::command('subscriptions:sync')
+    ->hourly()
+    ->withoutOverlapping()
+    ->description('Re-read subscriptions due for renewal from Stripe, in case a webhook was missed');

@@ -965,7 +965,7 @@
         },
         {
             "name": "06. Stripe payments",
-            "description": "Payment Sheet flow. The order is fixed:\n\n  create-payment-intent -> present the Payment Sheet on the device ->\n  confirm-payment -> a PaymentHold row exists\n\nFrom Postman you can only run step 1 and step 3; the card is collected by the Stripe\nSDK on the device. To test step 3 without a device, confirm the intent with a test\ncard through the Stripe CLI or dashboard first, then call confirm-payment.\n\nUse test keys. A 200 from Stripe is not proof a charge settled - check the hold.",
+            "description": "Payment Sheet flow. The order is fixed:\n\n  create-payment-intent -> present the Payment Sheet on the device ->\n  confirm-payment -> a PaymentHold row exists\n\nFrom Postman you can only run step 1 and step 3; the card is collected by the Stripe\nSDK on the device. To test step 3 without a device, confirm the intent with a test\ncard through the Stripe CLI or dashboard first, then call confirm-payment.\n\nUse test keys. A 200 from Stripe is not proof a charge settled - check the hold.\n\ncreate-payment-intent is gated by the free tier (folder 11): once the user has used\ntheir free locks and has no subscription it returns 402 code=subscription_required\nbefore any card is touched. confirm-payment is never gated.",
             "item": [
                 {
                     "name": "6.1 Create payment intent",
@@ -1469,7 +1469,7 @@
                                 }
                             }
                         },
-                        "description": "The normal withdrawal path. Takes an amount, not a hold id, and spreads it across\nevery eligible hold oldest-first, creating one Transfer per hold touched.\n\nRules: amount required, numeric, min 0.50, max 999999.99.\n\nA partly-consumed hold becomes partial_transferred. remaining_amount is deducted\nhere for both completed and pending transfers; if a pending transfer later fails,\nverify:pending-transfers restores it.\n\nMoney goes to the primary bank account, so set that first (7.4)."
+                        "description": "The normal withdrawal path. Takes an amount, not a hold id, and spreads it across\nevery eligible hold oldest-first, creating one Transfer per hold touched.\n\nRules: amount required, numeric, min 0.50, max 999999.99.\n\nA partly-consumed hold becomes partial_transferred. remaining_amount is deducted\nhere for both completed and pending transfers; if a pending transfer later fails,\nverify:pending-transfers restores it.\n\nMoney goes to the primary bank account, so set that first (7.4).\n\nGated by the free tier (folder 11) like 8.3: 402 code=subscription_required once the\nfree withdrawals are used, unless the admin switched the withdrawal limit off. A\nwithdrawal that sends no money does not use one up."
                     },
                     "response": []
                 }
@@ -1687,6 +1687,198 @@
                     "response": []
                 }
             ]
+        },
+        {
+            "name": "11. Subscription",
+            "description": "Free tier + paid plans. A user gets 2 free locks (6.1) and 2 free withdrawals (8.3 / 8.4);\nboth numbers are set in the admin panel (Free Tier). The next attempt returns:\n\n  HTTP 402 {\"success\":false,\"code\":\"subscription_required\",\"action\":\"lock\"|\"withdraw\",\n            \"used\":2,\"limit\":2,\"message\":\"...\"}\n\nThe app opens the plans screen on that 402, then:\n\n  11.3 subscribe -> present the Payment Sheet with the returned keys ->\n  11.4 confirm   -> is_subscribed=true -> retry the request that got the 402\n\nLike 6.x, the card step needs the device (or the Stripe CLI). Subscriptions renew\nautomatically in Stripe; renewal results arrive by webhook.",
+            "item": [
+                {
+                    "name": "11.1 List plans",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/subscription/plans",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "subscription",
+                                "plans"
+                            ]
+                        },
+                        "description": "Plans the admin has made visible and synced to Stripe, in display order. Saves the first id into {{plan_id}}."
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "const body = pm.response.json();",
+                                    "const plans = body && body.data ? body.data.plans : null;",
+                                    "",
+                                    "if (Array.isArray(plans) && plans.length) {",
+                                    "    pm.collectionVariables.set(\"plan_id\", plans[0].id);",
+                                    "    console.log(\"Saved plan_id:\", plans[0].id);",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "11.2 Status and free allowance",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/subscription/status",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "subscription",
+                                "status"
+                            ]
+                        },
+                        "description": "is_subscribed, the current subscription (plan, status, current_period_end,\ncancel_at_period_end) and the free counters: locks_used / lock_limit / locks_left and\nwithdrawals_used / withdraw_limit / withdrawals_left. A null *_left means unlimited\n(subscribed, or that limit is switched off)."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "11.3 Subscribe",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/subscription/subscribe",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "subscription",
+                                "subscribe"
+                            ]
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"plan_id\": \"{{plan_id}}\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "description": "Starts a Stripe subscription and returns the same keys as 6.1 (client_secret,\ncustomer_id, ephemeral_key, publishable_key), so the app reuses its Payment Sheet code.\n\nNothing is active yet - the first invoice must be paid in the Payment Sheet.\nCalling it again within 23 h for the same plan returns the same unpaid subscription.\n\n409 = already subscribed. 422 = plan hidden, deleted or not synced."
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "const b = pm.response.json();",
+                                    "if (b.data && b.data.client_secret) { pm.collectionVariables.set('client_secret', b.data.client_secret); }"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "11.4 Confirm after payment",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/subscription/confirm",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "subscription",
+                                "confirm"
+                            ]
+                        },
+                        "description": "Call right after the Payment Sheet succeeds. The server reads the subscription back\nfrom Stripe, so access starts now instead of when the webhook arrives. If the\nmessage says the payment is still processing, poll 11.2 for a few seconds.\n\n404 = the user never started a subscription."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "11.5 Cancel at period end",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/subscription/cancel",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "subscription",
+                                "cancel"
+                            ]
+                        },
+                        "description": "Stops renewal. The user keeps access until current_period_end. 404 = no active subscription."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "11.6 Manage payment method",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/subscription/portal",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "subscription",
+                                "portal"
+                            ]
+                        },
+                        "description": "Returns data.url, a short-lived Stripe Customer Portal link to change the card or see invoices. Open it in an in-app browser."
+                    },
+                    "response": []
+                }
+            ]
         }
     ],
     "variable": [
@@ -1748,6 +1940,11 @@
         {
             "key": "hold_end_at",
             "value": "",
+            "type": "string"
+        },
+        {
+            "key": "plan_id",
+            "value": "1",
             "type": "string"
         }
     ]

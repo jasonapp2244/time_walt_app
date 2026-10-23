@@ -59,6 +59,9 @@
             @endif
         </form>
 
+        @include('admin.partials.auto-refresh', ['statsRoute' => 'admin.feedback.stats', 'label' => 'New feedback received'])
+        @include('admin.partials.list-toolbar', ['exportRoute' => 'admin.feedback.export'])
+
         <div class="card">
             <div class="card-body p-0">
                 <div class="table-responsive">

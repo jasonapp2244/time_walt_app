@@ -74,6 +74,8 @@
             @endif
         </form>
 
+        @include('admin.partials.list-toolbar', ['exportRoute' => 'admin.transfers.export'])
+
         <div class="card">
             <div class="card-body p-0">
                 <div class="table-responsive">

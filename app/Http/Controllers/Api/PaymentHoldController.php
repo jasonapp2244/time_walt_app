@@ -481,6 +481,7 @@ class PaymentHoldController extends Controller
                 \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
                 $remainingAmount = $requestedAmount;
                 $processedHolds = [];
+                $sentStripeTransfers = [];
 
                 // Process holds until we've transferred the requested amount
                 foreach ($availableHolds as $hold) {
@@ -514,18 +515,41 @@ class PaymentHoldController extends Controller
                     $currency = strtolower($payment->currency);
 
                     // Create Stripe transfer for this amount
-                    $transfer = \Stripe\Transfer::create($this->stripeService->withSourceTransaction([
-                        'amount' => (int) round($amountFromThisHold * 100),
-                        'currency' => $currency,
-                        'destination' => $connectAccount->connect_account_id,
-                        'description' => "Withdrawal from hold #{$hold->id}",
-                        'metadata' => [
-                            'hold_id' => $hold->id,
+                    try {
+                        $transfer = \Stripe\Transfer::create($this->stripeService->withSourceTransaction([
+                            'amount' => (int) round($amountFromThisHold * 100),
+                            'currency' => $currency,
+                            'destination' => $connectAccount->connect_account_id,
+                            'description' => "Withdrawal from hold #{$hold->id}",
+                            'metadata' => [
+                                'hold_id' => $hold->id,
+                                'user_id' => $user->id,
+                                'payment_id' => $payment ? $payment->id : null,
+                                'withdrawal_type' => $amountFromThisHold < $availableInHold ? 'partial' : 'full',
+                            ],
+                        ], $payment), [
+                            'idempotency_key' => $this->stripeService->transferIdempotencyKey($hold->id, $availableInHold, $amountFromThisHold),
+                        ]);
+                        $sentStripeTransfers[] = $transfer->id;
+                    } catch (\Stripe\Exception\ApiErrorException $e) {
+                        $this->stripeService->transferRejected($hold->id);
+
+                        if (empty($processedHolds)) {
+                            throw $e;
+                        }
+
+                        // Earlier transfers in this request already moved money. Rolling
+                        // back would erase their records and free the same funds to be
+                        // withdrawn again, so stop here and commit what was sent.
+                        Log::error('Stripe rejected a transfer mid-withdrawal; keeping completed transfers', [
                             'user_id' => $user->id,
-                            'payment_id' => $payment ? $payment->id : null,
-                            'withdrawal_type' => $amountFromThisHold < $availableInHold ? 'partial' : 'full',
-                        ],
-                    ], $payment));
+                            'hold_id' => $hold->id,
+                            'amount' => $amountFromThisHold,
+                            'error' => $e->getMessage(),
+                        ]);
+
+                        break;
+                    }
 
                     // Determine transfer status - Stripe transfers are usually instant
                     $transferStatus = 'pending';
@@ -693,9 +717,12 @@ class PaymentHoldController extends Controller
 
                 // Determine overall status and message
                 $overallStatus = $allCompleted ? 'completed' : ($anyFailed ? 'partial_failed' : 'pending');
-                $message = $allCompleted
-                    ? "Withdrawal of \${$totalProcessed} completed successfully."
-                    : "Withdrawal request for \${$requestedAmount} submitted successfully. Transfers are being processed.";
+                $partial = $totalProcessed < $requestedAmount;
+                $message = match (true) {
+                    $partial => "Only \${$totalProcessed} of \${$requestedAmount} could be withdrawn right now. Please try the rest again later.",
+                    $allCompleted => "Withdrawal of \${$totalProcessed} completed successfully.",
+                    default => "Withdrawal request for \${$requestedAmount} submitted successfully. Transfers are being processed.",
+                };
 
                 return response()->json([
                     'success' => true,
@@ -708,6 +735,7 @@ class PaymentHoldController extends Controller
                         'transfers' => $transferDetails,
                         'status' => $overallStatus,
                         'all_completed' => $allCompleted,
+                        'partial' => $partial,
                         'summary' => [
                             'requested' => (float) $requestedAmount,
                             'processed' => (float) $totalProcessed,
@@ -717,6 +745,18 @@ class PaymentHoldController extends Controller
                 ]);
             } catch (\Exception $e) {
                 DB::rollBack();
+
+                // Stripe already sent these, but the rollback erased their records.
+                // A retry within 24 hours reuses their idempotency keys, so Stripe
+                // returns the same transfers instead of paying again.
+                if (! empty($sentStripeTransfers)) {
+                    Log::critical('Withdrawal rolled back after Stripe transfers were sent; reconcile if the user does not retry.', [
+                        'user_id' => $user->id,
+                        'stripe_transfer_ids' => $sentStripeTransfers,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+
                 throw $e;
             }
         } catch (\Stripe\Exception\ApiErrorException $e) {

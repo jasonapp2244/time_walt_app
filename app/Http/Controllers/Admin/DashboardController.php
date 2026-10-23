@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Models\PaymentHold;
+use App\Models\Subscription;
 use App\Models\Transfer;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -100,6 +101,26 @@ class DashboardController extends Controller
             'total_holds_amount' => (float) PaymentHold::whereIn('status', ['holding', 'ready_for_transfer', 'partial_transferred'])
                 ->whereNull('abandoned_at')
                 ->sum(\Illuminate\Support\Facades\DB::raw('COALESCE(remaining_amount, amount)')),
+
+            'active_subscribers' => Subscription::entitled()->count(),
+
+            'mrr_display' => $this->mrrDisplay(),
         ];
+    }
+
+    /**
+     * Monthly recurring revenue per currency, e.g. "USD 120.00 · EUR 30.00".
+     * Plans can be priced in different currencies, so they are not summed.
+     */
+    private function mrrDisplay(): string
+    {
+        $mrr = Subscription::entitled()
+            ->where('cancel_at_period_end', false)
+            ->with('plan')
+            ->get()
+            ->groupBy(fn ($s) => strtoupper($s->plan?->currency ?? 'usd'))
+            ->map(fn ($group, $currency) => $currency.' '.number_format($group->sum(fn ($s) => $s->plan?->monthlyAmount() ?? 0), 2));
+
+        return $mrr->isEmpty() ? '0.00' : $mrr->implode(' · ');
     }
 }

@@ -5,12 +5,13 @@ use App\Http\Controllers\Api\AppConfigController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BankAccountController;
 use App\Http\Controllers\Api\FeedbackController;
-use App\Http\Controllers\Api\SupportController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\PaymentSheetController;
 use App\Http\Controllers\Api\PrivacyPolicyController;
 use App\Http\Controllers\Api\ProfileController;
-use App\Http\Controllers\Api\PaymentSheetController;
 use App\Http\Controllers\Api\StripeController;
+use App\Http\Controllers\Api\SubscriptionController;
+use App\Http\Controllers\Api\SupportController;
 use App\Http\Controllers\Api\TransactionHistoryController;
 use Illuminate\Support\Facades\Route;
 
@@ -36,7 +37,7 @@ Route::get('/privacy-policy', [PrivacyPolicyController::class, 'active'])
 // Protected Routes (Require Authentication)
 // Rate limit: 1000 requests per 1 minute per user
 Route::middleware(['auth:sanctum', 'throttle:1000,1'])->group(function () {
-    
+
     // Authentication
     Route::prefix('auth')->name('auth.')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
@@ -68,8 +69,18 @@ Route::middleware(['auth:sanctum', 'throttle:1000,1'])->group(function () {
 
     // Stripe Payment Sheet Routes
     Route::prefix('stripe')->name('stripe.')->group(function () {
-        Route::post('/create-payment-intent', [PaymentSheetController::class, 'createPaymentIntent'])->name('create-payment-intent');
+        Route::post('/create-payment-intent', [PaymentSheetController::class, 'createPaymentIntent'])->name('create-payment-intent')->middleware('quota:lock');
         Route::post('/confirm-payment', [PaymentSheetController::class, 'confirmPayment'])->name('confirm-payment');
+    });
+
+    // Subscription Routes (free tier: 2 locks + 2 withdrawals, then a plan is required)
+    Route::prefix('subscription')->name('subscription.')->group(function () {
+        Route::get('/plans', [SubscriptionController::class, 'plans'])->name('plans');
+        Route::get('/status', [SubscriptionController::class, 'status'])->name('status');
+        Route::post('/subscribe', [SubscriptionController::class, 'subscribe'])->name('subscribe')->middleware('throttle:10,1');
+        Route::post('/confirm', [SubscriptionController::class, 'confirm'])->name('confirm')->middleware('throttle:30,1');
+        Route::post('/cancel', [SubscriptionController::class, 'cancel'])->name('cancel')->middleware('throttle:10,1');
+        Route::post('/portal', [SubscriptionController::class, 'portal'])->name('portal')->middleware('throttle:10,1');
     });
 
     // Bank Account Routes
@@ -84,8 +95,8 @@ Route::middleware(['auth:sanctum', 'throttle:1000,1'])->group(function () {
     Route::prefix('payment-holds')->name('payment-holds.')->group(function () {
         Route::get('/', [\App\Http\Controllers\Api\PaymentHoldController::class, 'index'])->name('index');
         Route::get('/summary', [\App\Http\Controllers\Api\PaymentHoldController::class, 'summary'])->name('summary');
-        Route::post('/{hold_id}/request-payout', [\App\Http\Controllers\Api\PaymentHoldController::class, 'requestPayout'])->name('request-payout');
-        Route::post('/withdraw', [\App\Http\Controllers\Api\PaymentHoldController::class, 'withdraw'])->name('withdraw');
+        Route::post('/{hold_id}/request-payout', [\App\Http\Controllers\Api\PaymentHoldController::class, 'requestPayout'])->name('request-payout')->middleware('quota:withdraw');
+        Route::post('/withdraw', [\App\Http\Controllers\Api\PaymentHoldController::class, 'withdraw'])->name('withdraw')->middleware('quota:withdraw');
     });
 
     // Transaction History Routes

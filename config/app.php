@@ -94,6 +94,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Free Tier
+    |--------------------------------------------------------------------------
+    |
+    | How many locks and withdrawals a user without a subscription may make
+    | over the life of the account. These are fallbacks only: the admin panel
+    | stores the live values in app_settings.
+    |
+    */
+
+    'free_lock_limit' => (int) env('FREE_LOCK_LIMIT', 2),
+    'free_withdraw_limit' => (int) env('FREE_WITHDRAW_LIMIT', 2),
+    'withdraw_limit_enabled' => (bool) env('WITHDRAW_LIMIT_ENABLED', true),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Locale Configuration
     |--------------------------------------------------------------------------
     |

@@ -88,7 +88,7 @@ class ProfileController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'No data provided to update. Please provide at least one field: full_name, phone, profile_image, timezone, or language.',
-                ], 400);
+            ], 400);
         }
 
         // Update non-profile fields via model
@@ -180,7 +180,7 @@ class ProfileController extends Controller
     protected function getProfileUrl(?string $profile): string
     {
         if ($profile && $profile !== '0' && $profile !== 'default.png') {
-            return asset('storage/' . $profile);
+            return asset('storage/'.$profile);
         }
 
         return asset('storage/profiles/default.png');

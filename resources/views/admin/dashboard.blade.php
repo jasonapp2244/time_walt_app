@@ -129,6 +129,34 @@
 
         </div>
 
+        {{-- ── Subscriptions ────────────────────────────────────────────── --}}
+        <div class="row g-3 mb-4">
+
+            <div class="col-6 col-xl-3">
+                <a href="{{ route('admin.subscriptions.index', ['status' => 'active']) }}" style="text-decoration:none;">
+                    <div class="stat-card">
+                        <div class="d-flex align-items-start justify-content-between mb-3">
+                            <div class="stat-icon gold"><i class='bx bxs-crown'></i></div>
+                        </div>
+                        <div class="stat-value" data-stat="active_subscribers">{{ number_format($stats['active_subscribers']) }}</div>
+                        <div class="stat-label">Active Subscribers</div>
+                        <div class="stat-sub">Paid plans</div>
+                    </div>
+                </a>
+            </div>
+
+            <div class="col-6 col-xl-3">
+                <div class="stat-card">
+                    <div class="d-flex align-items-start justify-content-between mb-3">
+                        <div class="stat-icon green"><i class='bx bx-line-chart'></i></div>
+                    </div>
+                    <div class="stat-value" data-stat="mrr_display" style="font-size:18px;">{{ $stats['mrr_display'] }}</div>
+                    <div class="stat-label">Monthly Recurring Revenue</div>
+                    <div class="stat-sub">Excludes subscriptions set to end</div>
+                </div>
+            </div>
+
+        </div>
         {{-- ── Recent Data Tables ────────────────────────────────────────── --}}
         <div class="row g-3">
 
@@ -381,6 +409,8 @@
             pending_transfers:        fmt(data.pending_transfers),
             total_holds_count:        fmt(data.total_holds_count),
             total_holds_amount:       fmtDecimal(data.total_holds_amount),
+            active_subscribers:       fmt(data.active_subscribers),
+            mrr_display:              data.mrr_display,
         };
 
         Object.entries(map).forEach(([key, value]) => {

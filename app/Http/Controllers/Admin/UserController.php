@@ -4,9 +4,13 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\ListExport;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\Response;
 
 class UserController extends Controller
 {
@@ -17,6 +21,35 @@ class UserController extends Controller
      * We support: exact email lookup via blind index, or lookup by numeric user ID.
      */
     public function index(Request $request): View
+    {
+        $query = $this->filteredQuery($request);
+
+        $users = $query->latest()->paginate(10)->withQueryString();
+
+        return view('admin.users.index', compact('users'));
+    }
+
+    /**
+     * Download the list, with the page's filters, as Excel or PDF.
+     */
+    public function export(Request $request): Response
+    {
+        $format = in_array($request->query('format'), ListExport::FORMATS, true) ? $request->query('format') : 'xlsx';
+
+        return ListExport::download($format, 'Users', $this->filteredQuery($request)->with('activeSubscription.plan')->latest(), [
+            'User ID', 'Name', 'Email', 'Phone', 'Status', 'Verified', 'Holds', 'Transfers',
+            'Free locks used', 'Free withdrawals used', 'Subscription', 'Joined',
+        ], fn (User $u) => [
+            str_pad($u->id, 5, '0', STR_PAD_LEFT), $u->displayName(), $u->displayEmail(), $u->safe('phone'),
+            ucfirst($u->status ?? 'active'), (bool) $u->is_verified, $u->payment_holds_count, $u->transfers_count,
+            $u->free_locks_used, $u->free_withdrawals_used, $u->activeSubscription?->plan?->name ?? 'Free tier', $u->created_at,
+        ], ['Status' => $request->status, 'Search' => $request->search]);
+    }
+
+    /**
+     * The users list query with the page's filters applied.
+     */
+    private function filteredQuery(Request $request): Builder
     {
         $query = User::where('role', 'user')
             ->withCount(['paymentHolds', 'transfers']);
@@ -35,9 +68,7 @@ class UserController extends Controller
             }
         }
 
-        $users = $query->latest()->paginate(10)->withQueryString();
-
-        return view('admin.users.index', compact('users'));
+        return $query;
     }
 
     /**
@@ -124,6 +155,23 @@ class UserController extends Controller
                 ->sum('amount'),
         ];
 
-        return view('admin.users.show', compact('user', 'userAmounts', 'paymentHolds', 'transfers', 'bankAccounts'));
+        $freeTier = app(\App\Services\FreeTierService::class);
+        $subscription = $user->activeSubscription ?? $user->subscriptions()->with('plan')->first();
+        $freeUsage = [
+            'lock' => $freeTier->quota($user, \App\Services\FreeTierService::LOCK),
+            'withdraw' => $freeTier->quota($user, \App\Services\FreeTierService::WITHDRAW),
+        ];
+
+        return view('admin.users.show', compact('user', 'userAmounts', 'paymentHolds', 'transfers', 'bankAccounts', 'subscription', 'freeUsage'));
+    }
+
+    /**
+     * Give a user their free locks and withdrawals back (support tool).
+     */
+    public function resetFreeUsage(User $user): RedirectResponse
+    {
+        $user->forceFill(['free_locks_used' => 0, 'free_withdrawals_used' => 0])->save();
+
+        return back()->with('success', 'Free locks and withdrawals reset for this user.');
     }
 }

@@ -67,6 +67,34 @@
             </a>
         </li>
 
+        <li class="{{ request()->routeIs('admin.subscriptions.*') ? 'mm-active' : '' }}">
+            <a href="{{ route('admin.subscriptions.index') }}" class="{{ request()->routeIs('admin.subscriptions.*') ? 'active' : '' }}">
+                <div class="parent-icon"><i class='bx bxs-crown'></i></div>
+                <div class="menu-title">Subscriptions</div>
+            </a>
+        </li>
+
+        <li class="{{ request()->routeIs('admin.subscription-payments.*') ? 'mm-active' : '' }}">
+            <a href="{{ route('admin.subscription-payments.index') }}" class="{{ request()->routeIs('admin.subscription-payments.*') ? 'active' : '' }}">
+                <div class="parent-icon"><i class='bx bxs-receipt'></i></div>
+                <div class="menu-title">Subscription Payments</div>
+            </a>
+        </li>
+
+        <li class="{{ request()->routeIs('admin.subscription-plans.*') ? 'mm-active' : '' }}">
+            <a href="{{ route('admin.subscription-plans.index') }}" class="{{ request()->routeIs('admin.subscription-plans.*') ? 'active' : '' }}">
+                <div class="parent-icon"><i class='bx bxs-purchase-tag'></i></div>
+                <div class="menu-title">Subscription Plans</div>
+            </a>
+        </li>
+
+        <li class="{{ request()->routeIs('admin.settings.free-tier*') ? 'mm-active' : '' }}">
+            <a href="{{ route('admin.settings.free-tier') }}" class="{{ request()->routeIs('admin.settings.free-tier*') ? 'active' : '' }}">
+                <div class="parent-icon"><i class='bx bxs-gift'></i></div>
+                <div class="menu-title">Free Tier</div>
+            </a>
+        </li>
+
         <li class="{{ request()->routeIs('admin.privacy-policy.*') ? 'mm-active' : '' }}">
             <a href="{{ route('admin.privacy-policy.index') }}" class="{{ request()->routeIs('admin.privacy-policy.*') ? 'active' : '' }}">
                 <div class="parent-icon"><i class='bx bxs-shield-alt-2'></i></div>

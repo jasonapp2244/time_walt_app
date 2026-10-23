@@ -8,6 +8,10 @@ use Carbon\Carbon;
 
 class PaymentHoldService
 {
+    public function __construct(
+        protected FreeTierService $freeTier
+    ) {}
+
     /**
      * Create payment hold from payment with hold period data.
      *
@@ -65,7 +69,7 @@ class PaymentHoldService
         $holdHours = intdiv($totalMinutes % 1440, 60);
         $holdMinutes = $totalMinutes % 60;
 
-        return PaymentHold::create([
+        $hold = PaymentHold::create([
             'payment_id' => $payment->id,
             'user_id' => $payment->user_id,
             'title' => $title,
@@ -79,6 +83,14 @@ class PaymentHoldService
             'hold_period_type' => $holdPeriodType,
             'status' => 'holding',
         ]);
+
+        // Every hold is created here (Payment Sheet confirm and both webhook
+        // paths), so this is the one place a lock is counted.
+        if ($payment->user) {
+            $this->freeTier->recordLock($payment->user);
+        }
+
+        return $hold;
     }
 
     /**

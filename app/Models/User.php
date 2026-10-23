@@ -79,6 +79,8 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_verified' => 'boolean',
             'two_factor_enabled' => 'boolean',
+            'free_locks_used' => 'integer',
+            'free_withdrawals_used' => 'integer',
             // Encrypted PII fields
             'email' => 'encrypted',
             'phone' => 'encrypted',
@@ -202,5 +204,29 @@ class User extends Authenticatable
     public function supportRequests()
     {
         return $this->hasMany(SupportRequest::class);
+    }
+
+    /**
+     * Get every subscription the user has started, newest first.
+     */
+    public function subscriptions()
+    {
+        return $this->hasMany(Subscription::class)->latest('id');
+    }
+
+    /**
+     * The subscription that currently lifts the free-tier limits, if any.
+     */
+    public function activeSubscription()
+    {
+        return $this->hasOne(Subscription::class)->ofMany(
+            ['id' => 'max'],
+            fn ($query) => $query->entitled()
+        );
+    }
+
+    public function isSubscribed(): bool
+    {
+        return $this->activeSubscription()->exists();
     }
 }

@@ -21,6 +21,10 @@
             </div>
         </div>
 
+        @if(session('success'))
+            <div class="alert-success-tv mb-4"><i class='bx bx-check-circle me-2'></i>{{ session('success') }}</div>
+        @endif
+
         {{-- User Amount Summary --}}
         <div class="row g-3 mb-4">
             <div class="col-12 col-md-4">
@@ -122,6 +126,55 @@
                             @endif
                         </div>
 
+                    </div>
+                </div>
+
+                {{-- Subscription & free usage --}}
+                <div class="card mt-3">
+                    <div class="card-header py-3 px-4">
+                        <h6 class="mb-0" style="color:#111827; font-weight:700;">
+                            <i class='bx bxs-crown me-2' style="color:var(--tv-gold);"></i>Subscription
+                        </h6>
+                    </div>
+                    <div class="card-body p-4" style="font-size:13px;">
+                        @if($subscription && $subscription->isEntitled())
+                            <div class="d-flex justify-content-between mb-2">
+                                <span style="color:#374151; font-weight:600;">Plan</span>
+                                <span style="color:#111827; font-weight:700;">{{ $subscription->plan?->name ?? '—' }}</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span style="color:#374151; font-weight:600;">Status</span>
+                                <span class="tv-badge {{ $subscription->cancel_at_period_end ? 'badge-pending' : ($subscription->status === 'past_due' ? 'badge-partial' : 'badge-active') }}">
+                                    {{ $subscription->cancel_at_period_end ? 'Ending' : ($subscription->status === 'past_due' ? 'Renewal failing' : 'Active') }}
+                                </span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-3">
+                                <span style="color:#374151; font-weight:600;">{{ $subscription->cancel_at_period_end ? 'Ends' : 'Renews' }}</span>
+                                <span style="color:#111827; font-weight:600;">{{ $subscription->current_period_end?->setTimezone(config('app.admin_timezone'))->format('d M Y') }}</span>
+                            </div>
+                        @else
+                            <div class="mb-3" style="color:#6b7280;">
+                                Free tier{{ $subscription ? ' (last subscription: '.($subscription->plan?->name ?? '—').', '.$subscription->status.')' : '' }}
+                            </div>
+                        @endif
+
+                        @php
+                            $usageLine = fn ($q) => $q['limit'] === null ? $q['used'].' / unlimited' : $q['used'].' / '.$q['limit'];
+                        @endphp
+                        <div class="d-flex justify-content-between mb-2">
+                            <span style="color:#374151; font-weight:600;">Free locks used</span>
+                            <span style="color:#111827; font-weight:600;">{{ $usageLine($freeUsage['lock']) }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-3">
+                            <span style="color:#374151; font-weight:600;">Free withdrawals used</span>
+                            <span style="color:#111827; font-weight:600;">{{ $usageLine($freeUsage['withdraw']) }}</span>
+                        </div>
+
+                        <form method="POST" action="{{ route('admin.users.reset-free-usage', $user) }}"
+                              onsubmit="return confirm('Give this user their free locks and withdrawals back?');">
+                            @csrf
+                            <button type="submit" class="btn-tv-outline" style="padding:4px 10px; font-size:12px;">Reset free usage</button>
+                        </form>
                     </div>
                 </div>
             </div>

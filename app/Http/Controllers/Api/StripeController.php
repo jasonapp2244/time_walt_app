@@ -664,6 +664,18 @@ class StripeController extends Controller
                     $this->webhookService->handlePaymentIntentCanceled($eventArray);
                     break;
 
+                case 'customer.subscription.created':
+                case 'customer.subscription.updated':
+                case 'customer.subscription.deleted':
+                    $this->webhookService->handleSubscriptionChanged($eventArray);
+                    break;
+
+                case 'invoice.paid':
+                case 'invoice.payment_failed':
+                case 'invoice.payment_action_required':
+                    $this->webhookService->handleSubscriptionInvoice($eventArray);
+                    break;
+
                 default:
                     Log::info('Unhandled webhook event type: '.$event['type']);
             }

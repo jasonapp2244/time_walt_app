@@ -6,10 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\PaymentHold;
 use App\Models\Transfer;
 use App\Services\StripeService;
+use App\Support\ListExport;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\Response;
 
 class TransferController extends Controller
 {
@@ -18,6 +21,33 @@ class TransferController extends Controller
      */
     public function index(Request $request): View
     {
+        $transfers = $this->filteredQuery($request)->latest()->paginate(10)->withQueryString();
+
+        ['statusCounts' => $statusCounts, 'totalTransferred' => $totalTransferred] = $this->buildSummary();
+
+        return view('admin.transfers.index', compact('transfers', 'statusCounts', 'totalTransferred'));
+    }
+
+    /**
+     * Download the list, with the page's filters, as Excel or PDF.
+     */
+    public function export(Request $request): Response
+    {
+        $format = in_array($request->query('format'), ListExport::FORMATS, true) ? $request->query('format') : 'xlsx';
+
+        return ListExport::download($format, 'Transfers', $this->filteredQuery($request)->latest(), [
+            'Transfer ID', 'User', 'Email', 'Amount', 'Currency', 'To account', 'Type', 'Status', 'Failure reason', 'Date',
+        ], fn (Transfer $t) => [
+            str_pad($t->id, 5, '0', STR_PAD_LEFT), $t->user?->displayName() ?? 'Deleted user', $t->user?->displayEmail() ?? '—',
+            (float) $t->amount, strtoupper($t->currency ?? ''),
+            $t->bankAccount ? $t->bankAccount->safe('bank_name').' '.$t->bankAccount->masked_account_number : '—',
+            str_replace('_', ' ', ucfirst($t->transfer_type ?? '—')), ucfirst($t->status ?? ''), $t->failure_reason ?? '—',
+            $t->transferred_at ?? $t->created_at,
+        ], ['Status' => $request->status]);
+    }
+
+    private function filteredQuery(Request $request): Builder
+    {
         $query = Transfer::with(['user', 'hold', 'bankAccount'])
             ->whereNull('abandoned_at');
 
@@ -25,11 +55,7 @@ class TransferController extends Controller
             $query->where('status', $request->status);
         }
 
-        $transfers = $query->latest()->paginate(10)->withQueryString();
-
-        ['statusCounts' => $statusCounts, 'totalTransferred' => $totalTransferred] = $this->buildSummary();
-
-        return view('admin.transfers.index', compact('transfers', 'statusCounts', 'totalTransferred'));
+        return $query;
     }
 
     /**

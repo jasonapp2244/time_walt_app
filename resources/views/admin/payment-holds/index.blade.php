@@ -111,6 +111,8 @@
             @endif
         </form>
 
+        @include('admin.partials.list-toolbar', ['exportRoute' => 'admin.payment-holds.export'])
+
         <div class="card">
             <div class="card-body p-0">
                 <div class="table-responsive">

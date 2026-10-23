@@ -91,6 +91,17 @@ class UndecryptableUserRenderingTest extends TestCase
             ->assertSee('[unreadable]');
     }
 
+    public function test_the_user_detail_page_renders_with_a_damaged_bank_account(): void
+    {
+        $user = User::factory()->create();
+        $this->corruptBankAccount(UserBankAccount::factory()->create(['user_id' => $user->id]));
+
+        $this->actingAs($this->admin())
+            ->get('/admin/users/'.$user->id)
+            ->assertOk()
+            ->assertSee('****');
+    }
+
     public function test_the_feedback_page_renders_feedback_from_a_damaged_user(): void
     {
         $user = User::factory()->create();

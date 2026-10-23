@@ -65,7 +65,7 @@ class FundTestBalance extends Command
 
             return self::SUCCESS;
         } catch (\Exception $e) {
-            $this->error('Failed: ' . $e->getMessage());
+            $this->error('Failed: '.$e->getMessage());
 
             return self::FAILURE;
         }

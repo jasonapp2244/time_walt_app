@@ -67,9 +67,13 @@ class UserBankAccount extends Model
         return hash_hmac('sha256', $value, config('app.key'));
     }
 
+    /**
+     * Degrades to a bare mask when the number was encrypted under a previous
+     * APP_KEY, instead of failing every page that lists the account.
+     */
     public function getMaskedAccountNumberAttribute(): string
     {
-        $number = $this->account_number ?? '';
+        $number = $this->safe('account_number', '', '');
 
         return '****'.substr($number, -4);
     }

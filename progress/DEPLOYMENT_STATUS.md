@@ -1,6 +1,16 @@
 # DEPLOYMENT STATUS — Time Vault
 
-**Last updated:** 2026-09-22
+**Last updated:** 2026-10-23: the release is committed and pushed and switches to the client's Stripe account (see PENDING RELEASE). Previous: 2026-10-14 — pending release also carries the `StripeService::createTransfer()` double-payout lock fix (code only, no migration, no `.env` change; after deploy, any `Stripe transfer was sent but could not be recorded` log line is a real payout with no DB row and must be reconciled by hand). 2026-10-13 — pending release also carries the `BankAccountController@store` orphaned-Connect-account fix (code only, no migration, no `.env` change). Previous: 2026-10-12
+
+> **2026-10-12 — deposit-webhook fix, not deployed.** Code-only (no migration, no `.env`, no
+> package change). After deploy: one test-mode deposit should produce exactly **one**
+> "payment successful" email to the user and one to `ADMIN_EMAIL` (the code before this fix sends two of each when the webhook is configured; not observed on production from this machine).
+
+> **2026-10-10 — security dependency update, not deployed.** `composer.lock` now clears all
+> 46 `composer audit` advisories (laravel/framework 12.69.3, guzzle 7.15.5, commonmark 2.10.3, …).
+> It ships with the next `./deploy.sh` (it runs `composer install --no-dev` from the lock). The lock
+> was resolved on PHP 8.2.12 — the `^8.2` floor — so it installs on any newer production PHP.
+> After deploy: `composer audit --no-dev` on the server should report 0.
 
 > **2026-09-22 — production email outage, resolved.** Support and feedback submissions
 > returned success but sent no mail, because no queue worker had ever been running on
@@ -37,6 +47,32 @@ A command completing is not a successful deployment. Nothing goes in the VERIFIE
 
 ## PENDING RELEASE
 
+- 2026-10-23: **everything below is now committed and pushed** (`development`, and `main` fast-forwarded).
+  - **New in this release:**
+    - client plans seeder;
+    - `subscriptions:sync` (hourly; the server's existing `schedule:run` cron picks it up);
+    - the security fixes (export formula injection, free-lock bypass, payout idempotency keys, webhook ordering).
+  - **Server `.env` must change to the client's Stripe account before or with the deploy:**
+    - `STRIPE_KEY` / `STRIPE_SECRET` (sk_test), `STRIPE_PUBLISHABLE_KEY` (pk_test), `STRIPE_WEBHOOK_SECRET` (the `whsec_` of the endpoint `https://api.timevaultapp.co/api/stripe/webhook` on that account);
+    - `STRIPE_PORTAL_RETURN_URL=https://timevaultapp.co/`;
+    - keep `STRIPE_AUTO_TRANSFER` off.
+  - **After deploy:** run `php artisan db:seed --class=SubscriptionPlanSeeder --force`.
+  - **Withdrawals stay broken on the new account** until the client completes Connect → Platform profile in the Stripe Dashboard.
+
+- 2026-10-07 (2nd pass) — **5th migration** `create_subscription_invoices_table`.
+  - **Composer adds 7 packages** (barryvdh/laravel-dompdf, dompdf/*, openspout/openspout, masterminds/html5, sabberworm/php-css-parser); they need the PHP extensions `zip`, `gd`, `dom` and `mbstring` on the server.
+  - **Check before the deploy:** if `composer install` on the server refuses because of the existing advisories (Composer 2.9 block-insecure), stop and decide on the security update rather than turning the check off silently.
+  - **No new `.env` keys.**
+  - **Uncommitted.**
+- 2026-10-07 — **subscription + free tier.** **5 migrations** (`users` counters, `subscription_plans`, `subscriptions`, `app_settings`, `subscription_invoices`), so `deploy.sh` will take a `mysqldump`.
+  - **Optional `.env` keys:** `FREE_LOCK_LIMIT`, `FREE_WITHDRAW_LIMIT`, `WITHDRAW_LIMIT_ENABLED` (defaults 2 / 2 / true) and `STRIPE_PORTAL_RETURN_URL`.
+  - **Before announcing it:**
+    - add the 6 webhook events in **live** mode;
+    - configure the Customer Portal and Smart Retries;
+    - create at least one plan in the admin panel.
+  - **Once the deploy finishes**, the free limit applies to every user straight away. Everyone starts with 0 used.
+  - **Uncommitted.**
+- 2026-10-06 — withdrawal double-payout fix in `PaymentHoldController::withdraw()` + 17 tests + Pint reformat (code only, no migration, no `.env` change). **Uncommitted.** Ship it with the `source_transaction` fix below.
 - 2026-09-24 — withdrawal `source_transaction` fix (code only, no migration, no `.env` change). Not deployed.
 
 Two tranches now sit between production and `main`.

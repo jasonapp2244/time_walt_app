@@ -44,6 +44,58 @@ class PaymentSheetService
     }
 
     /**
+     * Free-tier guard for a new deposit. A free lock is only counted once its
+     * hold is recorded, so without this a user could open several deposits
+     * while one free lock is left and pay them all.
+     *
+     * Cancels the user's unpaid deposits from the last day, so at most one can
+     * be paid, and returns how many are already charged in Stripe but not yet
+     * recorded as a payment here; the caller counts those as used.
+     */
+    public function settleOpenDeposits(User $user): int
+    {
+        $customer = StripeCustomer::where('user_id', $user->id)->first();
+
+        if (! $customer) {
+            return 0; // No customer yet, so no earlier deposit can exist.
+        }
+
+        $intents = \Stripe\PaymentIntent::all([
+            'customer' => $customer->stripe_customer_id,
+            'created' => ['gte' => now()->subDay()->timestamp],
+            'limit' => 100,
+        ]);
+
+        $charged = 0;
+
+        foreach ($intents->data as $intent) {
+            // Only this app's deposits; subscription invoices carry no hold metadata.
+            if (($intent->metadata->user_id ?? null) !== (string) $user->id || empty($intent->metadata->hold_period_type)) {
+                continue;
+            }
+
+            if (in_array($intent->status, ['requires_payment_method', 'requires_confirmation', 'requires_action'], true)) {
+                try {
+                    $intent->cancel(['cancellation_reason' => 'abandoned']);
+
+                    continue;
+                } catch (\Stripe\Exception\ApiErrorException $e) {
+                    // Paid in the meantime: count it below rather than lose track of it.
+                    Log::info('Open deposit could not be cancelled', ['user_id' => $user->id, 'error' => $e->getMessage()]);
+                    $intent = \Stripe\PaymentIntent::retrieve($intent->id);
+                }
+            }
+
+            if (in_array($intent->status, ['succeeded', 'processing'], true)
+                && ! Payment::where('payment_intent_id_index', Payment::blindIndex($intent->id))->exists()) {
+                $charged++;
+            }
+        }
+
+        return $charged;
+    }
+
+    /**
      * Create Ephemeral Key for customer (required by Payment Sheet SDK).
      */
     public function createEphemeralKey(string $customerId): string

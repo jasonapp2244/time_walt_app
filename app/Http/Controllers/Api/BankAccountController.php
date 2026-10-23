@@ -23,6 +23,10 @@ class BankAccountController extends Controller
 
             DB::beginTransaction();
 
+            // Set only when this request creates the Connect account, so a later
+            // failure can delete it on Stripe instead of leaving it orphaned.
+            $createdStripeAccount = null;
+
             try {
                 \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
 
@@ -97,6 +101,7 @@ class BankAccountController extends Controller
                     ];
 
                     $stripeAccount = \Stripe\Account::create($accountParams);
+                    $createdStripeAccount = $stripeAccount;
 
                     Log::info('Stripe Custom Connect account created', [
                         'user_id' => $user->id,
@@ -181,6 +186,11 @@ class BankAccountController extends Controller
                 ], 201);
             } catch (\Exception $e) {
                 DB::rollBack();
+
+                if ($createdStripeAccount) {
+                    $this->deleteOrphanedConnectAccount($createdStripeAccount, $user->id);
+                }
+
                 throw $e;
             }
         } catch (\Exception $e) {
@@ -192,6 +202,29 @@ class BankAccountController extends Controller
                 'success' => false,
                 'message' => 'Failed to setup bank account. Please try again.',
             ], 500);
+        }
+    }
+
+    /**
+     * Delete a Custom account created earlier in a request that then failed.
+     * A failure here is logged and swallowed so the caller still reports the
+     * original error; the account carries metadata.user_id for manual cleanup.
+     */
+    private function deleteOrphanedConnectAccount(\Stripe\Account $account, int $userId): void
+    {
+        try {
+            $account->delete();
+
+            Log::info('Deleted Connect account after failed bank setup', [
+                'user_id' => $userId,
+                'account_id_suffix' => substr($account->id, -6),
+            ]);
+        } catch (\Exception $e) {
+            Log::warning('Could not delete Connect account after failed bank setup; it is orphaned on Stripe', [
+                'user_id' => $userId,
+                'account_id_suffix' => substr($account->id, -6),
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 

@@ -29,7 +29,8 @@ class AppServiceProvider extends ServiceProvider
 
         \Illuminate\Support\Facades\Blade::directive('adminDateFormat', function ($expression) {
             // Usage: @adminDateFormat($date, 'format')
-            list($date, $format) = array_map('trim', explode(',', $expression, 2));
+            [$date, $format] = array_map('trim', explode(',', $expression, 2));
+
             return "<?php echo ({$date}) ? ({$date})->copy()->setTimezone(config('app.admin_timezone'))->format({$format}) : '—'; ?>";
         });
     }

@@ -1,6 +1,33 @@
 # TEST STATUS — Time Vault
 
-**Last updated:** 2026-09-22
+**Last updated:** 2026-10-23. Latest run: `php artisan test` → **301 passed / 1131 assertions**, `pint --test` pass, `route:list` 100 routes, `composer audit` 0.
+- **New test files:**
+  - `SubscriptionPlanSeederTest` (7): creates the 2 recurring plans; a re-run is a no-op; adopts a price by lookup key; a failure leaves drafts a re-run completes; re-links plans from another Stripe account; refuses without a key.
+  - `SyncSubscriptionsCommandTest` (6).
+- **New tests in existing files:**
+  - `SubscriptionWebhookTest`: a late "active" event cannot undo a cancel; a price switch moves the plan.
+  - `FreeTierGateTest` (+3): an open deposit is cancelled; a charged-unrecorded deposit counts; a recorded one is not double-counted.
+  - `CreateTransferTest` (+2): the idempotency key is reused after an unrecorded transfer and is fresh after a rejection.
+  - `WithdrawTest`: key format, `partial: true`.
+  - `ListExportTest`: `=HYPERLINK(...)` is exported as text, with no `<f>` formula cell.
+- **Real Stripe test-mode run on 2026-10-23** (scratch scripts driving the local API on :8020, with `stripe listen` and test clocks; not part of the suite):
+  - monthly first payment + automatic month-2 renewal recorded once;
+  - declined renewal → `past_due` with access kept and the issue email queued;
+  - cancel → canceled at period end, no further charge;
+  - yearly first payment + automatic year-2 renewal;
+  - free tier: locks 1-2 OK, the abandoned deposit cancelled, lock 3 → 402, after subscribing lock 3 OK;
+  - admin pages and plan exports 200.
+  - **Bank add FAILED on the new account:** a Stripe platform-profile requirement, not code (see PROJECT_STATE). The withdrawal-limit E2E is still pending on it; it is covered by `FreeTierGateTest`.
+
+Previous (2026-10-14) run: `php artisan test` → **280 passed / 1062 assertions** (111.5s), `pint --test` pass, `route:list` 100 routes. New: `tests/Feature/Stripe/CreateTransferTest.php` (14) covering `StripeService::createTransfer()` directly and through the admin panel execute, `request-payout` and cron auto-transfer callers (the admin API calls the same service method). The two stale-hold race tests and the reconciliation-log test failed before the fix (the stale model reached `POST /v1/transfers` a second time).
+
+Previous (2026-10-13, 2nd pass) run: `php artisan test` → **266 passed / 997 assertions** (100.1s), `pint --test` pass. `BankAccountStoreTest` 12 → 15 for the orphaned-Connect-account fix: the bank-rejection test now requires `DELETE /v1/accounts/acct_new`; new tests for a wrong-country first attempt followed by a corrected retry, a failed cleanup (still the generic 500, `warning` logged with user_id + account suffix), and a bank rejected on a pre-existing Connect account (no DELETE). The two cleanup tests failed before the fix. No routes changed.
+
+Previous (2026-10-13, 1st pass) run: `php artisan test` → **263 passed / 985 assertions** (103.4s), `pint --test` pass. New: `tests/Feature/Stripe/BankAccountStoreTest.php` (12 — first US bank creates the Custom Connect account with the right individual/dob/ssn params and becomes primary, account number encrypted at rest; details_submitted → verified; non-US sends id_number not ssn, no routing number; second bank reuses the Connect account and is not primary; stale account (404 resource_missing and 403 other-key) replaced and its banks discarded; Stripe rejecting the bank or the account rolls back both rows and leaks neither the account number nor the Stripe message; validation for US routing/ssn, non-US IBAN, unsupported country, future dob; guest 401). All passed first run — no production code changed. No routes changed.
+
+Previous (2026-10-12) run: `php artisan test` → **251 passed / 908 assertions** (93.3s), `pint --test` pass. New: `tests/Feature/Stripe/PaymentSheetTest.php` (12 — create-payment-intent params/cents/customer reuse/validation/auth/Stripe 500; confirm-payment record + titled hold, idempotent re-confirm, unfinished, other user's PI 403, malformed id, notification settings) and `DepositWebhookTest.php` (8 — webhook after confirm sends no 2nd receipt, webhook-first keeps the title then confirm says "already recorded", failed→succeeded retry is receipted, non-deposit PI ignored, replayed event once, bad signature 400, payment_failed, canceled cancels the hold). The two regression tests failed before the fix (2 receipts; `null` title). No routes changed.
+
+Previous (2026-10-10) run (after the dependency security update): `php artisan test` → **231 passed / 788 assertions** (91.2s) on MySQL `time_walt_test`, `pint --test` pass, `route:list` **100 routes** (+1 is the framework's signed `PUT storage/{path}` upload route, new in 12.69; an unsigned PUT returns 403), `composer audit` **0 advisories**. XAMPP MySQL must be running first: without it the suite hangs on connect instead of failing.
 
 ## How to test this project
 
@@ -46,13 +73,37 @@ Any test using `RefreshDatabase` died there, which is why every pre-existing tes
 | `tests/Feature/UndecryptableUserRenderingTest.php`, `Admin/AdminAccountFromEnvTest.php`, `CleanupUnverifiedAccountsTest.php` | remainder | Yes — added between 2026-09-17 and 2026-09-21 |
 | `AppConfigTest`, `Auth/ChangePasswordTest`, `SendTransferCompletedNotificationTest`, `Feature/ExampleTest`, `Unit/ExampleTest` | 5 | **No — placeholders** |
 
+**2026-10-06:** `tests/Feature/Stripe/WithdrawTest.php`, `VerifyPendingTransfersTest.php` and `CheckPaymentHoldsTest.php` now cover the hold → withdrawal path for real, with Stripe faked at the SDK HTTP layer (`tests/Fakes/FakeStripeHttpClient.php`). The paragraph below is superseded for those three; it still holds for Payment Sheet, webhooks, admin transfers and bank-account setup.
+
 Everything outside the feedback feature is still unverified by tests. A green suite proves the feedback feature works and that the application boots — nothing more. For payments, holds, transfers and withdrawals, verify the real flow by hand: functionality, validation, authentication, authorization, API contract, database behaviour, error handling and edge cases.
 
 ---
 
 ## LAST RUN
 
+**2026-10-07 (2nd pass):** `php artisan test` → **231 passed / 788 assertions**.
+- New: `tests/Feature/Subscription/SubscriptionPaymentEmailTest.php` (11: recording, once-per-invoice, both recipients, subjects, rendering, user opt-out, admin copy of failures, account deletion cancels / survives Stripe outage).
+- New: `tests/Feature/Admin/ListExportTest.php` (32: every list as xlsx — rows parsed with OpenSpout — and pdf, toolbar links, filters carried, admin-only, stats endpoints, plans pagination).
+
+Real dev DB through the HTTP kernel: 9 list pages, 9 xlsx and 9 pdf downloads and the 4 new stats endpoints all 200.
+
+Pint pass. 99 routes.
+**2026-10-07:** `php artisan test` → **188 passed / 584 assertions**:
+- 132 from before, plus 55 in `tests/Feature/Subscription/`: `FreeTierGateTest` 15, `SubscriptionApiTest` 14, `SubscriptionWebhookTest` 11, `AdminSubscriptionTest` 15.
+- Plus 1 regression test for a damaged bank account on the admin user page.
+
+Stripe is faked at the HTTP layer (`tests/Fakes/FakesStripe.php` + `FakeStripeHttpClient`); webhooks go through the real signature-checked endpoint.
+
+Other checks:
+- `vendor/bin/pint --test` → pass.
+- `route:list` → 85 routes.
+- Dev DB: migrate, rollback and re-migrate of the 4 new migrations all succeeded.
+- Every new admin page plus the dashboard and a user detail page was rendered through the HTTP kernel against the dev DB → all 200, after the bank-account fix.
+**2026-10-06:** `php artisan test` → **132 passed / 392 assertions** (115 + 17 new under `tests/Feature/Stripe/`: `WithdrawTest` 8, `VerifyPendingTransfersTest` 6, `CheckPaymentHoldsTest` 3). `vendor/bin/pint --test` → **pass** (the 6 old failures fixed). `route:list` → 65 routes. `WithdrawTest::test_money_already_sent_stays_recorded_when_a_later_transfer_is_rejected` was written first and failed (500, records rolled back) before the controller fix.
+
 **2026-09-24:** `php artisan test` → **115 passed / 307 assertions** (110 + 5 new in `tests/Feature/Stripe/TransferSourceTransactionTest.php`). Pint clean on changed files.
+
+**2026-10-03:** re-run, unchanged → **115 passed / 307 assertions** (75s). `route:list` 65 routes; `migrate:status` shows nothing pending on the dev database (the two migrations previously listed as pending have been applied).
 
 **Date:** 2026-09-17
 **Command:** `php artisan test` / `php artisan route:list` / `vendor/bin/pint --test`
@@ -63,7 +114,7 @@ Everything outside the feedback feature is still unverified by tests. A green su
 
 ## FAILING TESTS
 
-No failing tests. Pint style failures, which are not tests but are part of the verifier:
+No failing tests, and Pint passes as of 2026-10-06. The table below is the historical list of Pint failures, all fixed:
 
 | File | Fixers needed |
 |---|---|

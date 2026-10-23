@@ -55,6 +55,10 @@ return [
         // Payment Intent Return URL (where Stripe redirects after payment) - set in .env file
         'payment_return_url' => env('STRIPE_PAYMENT_RETURN_URL', 'https://time-vault.devonlinetestserver.com/api/stripe/payment/return'),
 
+        // Where the Stripe Customer Portal sends the user back to. Optional: when
+        // empty, the default return URL from the Dashboard portal settings is used.
+        'portal_return_url' => env('STRIPE_PORTAL_RETURN_URL'),
+
         // Frontend URLs (set in .env file)
         'payment_success_url' => env('STRIPE_PAYMENT_SUCCESS_URL', 'https://time-vault.devonlinetestserver.com/payment/success'),
         'payment_failed_url' => env('STRIPE_PAYMENT_FAILED_URL', 'https://time-vault.devonlinetestserver.com/payment/failed'),

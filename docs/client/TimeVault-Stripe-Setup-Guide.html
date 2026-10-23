@@ -1,0 +1,350 @@
+  cut decline note   cut have-ready para <!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TimeVault — Stripe Account Setup</title>
+<style>
+  @page { size: A4; margin: 13mm 14mm 12mm 14mm; }
+
+  :root {
+    --ink:      #14181f;
+    --body:     #2c3440;
+    --muted:    #667085;
+    --rule:     #dfe3e9;
+    --accent:   #935510;
+    --accent-2: #f2cf7a;
+    --tint:     #fbf7ef;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  body {
+    margin: 0;
+    font-family: "Segoe UI", -apple-system, "Helvetica Neue", Arial, sans-serif;
+    font-size: 9.1pt;
+    line-height: 1.42;
+    color: var(--body);
+  }
+
+  /* ---------- cover ---------- */
+
+  .cover {
+    page-break-after: always;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 250mm;
+  }
+
+  .cover .bar { height: 5px; width: 68px; background: var(--accent); margin-bottom: 26px; }
+
+  .cover h1 {
+    font-size: 31pt;
+    line-height: 1.1;
+    margin: 0 0 10px;
+    color: var(--ink);
+    letter-spacing: -0.5px;
+    font-weight: 700;
+  }
+
+  .cover .sub {
+    font-size: 13pt;
+    color: var(--accent);
+    font-weight: 600;
+    margin: 0 0 32px;
+  }
+
+  .cover .lede {
+    font-size: 10.6pt;
+    line-height: 1.6;
+    max-width: 116mm;
+    margin: 0 0 38px;
+  }
+
+  .meta { border-top: 1px solid var(--rule); padding-top: 15px; }
+  .meta table { border: 0; margin: 0; width: auto; }
+  .meta td { border: 0; padding: 3px 28px 3px 0; }
+  .meta td:first-child {
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    font-size: 7.4pt;
+    font-weight: 600;
+  }
+  .meta td:last-child { color: var(--ink); font-weight: 600; font-size: 9pt; }
+
+  /* ---------- structure ---------- */
+
+  h2 {
+    font-size: 12.6pt;
+    color: var(--ink);
+    margin: 15px 0 6px;
+    padding-bottom: 5px;
+    border-bottom: 2px solid var(--accent-2);
+    page-break-after: avoid;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+  }
+  h2:first-of-type { margin-top: 0; }
+
+  h3 {
+    font-size: 10pt;
+    color: var(--accent);
+    margin: 10px 0 4px;
+    page-break-after: avoid;
+    font-weight: 700;
+  }
+
+  p { margin: 0 0 7px; }
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent-2); }
+
+  code {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 8.4pt;
+    background: #f4f5f7;
+    border: 1px solid #e6e8ec;
+    border-radius: 3px;
+    padding: 0 3px;
+    color: #1f2937;
+  }
+
+  pre {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 8.3pt;
+    line-height: 1.45;
+    background: #f7f8fa;
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+    padding: 9px 11px;
+    margin: 8px 0 10px;
+    white-space: pre-wrap;
+    page-break-inside: avoid;
+    color: #1f2937;
+  }
+  pre code { background: none; border: 0; padding: 0; font-size: inherit; }
+
+  ol, ul { margin: 0 0 8px; padding-left: 17px; }
+  li { margin-bottom: 3px; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 8px 0 11px;
+    font-size: 8.7pt;
+    page-break-inside: avoid;
+  }
+
+  th {
+    background: var(--tint);
+    color: var(--ink);
+    text-align: left;
+    font-weight: 700;
+    font-size: 7.8pt;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 6px 8px;
+    border-bottom: 2px solid var(--accent-2);
+  }
+
+  td { padding: 5px 8px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+
+  .nav-table td:first-child {
+    font-weight: 700;
+    color: var(--accent);
+    width: 22px;
+    text-align: center;
+  }
+
+  .warn {
+    background: #fdf3f2;
+    border-left: 3px solid #c0392b;
+    padding: 8px 11px;
+    margin: 9px 0;
+    font-size: 8.9pt;
+    page-break-inside: avoid;
+  }
+
+  .note {
+    background: var(--tint);
+    border-left: 3px solid var(--accent-2);
+    padding: 8px 11px;
+    margin: 9px 0;
+    font-size: 8.9pt;
+    page-break-inside: avoid;
+  }
+
+  .page-two { page-break-before: always; }
+
+  footer.docfoot {
+    margin-top: 18px;
+    padding-top: 9px;
+    border-top: 1px solid var(--rule);
+    font-size: 7.8pt;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ PAGE 1 — COVER ============ -->
+<section class="cover">
+  <div class="bar"></div>
+  <h1>Stripe Account Setup</h1>
+  <p class="sub">TimeVault — Client Onboarding</p>
+
+  <p class="lede">
+    TimeVault takes card payments, holds each payment for a period the user chooses, then pays the
+    money out to that user's own bank account. That payout leg means a standard Stripe account is not
+    enough — the account must also be approved for <strong>Stripe Connect with Custom accounts</strong>.
+    That approval is the only step with a waiting period, so it should be started first.
+  </p>
+
+  <div class="meta">
+    <table>
+      <tr><td>Prepared for</td><td>TimeVault — client onboarding</td></tr>
+      <tr><td>Applies to</td><td>api.timevaultapp.co and the TimeVault mobile app</td></tr>
+      <tr><td>Date</td><td>18 September 2026</td></tr>
+      <tr><td>Audience</td><td>Business owner / account holder</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ============ PAGE 2 ============ -->
+<section>
+<h2>Every click, in order</h2>
+
+<table class="nav-table">
+  <thead>
+    <tr><th>#</th><th>Where to click in Stripe</th><th>What you do</th><th>What to copy out</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>1</td><td>dashboard.stripe.com/register</td><td>Sign up with a company email</td><td>—</td></tr>
+    <tr><td>2</td><td>Orange <strong>Activate your account</strong> banner</td><td>Business details, bank account, ID</td><td>—</td></tr>
+    <tr><td>3</td><td>Gear → <strong>Team and security</strong> → Two-step authentication</td><td>Turn on 2FA</td><td>—</td></tr>
+    <tr><td>4</td><td>Sidebar → <strong>Connect</strong> → Get started → Platform or marketplace → <strong>Custom</strong></td><td>Submit, then wait 3–10 days</td><td>—</td></tr>
+    <tr><td>5</td><td>Top right → <strong>Test mode</strong> toggle</td><td>Switch on, for rows 6–7</td><td>—</td></tr>
+    <tr><td>6</td><td><strong>Developers</strong> → <strong>API keys</strong></td><td>Reveal both keys</td><td><code>pk_test_…</code>, <code>sk_test_…</code></td></tr>
+    <tr><td>7</td><td><strong>Developers</strong> → <strong>Webhooks</strong> → Add endpoint</td><td>Add the URL and 3 events</td><td><code>whsec_…</code></td></tr>
+    <tr><td>8</td><td>—</td><td>Send the three values to the development team</td><td>—</td></tr>
+    <tr><td>9</td><td>Top right → turn <strong>Test mode</strong> off</td><td>Repeat rows 6–7 in live mode</td><td><code>pk_live_…</code>, <code>sk_live_…</code>, new <code>whsec_…</code></td></tr>
+  </tbody>
+</table>
+
+<div class="warn">
+  Rows 1–3 take about half an hour. <strong>Row 4 is the only step with a waiting period — do it first,
+  on day one.</strong> Rows 5–8 can all be completed while the application is pending.
+</div>
+
+<h2>Steps 1–3 — Account, Connect, keys</h2>
+
+<h3>1. Create and verify the account</h3>
+<p>
+  Sign up at <a href="https://dashboard.stripe.com/register">dashboard.stripe.com/register</a> with a
+  company email more than one person can reach — Stripe sends password resets and risk notices there.
+  Turn on two-factor authentication, then complete <strong>Activate your account</strong>: business type
+  and registration number, address, directors, and the business bank account Stripe pays TimeVault's own
+  revenue into. Upload ID when asked; verification usually clears in one to two business days.
+</p>
+<h3>2. Apply for Connect with Custom accounts</h3>
+<p>
+  Open <strong>Connect</strong> in the sidebar → <strong>Get started</strong> →
+  <strong>Platform or marketplace</strong> → account type <strong>Custom</strong>. Standard and Express
+  will not work: the app creates accounts through the API and collects bank details in its own screens.
+  Complete the platform profile — who your users are, what they are paid for, average payout size and
+  expected monthly volume — then submit and wait for approval by email.
+</p>
+<h3>3. Collect the API keys</h3>
+<p>
+  Go to <a href="https://dashboard.stripe.com/apikeys">Developers → API keys</a>. The
+  <strong>Test mode</strong> toggle at the top right changes which keys are shown.
+</p>
+<table>
+  <thead><tr><th>Key</th><th>Looks like</th><th>Used by</th><th>Secret?</th></tr></thead>
+  <tbody>
+    <tr><td>Publishable key</td><td><code>pk_…</code></td><td>The mobile app, to show the card form</td><td>No</td></tr>
+    <tr><td>Secret key</td><td><code>sk_…</code></td><td>The server, to charge cards and send payouts</td><td><strong>Yes</strong></td></tr>
+  </tbody>
+</table>
+<div class="warn">
+  Send keys through a password manager or encrypted channel — never email or chat. The live secret key
+  can move money out of the business's account. If one is ever exposed, click <strong>Roll key</strong>
+  in the dashboard immediately.
+</div>
+</section>
+
+<!-- ============ PAGE 3 ============ -->
+<section class="page-two">
+
+<h2>Step 4 — Create the webhook endpoint</h2>
+<p>
+  A webhook is how Stripe tells TimeVault a payment actually succeeded. Without it a user could be
+  charged and the app would never record it — this step is not optional. Go to
+  <a href="https://dashboard.stripe.com/webhooks">Developers → Webhooks</a> →
+  <strong>Add endpoint</strong> and set the URL to:
+</p>
+<pre><code>https://api.timevaultapp.co/api/stripe/webhook</code></pre>
+
+<p>Under <strong>Select events</strong>, add exactly these three:</p>
+<table>
+  <thead><tr><th>Event</th><th>What it means</th></tr></thead>
+  <tbody>
+    <tr><td><code>payment_intent.succeeded</code></td><td>The card was charged; start the hold period</td></tr>
+    <tr><td><code>payment_intent.payment_failed</code></td><td>The charge was declined; tell the user</td></tr>
+    <tr><td><code>payment_intent.canceled</code></td><td>The payment was abandoned or cancelled</td></tr>
+  </tbody>
+</table>
+
+<p>Save, open the endpoint, reveal the <strong>Signing secret</strong> — it begins
+   <code>whsec_</code> — and copy it. Treat it like the secret key.</p>
+
+<div class="warn">
+  Test and live mode have <strong>separate endpoints and separate signing secrets</strong>. This endpoint
+  is created twice — once in test mode, once at go-live. Using the test secret against live traffic makes
+  every webhook fail verification, and payments silently stop being recorded.
+</div>
+
+<h2>Step 5 — Send these values to the development team</h2>
+<p>Nothing else from the Stripe account is needed. The account password is never required.</p>
+
+<table>
+  <thead><tr><th>Value</th><th>From</th><th>Example</th></tr></thead>
+  <tbody>
+    <tr><td>Publishable key</td><td>Step 3</td><td><code>pk_live_51Ab…</code></td></tr>
+    <tr><td>Secret key</td><td>Step 3</td><td><code>sk_live_51Ab…</code></td></tr>
+    <tr><td>Webhook signing secret</td><td>Step 4</td><td><code>whsec_7Kd…</code></td></tr>
+  </tbody>
+</table>
+
+<p>The development team also needs these URLs confirmed. All must be <code>https</code> and publicly
+   reachable — Stripe rejects <code>http</code>, <code>localhost</code> and IP addresses.</p>
+
+<pre><code>Platform website              https://timevaultapp.co
+Return after payment          https://api.timevaultapp.co/api/stripe/payment/return
+Return after bank onboarding  https://api.timevaultapp.co/api/stripe/connect/return
+Payment succeeded page        https://timevaultapp.co/payment/success
+Payment failed page           https://timevaultapp.co/payment/failed</code></pre>
+
+<h2>Step 6 — Go live</h2>
+<p>
+  Only after Connect approval and a successful test payment. Switch out of <strong>Test mode</strong>,
+  collect the <strong>live</strong> keys, create the webhook endpoint again in live mode with the same URL
+  and events, and send all three live values across. Then take one real payment for the smallest amount
+  the app allows, confirm the webhook returned <code>200</code>, and refund it.
+</p>
+
+<div class="note">
+  <strong>To confirm before we finalise:</strong> the country the business is registered in, the
+  currencies to accept at launch (the app supports USD, EUR and GBP), and whether the live domain is
+  <code>timevaultapp.co</code>.
+</div>
+
+<footer class="docfoot">
+  TimeVault — Stripe Account Setup &nbsp;·&nbsp; 18 September 2026 &nbsp;·&nbsp;
+  Contains no account credentials.
+</footer>
+</section>
+
+</body>
+</html>
