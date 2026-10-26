@@ -1,5 +1,7 @@
 # TEST STATUS — Time Vault
 
+**2026-10-27:** 311/1173 green again right before commit `a799a90`.
+
 **Re-run 2026-10-26 (after the user edited `.env`):**
 - **Results:** 311/1173 green, Pint pass. E2E 80/80 with new users #58–60, all 72 webhooks 200, admin pages and exports 15/15.
 - **Webhook secret:** webhooks signed with the `.env` `STRIPE_WEBHOOK_SECRET` → 200; a wrong signature → 400.

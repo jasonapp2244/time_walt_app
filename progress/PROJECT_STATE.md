@@ -1,6 +1,6 @@
 # PROJECT STATE — Time Vault
 
-**Last updated:** 2026-10-26. **Pre-go-live subscription review + human-style test pass, fixes UNCOMMITTED on `development`.**
+**Last updated:** 2026-10-27. **Pre-go-live fixes committed and pushed as `a799a90` (`development` = `main` = origin). Not deployed yet.** The 2026-10-26 review and test pass is below.
 - **Reviews:** a security review and a correctness review of the subscription code (API and admin). The fixes below came out of them.
 - **Fixes:**
   - **Double charge prevented:** `/subscribe` re-reads a recent unpaid attempt from Stripe first, and returns 409 if it was paid with the webhook still on the way. Switching plans on the paywall cancels the other unpaid attempt (`SubscriptionService::refreshPending()` / `cancelOpenAttempts()`). An attempt is reused only if its Stripe price still matches the plan's price.

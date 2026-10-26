@@ -1,6 +1,6 @@
 # TODO — Time Vault
 
-**Last updated:** 2026-10-26
+**Last updated:** 2026-10-27
 
 One line per item. Keep it honest: an item is only done when it has been verified working, not when it compiles.
 
@@ -14,7 +14,7 @@ One line per item. Keep it honest: an item is only done when it has been verifie
   - Then re-test the bank add (routing 110000000 / account 000123456789) and 2 withdrawals → the 3rd returns 402.
   - Re-checked 2026-10-24 and 2026-10-26: still refused. Countries: USA only (the app is USD/US-bank only; non-US needs a code change).
   - 2026-10-26: this account ALSO blocks Accounts v1 creation ("Stripe no longer recommends Accounts v1…"). The client must enable **Accounts v1 support** at `dashboard.stripe.com/test/settings/developers/api-policies` (then live), or the app moves to Accounts v2 (a bigger code change).
-- [ ] **Commit the 2026-10-26 pre-go-live fixes** (double charge, rate limits, free-tier edges, admin price lock, status shape), when the user says so. Then deploy `main`.
+- [x] ~~Commit the 2026-10-26 pre-go-live fixes~~: committed and pushed as `a799a90` on 2026-10-27 (`development` = `main`). Next: deploy `main`.
 - [ ] Known, low priority (from review 2026-10-26):
   - a "Renewals" count includes `subscription_update` invoices;
   - a Stripe failure in the middle of a plan sync can orphan a Product or Price;

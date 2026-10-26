@@ -1,6 +1,6 @@
 # DEPLOYMENT STATUS — Time Vault
 
-**Last updated:** 2026-10-26: pre-go-live fixes are UNCOMMITTED on `development`. They must be committed, pushed and fast-forwarded to `main` before `./deploy.sh --branch main`, or production ships without them.
+**Last updated:** 2026-10-27: the pre-go-live fixes are committed and pushed as `a799a90`; `main` = `development` = origin. Ready for `./deploy.sh --branch main` (the user runs it). Previous: 2026-10-26 (fixes were uncommitted).
 - No migration and no `.env` change.
 - `routes/api.php` changed (throttle prefixes). `deploy.sh` runs `route:cache`/`optimize`, so that is fine.
 - Server steps are unchanged:
