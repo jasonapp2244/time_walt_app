@@ -1,6 +1,6 @@
 # TODO — Time Vault
 
-**Last updated:** 2026-10-23
+**Last updated:** 2026-10-26
 
 One line per item. Keep it honest: an item is only done when it has been verified working, not when it compiles.
 
@@ -12,7 +12,15 @@ One line per item. Keep it honest: an item is only done when it has been verifie
   - On the new account Stripe refuses to create Custom Connect accounts with: "Please review the responsibilities of collecting requirements for connected accounts at https://dashboard.stripe.com/settings/connect/platform-profile".
   - Until the client completes that page (test mode, then live), no user can add a bank, so **no withdrawal works**.
   - Then re-test the bank add (routing 110000000 / account 000123456789) and 2 withdrawals → the 3rd returns 402.
-- [ ] **Client: Stripe Dashboard edits did not save** (read back over the API on 2026-10-23):
+  - Re-checked 2026-10-24 and 2026-10-26: still refused. Countries: USA only (the app is USD/US-bank only; non-US needs a code change).
+  - 2026-10-26: this account ALSO blocks Accounts v1 creation ("Stripe no longer recommends Accounts v1…"). The client must enable **Accounts v1 support** at `dashboard.stripe.com/test/settings/developers/api-policies` (then live), or the app moves to Accounts v2 (a bigger code change).
+- [ ] **Commit the 2026-10-26 pre-go-live fixes** (double charge, rate limits, free-tier edges, admin price lock, status shape), when the user says so. Then deploy `main`.
+- [ ] Known, low priority (from review 2026-10-26):
+  - a "Renewals" count includes `subscription_update` invoices;
+  - a Stripe failure in the middle of a plan sync can orphan a Product or Price;
+  - `subscriptions:sync` keeps retrying rows that no longer exist in Stripe;
+  - the template's PerfectScrollbar console error on every admin page.
+- [ ] **Client: Stripe Dashboard edits did not save** (read back over the API on 2026-10-23, again on 2026-10-26: unchanged, so they were made in live mode or a sandbox):
   - Customer portal: privacy `https://timevaultapp.co/privacy-policy/`, terms `https://timevaultapp.co/terms-conditions/`, redirect `https://timevaultapp.co/`, "switch plans" off;
   - Public details: name, support email, website;
   - Billing: Smart Retries → cancel, 3-D Secure emails, renewal reminders;

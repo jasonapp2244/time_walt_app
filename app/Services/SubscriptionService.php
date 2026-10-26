@@ -91,8 +91,14 @@ class SubscriptionService
     {
         $customer = $this->paymentSheetService->getOrCreateCustomer($user);
 
-        $stripeSubscription = $this->reusableIncomplete($user, $plan)
-            ?? \Stripe\Subscription::create([
+        $stripeSubscription = $this->reusableIncomplete($user, $plan);
+
+        // Only one unpaid attempt may stay open, so a user cannot end up
+        // paying two subscriptions after switching plans on the paywall.
+        $this->cancelOpenAttempts($user, $stripeSubscription?->id);
+
+        if (! $stripeSubscription) {
+            $stripeSubscription = \Stripe\Subscription::create([
                 'customer' => $customer->stripe_customer_id,
                 'items' => [['price' => $plan->stripe_price_id]],
                 'payment_behavior' => 'default_incomplete',
@@ -103,6 +109,7 @@ class SubscriptionService
                     'subscription_plan_id' => (string) $plan->id,
                 ],
             ]);
+        }
 
         $subscription = $this->syncFromStripe($stripeSubscription);
 
@@ -158,8 +165,10 @@ class SubscriptionService
         }
 
         $secret = $stripeSubscription->latest_invoice->confirmation_secret->client_secret ?? null;
+        // A price changed since this attempt would bill something the app no longer shows.
+        $samePrice = ($stripeSubscription->items->data[0]->price->id ?? null) === $plan->stripe_price_id;
 
-        return $stripeSubscription->status === 'incomplete' && $secret ? $stripeSubscription : null;
+        return $stripeSubscription->status === 'incomplete' && $secret && $samePrice ? $stripeSubscription : null;
     }
 
     /**
@@ -175,7 +184,61 @@ class SubscriptionService
             return null;
         }
 
-        return $this->syncFromStripe($latest->stripe_subscription_id);
+        // The sheet may have paid an older attempt that subscribe() reused.
+        if ($active = $this->refreshPending($user)) {
+            return $active;
+        }
+
+        return $this->pendingAttempts($user)->whereKey($latest->id)->exists()
+            ? $latest->fresh() // Just read back above.
+            : $this->syncFromStripe($latest->stripe_subscription_id);
+    }
+
+    /**
+     * Re-read the user's recent unpaid attempts from Stripe, so one that was
+     * paid but whose webhook has not arrived yet is seen as active. Returns
+     * the subscription that now grants access, if any.
+     */
+    public function refreshPending(User $user): ?Subscription
+    {
+        foreach ($this->pendingAttempts($user)->get() as $subscription) {
+            $this->syncFromStripe($subscription->stripe_subscription_id);
+        }
+
+        return $user->activeSubscription()->first();
+    }
+
+    /**
+     * The user's unpaid attempts that Stripe may still let them pay.
+     */
+    private function pendingAttempts(User $user): \Illuminate\Database\Eloquent\Builder
+    {
+        return Subscription::where('user_id', $user->id)
+            ->where('status', 'incomplete')
+            ->where('created_at', '>', now()->subHours(self::INCOMPLETE_WINDOW_HOURS));
+    }
+
+    /**
+     * Cancel the user's other unpaid attempts in Stripe. Each is read back
+     * first and only cancelled while still unpaid.
+     */
+    private function cancelOpenAttempts(User $user, ?string $keepStripeId): void
+    {
+        $open = Subscription::where('user_id', $user->id)->where('status', 'incomplete')->get();
+
+        foreach ($open as $subscription) {
+            if ($subscription->stripe_subscription_id === $keepStripeId) {
+                continue;
+            }
+
+            $stripeSubscription = \Stripe\Subscription::retrieve($subscription->stripe_subscription_id);
+
+            if ($stripeSubscription->status === 'incomplete') {
+                $stripeSubscription = $stripeSubscription->cancel();
+            }
+
+            $this->syncFromStripe($stripeSubscription);
+        }
     }
 
     /**

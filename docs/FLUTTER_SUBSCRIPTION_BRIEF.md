@@ -214,6 +214,7 @@ When subscribed:
 - Use `locks_left` / `withdrawals_left` for the "1 free lock left" hint. When it is `0`, you may open the plans screen straight away instead of waiting for the 402.
 - `current_period_end` is in the user's saved timezone.
 - `status` can be `past_due` while Stripe retries a failed renewal. The user still has access; you may show "Payment problem — update your card".
+- `subscription` is `null` whenever nothing gives access (never subscribed, payment abandoned, or ended). Gate on `is_subscribed`; a non-null `subscription` is always `active` or `past_due`.
 
 ---
 
@@ -223,6 +224,7 @@ When subscribed:
 | --- | --- | --- |
 | Cancel | `POST /api/subscription/cancel` | Stops renewal. Access continues until `current_period_end`; show "Ends on {date}". 404 if nothing is active. |
 | Manage payment method | `POST /api/subscription/portal` | Returns `data.url`; open it in an in-app browser. The user can change their card and see invoices there. Refresh `/status` when they come back. |
+| Undo a cancel | `POST /api/subscription/portal` | While `cancel_at_period_end` is true, `/subscribe` answers 409, so show "Renew" that opens the portal, where the user can renew the plan. After it ends, Subscribe works again. |
 
 ---
 

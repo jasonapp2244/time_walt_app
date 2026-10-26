@@ -139,7 +139,17 @@
                                 </td>
                                 <td><span class="tv-badge {{ $badge }}">{{ $label }}</span></td>
                                 <td style="color:#4b5563; font-size:12px; font-weight:500;">
-                                    {{ $subscription->current_period_end?->setTimezone(config('app.admin_timezone'))->format('d M Y H:i') ?? '—' }}
+                                    @php
+                                        // Cancelled early: Stripe keeps the unused period end, so show when it stopped.
+                                        $endedAt = $subscription->current_period_end?->isFuture() ? $subscription->canceled_at : $subscription->current_period_end;
+                                    @endphp
+                                    @if($entitled)
+                                        {{ $subscription->current_period_end?->setTimezone(config('app.admin_timezone'))->format('d M Y H:i') ?? '—' }}
+                                    @elseif(in_array($subscription->status, ['incomplete', 'incomplete_expired'], true))
+                                        Not paid
+                                    @else
+                                        {{ $endedAt ? 'Ended '.$endedAt->setTimezone(config('app.admin_timezone'))->format('d M Y H:i') : '—' }}
+                                    @endif
                                 </td>
                                 <td>
                                     @if($entitled)

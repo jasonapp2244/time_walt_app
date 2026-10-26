@@ -113,9 +113,12 @@ class SubscriptionApiTest extends TestCase
             'stripe_subscription_id' => 'sub_open',
             'status' => 'incomplete',
         ]);
-        $this->stripe->respond('GET /v1/subscriptions/sub_open', $this->stripeSubscription('sub_open', 'incomplete', [
+        $open = $this->stripeSubscription('sub_open', 'incomplete', [
             'latest_invoice' => ['id' => 'in_1', 'object' => 'invoice', 'confirmation_secret' => ['client_secret' => 'pi_open_secret']],
-        ]));
+            'items' => ['data' => [['price' => ['id' => 'price_premium']]]],
+        ]);
+        $this->stripe->respond('GET /v1/subscriptions/sub_open', $open); // still unpaid?
+        $this->stripe->respond('GET /v1/subscriptions/sub_open', $open); // its Payment Sheet secret
         $this->stripe->respond('POST /v1/ephemeral_keys', ['id' => 'ephkey_2', 'object' => 'ephemeral_key', 'secret' => 'ek_test_2']);
 
         $this->api('POST', '/api/subscription/subscribe', ['plan_id' => $this->plan->id])
@@ -124,6 +127,102 @@ class SubscriptionApiTest extends TestCase
 
         $this->assertSame([], $this->stripe->requestsTo('POST', '/v1/subscriptions'));
         $this->assertSame(1, Subscription::count());
+    }
+
+    public function test_subscribe_again_after_paying_an_unsynced_attempt_is_refused(): void
+    {
+        Subscription::factory()->create([
+            'user_id' => $this->user->id,
+            'subscription_plan_id' => $this->plan->id,
+            'stripe_subscription_id' => 'sub_paid',
+            'status' => 'incomplete',
+        ]);
+        // Paid in the Payment Sheet; /confirm and the webhook have not run yet.
+        $this->stripe->respond('GET /v1/subscriptions/sub_paid', $this->stripeSubscription('sub_paid', 'active'));
+
+        $this->api('POST', '/api/subscription/subscribe', ['plan_id' => $this->plan->id])
+            ->assertStatus(409)
+            ->assertJsonPath('data.is_subscribed', true);
+
+        $this->assertSame([], $this->stripe->requestsTo('POST', '/v1/subscriptions'));
+    }
+
+    public function test_switching_plan_on_the_paywall_cancels_the_other_unpaid_attempt(): void
+    {
+        $this->existingCustomer();
+        $yearly = SubscriptionPlan::factory()->create(['stripe_price_id' => 'price_yearly', 'interval' => 'year']);
+        Subscription::factory()->create([
+            'user_id' => $this->user->id,
+            'subscription_plan_id' => $this->plan->id,
+            'stripe_subscription_id' => 'sub_monthly',
+            'status' => 'incomplete',
+        ]);
+        $this->stripe->respond('GET /v1/subscriptions/sub_monthly', $this->stripeSubscription('sub_monthly', 'incomplete'));
+        $this->stripe->respond('GET /v1/subscriptions/sub_monthly', $this->stripeSubscription('sub_monthly', 'incomplete'));
+        $this->stripe->respond('DELETE /v1/subscriptions/sub_monthly', $this->stripeSubscription('sub_monthly', 'canceled'));
+        $this->stripe->respond('POST /v1/subscriptions', $this->stripeSubscription('sub_yearly', 'incomplete', [
+            'latest_invoice' => ['id' => 'in_2', 'object' => 'invoice', 'confirmation_secret' => ['client_secret' => 'pi_yearly_secret']],
+            'items' => ['data' => [['price' => ['id' => 'price_yearly']]]],
+        ]));
+        $this->stripe->respond('POST /v1/ephemeral_keys', ['id' => 'ephkey_3', 'object' => 'ephemeral_key', 'secret' => 'ek_test_3']);
+
+        $this->api('POST', '/api/subscription/subscribe', ['plan_id' => $yearly->id])
+            ->assertOk()
+            ->assertJsonPath('data.client_secret', 'pi_yearly_secret');
+
+        $this->assertCount(1, $this->stripe->requestsTo('DELETE', '/v1/subscriptions/sub_monthly'));
+        $this->assertSame('canceled', Subscription::findByStripeId('sub_monthly')->status);
+    }
+
+    public function test_confirm_finds_an_older_attempt_that_was_paid(): void
+    {
+        Subscription::factory()->create([
+            'user_id' => $this->user->id,
+            'subscription_plan_id' => $this->plan->id,
+            'stripe_subscription_id' => 'sub_reused',
+            'status' => 'incomplete',
+        ]);
+        Subscription::factory()->create([
+            'user_id' => $this->user->id,
+            'subscription_plan_id' => $this->plan->id,
+            'stripe_subscription_id' => 'sub_newer',
+            'status' => 'incomplete',
+        ]);
+        $this->stripe->respond('GET /v1/subscriptions/sub_reused', $this->stripeSubscription('sub_reused', 'active'));
+        $this->stripe->respond('GET /v1/subscriptions/sub_newer', $this->stripeSubscription('sub_newer', 'incomplete'));
+
+        $this->api('POST', '/api/subscription/confirm')
+            ->assertOk()
+            ->assertJsonPath('data.is_subscribed', true)
+            ->assertJsonPath('message', 'Your subscription is active.');
+    }
+
+    public function test_a_busy_app_is_not_rate_limited_at_the_paywall(): void
+    {
+        // Each route limit has its own counter, so other API calls in the same
+        // minute do not use up the 10 subscribe attempts.
+        Subscription::factory()->create(['user_id' => $this->user->id]);
+        for ($i = 0; $i < 15; $i++) {
+            $this->api('GET', '/api/subscription/status')->assertOk();
+        }
+
+        $this->api('POST', '/api/subscription/subscribe', ['plan_id' => $this->plan->id])
+            ->assertStatus(409);
+    }
+
+    public function test_status_hides_a_subscription_that_no_longer_grants_access(): void
+    {
+        Subscription::factory()->create([
+            'user_id' => $this->user->id,
+            'subscription_plan_id' => $this->plan->id,
+            'status' => 'canceled',
+            'current_period_end' => now()->addWeeks(3), // "Cancel now" keeps Stripe's period end
+        ]);
+
+        $this->api('GET', '/api/subscription/status')
+            ->assertOk()
+            ->assertJsonPath('data.is_subscribed', false)
+            ->assertJsonPath('data.subscription', null);
     }
 
     public function test_an_active_subscriber_cannot_subscribe_twice(): void

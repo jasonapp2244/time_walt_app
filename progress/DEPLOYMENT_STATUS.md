@@ -1,6 +1,16 @@
 # DEPLOYMENT STATUS — Time Vault
 
-**Last updated:** 2026-10-23: the release is committed and pushed and switches to the client's Stripe account (see PENDING RELEASE). Previous: 2026-10-14 — pending release also carries the `StripeService::createTransfer()` double-payout lock fix (code only, no migration, no `.env` change; after deploy, any `Stripe transfer was sent but could not be recorded` log line is a real payout with no DB row and must be reconciled by hand). 2026-10-13 — pending release also carries the `BankAccountController@store` orphaned-Connect-account fix (code only, no migration, no `.env` change). Previous: 2026-10-12
+**Last updated:** 2026-10-26: pre-go-live fixes are UNCOMMITTED on `development`. They must be committed, pushed and fast-forwarded to `main` before `./deploy.sh --branch main`, or production ships without them.
+- No migration and no `.env` change.
+- `routes/api.php` changed (throttle prefixes). `deploy.sh` runs `route:cache`/`optimize`, so that is fine.
+- Server steps are unchanged:
+  1. new Stripe keys in `.env`;
+  2. `./deploy.sh --branch main`;
+  3. `php artisan db:seed --class=SubscriptionPlanSeeder --force`;
+  4. `schedule:list | grep subscriptions:sync`;
+  5. a 4242 deposit → webhook 200.
+
+Previous: 2026-10-23: the release is committed and pushed and switches to the client's Stripe account (see PENDING RELEASE). Previous: 2026-10-14 — pending release also carries the `StripeService::createTransfer()` double-payout lock fix (code only, no migration, no `.env` change; after deploy, any `Stripe transfer was sent but could not be recorded` log line is a real payout with no DB row and must be reconciled by hand). 2026-10-13 — pending release also carries the `BankAccountController@store` orphaned-Connect-account fix (code only, no migration, no `.env` change). Previous: 2026-10-12
 
 > **2026-10-12 — deposit-webhook fix, not deployed.** Code-only (no migration, no `.env`, no
 > package change). After deploy: one test-mode deposit should produce exactly **one**

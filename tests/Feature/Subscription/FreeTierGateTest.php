@@ -124,6 +124,21 @@ class FreeTierGateTest extends TestCase
         $this->assertCount(1, $this->stripe->requestsTo('POST', '/v1/payment_intents/pi_open/cancel'));
     }
 
+    public function test_every_open_deposit_is_checked_however_old(): void
+    {
+        // Unpaid PaymentIntents never expire, so a days-old one could still be paid.
+        $this->used(locks: 1);
+        $this->stripeListsDeposits([['id' => 'pi_old', 'status' => 'requires_payment_method', 'created' => now()->subDays(5)->timestamp]]);
+        $this->stripe->respond('POST /v1/payment_intents/pi_old/cancel', ['id' => 'pi_old', 'object' => 'payment_intent', 'status' => 'canceled']);
+        $this->stripe->respond('POST /v1/ephemeral_keys', ['id' => 'ephkey_fake', 'object' => 'ephemeral_key', 'secret' => 'ek_test_fake']);
+        $this->stripe->respond('POST /v1/payment_intents', ['id' => 'pi_new', 'object' => 'payment_intent', 'client_secret' => 'pi_new_secret_x']);
+
+        $this->lock()->assertOk();
+
+        $this->assertArrayNotHasKey('created', $this->stripe->requestsTo('GET', '/v1/payment_intents')[0]['params']);
+        $this->assertCount(1, $this->stripe->requestsTo('POST', '/v1/payment_intents/pi_old/cancel'));
+    }
+
     public function test_a_charged_deposit_not_yet_recorded_counts_as_the_last_free_lock(): void
     {
         // 1 lock recorded, and a 2nd already charged whose hold is not created yet.
@@ -270,6 +285,35 @@ class FreeTierGateTest extends TestCase
 
         $this->withdraw()->assertOk();
 
+        $this->assertSame(2, $this->user->fresh()->free_withdrawals_used);
+    }
+
+    public function test_a_withdrawal_that_fails_after_stripe_paid_still_uses_one_up(): void
+    {
+        $this->used(withdrawals: 1);
+        \App\Models\StripeConnectAccount::create([
+            'user_id' => $this->user->id,
+            'connect_account_id' => 'acct_fake',
+            'status' => 'verified',
+        ]);
+        PaymentHold::factory()->create([
+            'user_id' => $this->user->id,
+            'payment_id' => Payment::factory()->create([
+                'user_id' => $this->user->id,
+                'stripe_data' => ['latest_charge' => 'ch_fake'],
+            ])->id,
+            'amount' => 50,
+            'remaining_amount' => 50,
+            'hold_end_at' => now()->subDay(),
+            'status' => 'ready_for_transfer',
+        ]);
+        $this->stripe->respond('POST /v1/transfers', ['id' => 'tr_fake', 'object' => 'transfer']);
+        // The money has left Stripe, then saving it locally fails.
+        \App\Models\Transfer::creating(fn () => throw new \RuntimeException('database went away'));
+
+        $this->withdraw()->assertStatus(500);
+
+        $this->assertCount(1, $this->stripe->requestsTo('POST', '/v1/transfers'));
         $this->assertSame(2, $this->user->fresh()->free_withdrawals_used);
     }
 

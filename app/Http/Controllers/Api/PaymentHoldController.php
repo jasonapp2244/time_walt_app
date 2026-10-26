@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\EnsureFreeQuotaOrSubscribed;
 use App\Http\Requests\Stripe\WithdrawPayoutRequest;
 use App\Jobs\SendPayoutRequestNotification;
 use App\Models\PaymentHold;
@@ -199,6 +200,7 @@ class PaymentHoldController extends Controller
 
             // Create transfer
             $transfer = $this->stripeService->createTransfer($hold, 'user_requested');
+            $request->attributes->set(EnsureFreeQuotaOrSubscribed::MONEY_SENT, true);
 
             // Send email notification to user and admin (check both transaction_alert and email_alert)
             $userSettings = UserNotificationSetting::where('user_id', $hold->user_id)->first();
@@ -531,6 +533,8 @@ class PaymentHoldController extends Controller
                             'idempotency_key' => $this->stripeService->transferIdempotencyKey($hold->id, $availableInHold, $amountFromThisHold),
                         ]);
                         $sentStripeTransfers[] = $transfer->id;
+                        // The form request is a copy; the middleware sees the original.
+                        request()->attributes->set(EnsureFreeQuotaOrSubscribed::MONEY_SENT, true);
                     } catch (\Stripe\Exception\ApiErrorException $e) {
                         $this->stripeService->transferRejected($hold->id);
 

@@ -23,10 +23,13 @@ use Symfony\Component\HttpFoundation\Response;
  *           unpaid deposits are cancelled first, so only one can be in flight.
  * withdraw: a free withdrawal is claimed before the controller runs (so
  *           parallel requests cannot share the last one) and given back if
- *           the request does not succeed.
+ *           the request does not succeed and no money was sent.
  */
 class EnsureFreeQuotaOrSubscribed
 {
+    /** Set on the request by a controller once Stripe has sent money. */
+    public const MONEY_SENT = 'free_tier.money_sent';
+
     public function __construct(
         protected FreeTierService $freeTier,
         protected PaymentSheetService $paymentSheet
@@ -60,7 +63,8 @@ class EnsureFreeQuotaOrSubscribed
 
         $response = $next($request);
 
-        if ($claimed === true && ! $this->succeeded($response)) {
+        // A request that failed after Stripe paid out still used the withdrawal.
+        if ($claimed === true && ! $this->succeeded($response) && ! $request->attributes->get(self::MONEY_SENT)) {
             $this->freeTier->releaseWithdrawal($user);
         }
 
@@ -76,9 +80,10 @@ class EnsureFreeQuotaOrSubscribed
     {
         try {
             return DB::transaction(function () use ($request, $next, $quota) {
-                User::whereKey($request->user()->id)->lockForUpdate()->first(['id']);
+                $locked = User::whereKey($request->user()->id)->lockForUpdate()->first(['id', 'free_locks_used']);
 
-                $quota['used'] += $this->paymentSheet->settleOpenDeposits($request->user());
+                // Read under the lock: a deposit recorded since the first check counts too.
+                $quota['used'] = (int) $locked->free_locks_used + $this->paymentSheet->settleOpenDeposits($request->user());
 
                 if ($quota['used'] >= $quota['limit']) {
                     return response()->json($this->freeTier->blockedPayload($quota), 402);

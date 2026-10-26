@@ -48,7 +48,7 @@ class PaymentSheetService
      * hold is recorded, so without this a user could open several deposits
      * while one free lock is left and pay them all.
      *
-     * Cancels the user's unpaid deposits from the last day, so at most one can
+     * Cancels the user's unpaid deposits, so at most one can
      * be paid, and returns how many are already charged in Stripe but not yet
      * recorded as a payment here; the caller counts those as used.
      */
@@ -60,15 +60,16 @@ class PaymentSheetService
             return 0; // No customer yet, so no earlier deposit can exist.
         }
 
+        // Every deposit, not only recent ones: an unpaid PaymentIntent never
+        // expires, so an old one could still be paid as an extra free lock.
         $intents = \Stripe\PaymentIntent::all([
             'customer' => $customer->stripe_customer_id,
-            'created' => ['gte' => now()->subDay()->timestamp],
             'limit' => 100,
         ]);
 
         $charged = 0;
 
-        foreach ($intents->data as $intent) {
+        foreach ($intents->autoPagingIterator() as $intent) {
             // Only this app's deposits; subscription invoices carry no hold metadata.
             if (($intent->metadata->user_id ?? null) !== (string) $user->id || empty($intent->metadata->hold_period_type)) {
                 continue;

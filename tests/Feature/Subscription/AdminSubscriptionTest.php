@@ -86,10 +86,24 @@ class AdminSubscriptionTest extends TestCase
 
         $this->actingAs($this->admin)->put("/admin/subscription-plans/{$plan->id}", $this->planForm(['price' => '14.99']))
             ->assertRedirect(route('admin.subscription-plans.index'))
-            ->assertSessionHas('success', fn ($m) => str_contains($m, 'existing subscribers keep theirs'));
+            ->assertSessionHas('success', fn ($m) => str_contains($m, 'New subscribers pay the new price'));
 
         $this->assertSame('price_new', $plan->fresh()->stripe_price_id);
         $this->assertSame('false', $this->stripe->requestsTo('POST', '/v1/prices/price_old')[0]['params']['active']);
+    }
+
+    public function test_a_plan_with_subscribers_cannot_change_price(): void
+    {
+        $plan = SubscriptionPlan::factory()->create(['stripe_product_id' => 'prod_x', 'stripe_price_id' => 'price_old', 'price' => 9.99]);
+        Subscription::factory()->create(['subscription_plan_id' => $plan->id]);
+
+        $this->actingAs($this->admin)->from("/admin/subscription-plans/{$plan->id}/edit")
+            ->put("/admin/subscription-plans/{$plan->id}", $this->planForm(['price' => '14.99']))
+            ->assertSessionHasErrors('price');
+
+        $this->assertEquals(9.99, $plan->fresh()->price);
+        $this->assertSame('price_old', $plan->fresh()->stripe_price_id);
+        $this->assertSame([], $this->stripe->requests);
     }
 
     public function test_a_name_change_only_updates_the_product(): void

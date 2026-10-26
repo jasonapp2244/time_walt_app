@@ -19,13 +19,13 @@ use Illuminate\Support\Facades\Route;
 // Public Authentication Routes with Rate Limiting
 // Rate limits: Signup/Login/Verify/Reset = 5/min, Resend/Forgot = 3/min, Check Email = 10/min
 Route::prefix('auth')->name('auth.')->group(function () {
-    Route::post('/check-email', [AuthController::class, 'checkEmail'])->name('check-email')->middleware('throttle:10,1');
-    Route::post('/signup', [AuthController::class, 'signup'])->name('signup')->middleware('throttle:5,1');
-    Route::post('/verify-otp', [AuthController::class, 'verifyOtp'])->name('verify-otp')->middleware('throttle:5,1');
-    Route::post('/resend-otp', [AuthController::class, 'resendOtp'])->name('resend-otp')->middleware('throttle:3,1');
-    Route::post('/login', [AuthController::class, 'login'])->name('login')->middleware('throttle:5,1');
-    Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->name('forgot-password')->middleware('throttle:5,1');
-    Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('reset-password')->middleware('throttle:5,1');
+    Route::post('/check-email', [AuthController::class, 'checkEmail'])->name('check-email')->middleware('throttle:10,1,check-email');
+    Route::post('/signup', [AuthController::class, 'signup'])->name('signup')->middleware('throttle:5,1,signup');
+    Route::post('/verify-otp', [AuthController::class, 'verifyOtp'])->name('verify-otp')->middleware('throttle:5,1,verify-otp');
+    Route::post('/resend-otp', [AuthController::class, 'resendOtp'])->name('resend-otp')->middleware('throttle:3,1,resend-otp');
+    Route::post('/login', [AuthController::class, 'login'])->name('login')->middleware('throttle:5,1,login');
+    Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->name('forgot-password')->middleware('throttle:5,1,forgot-password');
+    Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('reset-password')->middleware('throttle:5,1,reset-password');
 
 });
 
@@ -43,7 +43,7 @@ Route::middleware(['auth:sanctum', 'throttle:1000,1'])->group(function () {
         Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
         Route::post('/delete-account', [AuthController::class, 'deleteAccount'])
             ->name('delete-account')
-            ->middleware('throttle:5,60'); // 5 attempts per hour (sensitive)
+            ->middleware('throttle:5,60,delete-account'); // 5 attempts per hour (sensitive)
     });
 
     // Profile Routes
@@ -51,11 +51,11 @@ Route::middleware(['auth:sanctum', 'throttle:1000,1'])->group(function () {
         Route::get('/', [ProfileController::class, 'show'])->name('show');
         // Use POST for update to support file uploads properly
         Route::post('/update', [ProfileController::class, 'update'])->name('update');
-        Route::post('/change-password', [AuthController::class, 'changePassword'])->name('change-password')->middleware('throttle:5,1');
+        Route::post('/change-password', [AuthController::class, 'changePassword'])->name('change-password')->middleware('throttle:5,1,change-password');
         Route::post('/language', [ProfileController::class, 'updateLanguage'])->name('language');
         Route::post('/timezone', [ProfileController::class, 'updateTimezone'])->name('timezone');
-        Route::post('/feedback', [FeedbackController::class, 'submitFeedback'])->name('feedback')->middleware('throttle:10,1');
-        Route::post('/support', [SupportController::class, 'submitSupport'])->name('support')->middleware('throttle:10,1');
+        Route::post('/feedback', [FeedbackController::class, 'submitFeedback'])->name('feedback')->middleware('throttle:10,1,feedback');
+        Route::post('/support', [SupportController::class, 'submitSupport'])->name('support')->middleware('throttle:10,1,support');
     });
 
     // Notification Settings Routes
@@ -77,10 +77,10 @@ Route::middleware(['auth:sanctum', 'throttle:1000,1'])->group(function () {
     Route::prefix('subscription')->name('subscription.')->group(function () {
         Route::get('/plans', [SubscriptionController::class, 'plans'])->name('plans');
         Route::get('/status', [SubscriptionController::class, 'status'])->name('status');
-        Route::post('/subscribe', [SubscriptionController::class, 'subscribe'])->name('subscribe')->middleware('throttle:10,1');
-        Route::post('/confirm', [SubscriptionController::class, 'confirm'])->name('confirm')->middleware('throttle:30,1');
-        Route::post('/cancel', [SubscriptionController::class, 'cancel'])->name('cancel')->middleware('throttle:10,1');
-        Route::post('/portal', [SubscriptionController::class, 'portal'])->name('portal')->middleware('throttle:10,1');
+        Route::post('/subscribe', [SubscriptionController::class, 'subscribe'])->name('subscribe')->middleware('throttle:10,1,subscribe');
+        Route::post('/confirm', [SubscriptionController::class, 'confirm'])->name('confirm')->middleware('throttle:30,1,subscription-confirm');
+        Route::post('/cancel', [SubscriptionController::class, 'cancel'])->name('cancel')->middleware('throttle:10,1,subscription-cancel');
+        Route::post('/portal', [SubscriptionController::class, 'portal'])->name('portal')->middleware('throttle:10,1,subscription-portal');
     });
 
     // Bank Account Routes

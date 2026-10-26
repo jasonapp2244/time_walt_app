@@ -53,18 +53,19 @@ class SubscriptionController extends Controller
     public function subscribe(SubscribeRequest $request): JsonResponse
     {
         $user = $request->user();
-
-        if ($user->isSubscribed()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'You already have an active subscription.',
-                'data' => $this->statusPayload($user),
-            ], 409);
-        }
-
         $plan = SubscriptionPlan::findOrFail($request->validated('plan_id'));
 
         try {
+            // An earlier attempt may be paid with its webhook still on the way;
+            // starting another one then would charge the user twice.
+            if ($user->isSubscribed() || $this->subscriptionService->refreshPending($user)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You already have an active subscription.',
+                    'data' => $this->statusPayload($user->fresh()),
+                ], 409);
+            }
+
             $data = $this->subscriptionService->subscribe($user, $plan);
         } catch (\Stripe\Exception\ApiErrorException $e) {
             Log::error('Subscription start failed', [
@@ -191,7 +192,9 @@ class SubscriptionController extends Controller
     private function statusPayload(User $user): array
     {
         $tz = $user->timezone ?? 'UTC';
-        $subscription = $user->activeSubscription ?? $user->subscriptions()->first();
+        // Only a subscription that grants access: an abandoned or ended one would
+        // show the app a renewal date and a Cancel button for nothing.
+        $subscription = $user->activeSubscription;
         $lock = $this->freeTier->quota($user, FreeTierService::LOCK);
         $withdraw = $this->freeTier->quota($user, FreeTierService::WITHDRAW);
 

@@ -1,6 +1,37 @@
 # TEST STATUS — Time Vault
 
-**Last updated:** 2026-10-23. Latest run: `php artisan test` → **301 passed / 1131 assertions**, `pint --test` pass, `route:list` 100 routes, `composer audit` 0.
+**Re-run 2026-10-26 (after the user edited `.env`):**
+- **Results:** 311/1173 green, Pint pass. E2E 80/80 with new users #58–60, all 72 webhooks 200, admin pages and exports 15/15.
+- **Webhook secret:** webhooks signed with the `.env` `STRIPE_WEBHOOK_SECRET` → 200; a wrong signature → 400.
+- **`.env` state:** `STRIPE_KEY` is now absent; it is unused by the code (only `STRIPE_SECRET` is read). `STRIPE_WEBHOOK_SECRET` still appears twice, with identical values.
+
+**Last updated:** 2026-10-26. Latest run: `php artisan test` → **311 passed / 1173 assertions**, `pint --test` pass, `route:list` 100 routes, `composer audit` 0.
+- **New tests:**
+  - `SubscriptionApiTest` (+6):
+    - an unsynced paid attempt → 409;
+    - a plan switch cancels the other unpaid attempt;
+    - `/confirm` finds an older paid attempt;
+    - `/status` hides a dead subscription;
+    - a busy app is not rate-limited at Subscribe;
+    - updated reuse test.
+  - `AdminSubscriptionTest` (+1): no price change while a plan has subscribers.
+  - `FreeTierGateTest` (+2): open deposits of any age are checked; a withdrawal that fails after Stripe paid is still counted.
+  - New `tests/Feature/Auth/AuthRateLimitTest.php` (2).
+- **Real Stripe test mode, through the local API** (scratch script `e2e_journeys.php`; 3 users signed up via signup → OTP → login; `stripe listen`; test clocks):
+  - 80/80 checks, all 39 webhooks 200;
+  - free locks 2 then 402;
+  - declined card;
+  - plan switch on the paywall;
+  - Monthly $4.99 and Yearly $49.99 bought;
+  - locks 3–5 allowed;
+  - withdraw paywall 402 / lifted;
+  - renewals recorded at $4.99 and $49.99;
+  - cancel at period end → ends, no charge → back to 402;
+  - `subscriptions:sync` repairs a missed renewal.
+- **Admin panel, Playwright:** all subscription pages and user pages show matching data. Reset free usage, a free-tier limit change seen by the API, a refused price edit, cancel-now (Stripe = canceled) and all 6 exports work.
+- **Not testable yet:** a real bank add / payout (the Stripe Connect settings block it).
+
+Previous: 2026-10-23. Latest run: `php artisan test` → **301 passed / 1131 assertions**, `pint --test` pass, `route:list` 100 routes, `composer audit` 0.
 - **New test files:**
   - `SubscriptionPlanSeederTest` (7): creates the 2 recurring plans; a re-run is a no-op; adopts a price by lookup key; a failure leaves drafts a re-run completes; re-links plans from another Stripe account; refuses without a key.
   - `SyncSubscriptionsCommandTest` (6).

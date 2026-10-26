@@ -1,6 +1,33 @@
 # PROJECT STATE — Time Vault
 
-**Last updated:** 2026-10-23. **New Stripe account + client plans + security pass, committed and pushed** (with all the 2026-10-06…14 work below, which was uncommitted until now).
+**Last updated:** 2026-10-26. **Pre-go-live subscription review + human-style test pass, fixes UNCOMMITTED on `development`.**
+- **Reviews:** a security review and a correctness review of the subscription code (API and admin). The fixes below came out of them.
+- **Fixes:**
+  - **Double charge prevented:** `/subscribe` re-reads a recent unpaid attempt from Stripe first, and returns 409 if it was paid with the webhook still on the way. Switching plans on the paywall cancels the other unpaid attempt (`SubscriptionService::refreshPending()` / `cancelOpenAttempts()`). An attempt is reused only if its Stripe price still matches the plan's price.
+  - **`/confirm`** finds an older attempt that was paid, not only the newest one.
+  - **`/status`:** `subscription` is `null` unless it grants access. The Flutter brief is updated to match.
+  - **Free locks:** `settleOpenDeposits` checks every open deposit, not only those from the last 24h. The middleware re-reads `free_locks_used` under the row lock.
+  - **Free withdrawals:** one is not given back once Stripe has sent money (`EnsureFreeQuotaOrSubscribed::MONEY_SENT`).
+  - **Admin plans:** the price, currency or interval of a plan with active subscribers cannot be changed; the admin must create a new plan instead.
+  - **Admin dates:** an ended subscription shows "Ended …", and an unpaid attempt shows "Not paid", instead of a future renewal date.
+  - **Rate limits:** every route `throttle:` in `routes/api.php` now has its own prefix. They used to share one counter per user or IP, so a busy app could get 429 on Subscribe, and the sign-up steps could lock users out of login.
+- **Verified:**
+  - 311 tests / 1173 assertions, Pint, 100 routes, `composer audit` 0.
+  - Real Stripe test mode, 3 users signed up through the API: free, Monthly and Yearly. 80/80 checks passed:
+    - free locks and the 402 paywall;
+    - buying each plan;
+    - unlimited locks after buying;
+    - the withdraw paywall;
+    - renewals at $4.99 and $49.99 on test clocks;
+    - cancel;
+    - reconcile.
+  - All 39 webhooks returned 200.
+  - Admin panel clicked through in Playwright: plans, subscriptions, payments, user pages, reset free usage, free-tier limit change seen by the API, a price edit refused, cancel-now, and all 6 exports.
+- **Still blocked:** real withdrawals.
+  - Bank add → Stripe refuses Connect account creation. Two Dashboard settings are needed in TEST mode: Connect **platform profile**, and **Accounts v1 support** (`/settings/developers/api-policies`). The v1 requirement was found 2026-10-26.
+- Local test users kept: #55 `+free`, #56 `+monthly`, #57 `+yearly` (aliases of `tauseefchoohan0401@gmail.com`). Their Stripe test clocks are deleted.
+
+Previous: 2026-10-23. **New Stripe account + client plans + security pass, committed and pushed** (with all the 2026-10-06…14 work below, which was uncommitted until now).
 - **Stripe:** the app now uses the client's account "The Gold Rose Agency llc" (`acct_1TLqQzA6wBqKEqYq`, test mode). The local `.env` is switched; the server `.env` is NOT (no SSH from this PC).
 - **Plans:** `database/seeders/SubscriptionPlanSeeder.php` creates the client's two auto-renewing plans: Monthly $4.99, Yearly $49.99, "No commitments. Cancel anytime.".
   - Stripe prices carry the lookup keys `time_vault_monthly` / `time_vault_yearly`, so every server on the account reuses them.

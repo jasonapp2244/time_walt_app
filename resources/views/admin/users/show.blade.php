@@ -154,7 +154,7 @@
                             </div>
                         @else
                             <div class="mb-3" style="color:#6b7280;">
-                                Free tier{{ $subscription ? ' (last subscription: '.($subscription->plan?->name ?? '—').', '.$subscription->status.')' : '' }}
+                                Free tier{{ $subscription ? ' (last subscription: '.($subscription->plan?->name ?? '—').', '.(in_array($subscription->status, ['incomplete', 'incomplete_expired'], true) ? 'not paid' : 'ended').')' : '' }}
                             </div>
                         @endif
 

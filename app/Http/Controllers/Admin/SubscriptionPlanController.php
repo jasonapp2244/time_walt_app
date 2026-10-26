@@ -79,6 +79,12 @@ class SubscriptionPlanController extends Controller
         $subscriptionPlan->is_active = $request->boolean('is_active');
         $priceChanged = $subscriptionPlan->isDirty(['price', 'currency', 'interval']);
 
+        // Subscribers keep billing at the old Stripe price, but every screen
+        // reads the plan's price, so it would show them an amount they don't pay.
+        if ($priceChanged && Subscription::where('subscription_plan_id', $subscriptionPlan->id)->entitled()->exists()) {
+            return back()->withInput()->withErrors(['price' => 'This plan has active subscribers, so its price, currency and billing period cannot change. Create a new plan and hide this one instead.']);
+        }
+
         try {
             $this->subscriptionService->syncPlanToStripe($subscriptionPlan);
         } catch (\Stripe\Exception\ApiErrorException $e) {
@@ -90,7 +96,7 @@ class SubscriptionPlanController extends Controller
 
         $message = "Plan \"{$subscriptionPlan->name}\" updated.";
         if ($priceChanged) {
-            $message .= ' New subscribers pay the new price; existing subscribers keep theirs.';
+            $message .= ' New subscribers pay the new price.';
         }
 
         return redirect()->route('admin.subscription-plans.index')->with('success', $message);
