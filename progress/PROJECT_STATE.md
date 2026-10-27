@@ -1,5 +1,14 @@
 # PROJECT STATE — Time Vault
 
+**2026-10-28 (2nd), client-ready cleanup (user request):**
+- **Personal Gmail removed from tracked files.** Postman (regenerated from `docs/postman/build_collection.php`; coverage check: 44 paths, none missing), tests, progress → `michael.reed@example.com` / US names.
+- **Deleted:** `tests/Unit/ExampleTest.php` (and the Unit suite in `phpunit.xml`), the unused `app/Http/Requests/Stripe/TestPaymentRequest.php`, and the demo "Test User" row in `DatabaseSeeder`. `tests/Feature/ExampleTest.php` renamed `HomePageTest.php`.
+- **New `users:remove-test-accounts`** (`app/Console/Commands/RemoveTestAccounts.php`): dry-run list, `--keep=ID`, `--force`; admins never touched.
+- **Local DB:** #58–61 renamed Daniel Brooks, Sarah Mitchell, Emily Carter, James Walker (`first.last@example.com`); #52 and 32 unreadable rows deleted. Users left: admin #42 + those 4.
+- **Not changed:** GitHub owner `jasonapp2244` (the repo URL deploy uses). Old git history still has the email (user chose no force push).
+
+**2026-10-28:** added `app/Console/Commands/ResetStripeTestData.php` (`stripe:reset-test-data`), the one-command cleanup for the test → live switch (production has only testers; user confirmed). Dry run by default, `--force` deletes in one DB transaction. Safety check: every saved Stripe customer and Connect account is looked up with the current key; if any still exists there, nothing is deleted (resource_missing / deleted / other-platform = stale). Stripe unreachable → nothing deleted. Real dry run on the local DB (test key) refused correctly: 3 of 37 saved ids live in the current test account (#52, #61); the other 34 were already stale from older accounts. Uncommitted.
+
 **Last updated:** 2026-10-27. **Pre-go-live fixes committed and pushed as `a799a90` (`development` = `main` = origin). Not deployed yet.** The 2026-10-26 review and test pass is below.
 - **Reviews:** a security review and a correctness review of the subscription code (API and admin). The fixes below came out of them.
 - **Fixes:**
@@ -25,7 +34,7 @@
   - Admin panel clicked through in Playwright: plans, subscriptions, payments, user pages, reset free usage, free-tier limit change seen by the API, a price edit refused, cancel-now, and all 6 exports.
 - **Still blocked:** real withdrawals.
   - Bank add → Stripe refuses Connect account creation. Two Dashboard settings are needed in TEST mode: Connect **platform profile**, and **Accounts v1 support** (`/settings/developers/api-policies`). The v1 requirement was found 2026-10-26.
-- Local test users kept: #55 `+free`, #56 `+monthly`, #57 `+yearly` (aliases of `tauseefchoohan0401@gmail.com`). Their Stripe test clocks are deleted.
+- Local test users kept: #55 `+free`, #56 `+monthly`, #57 `+yearly` (local test aliases; renamed/removed 2026-10-28). Their Stripe test clocks are deleted.
 
 Previous: 2026-10-23. **New Stripe account + client plans + security pass, committed and pushed** (with all the 2026-10-06…14 work below, which was uncommitted until now).
 - **Stripe:** the app now uses the client's account "The Gold Rose Agency llc" (`acct_1TLqQzA6wBqKEqYq`, test mode). The local `.env` is switched; the server `.env` is NOT (no SSH from this PC).

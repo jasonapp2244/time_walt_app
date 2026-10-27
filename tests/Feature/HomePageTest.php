@@ -5,12 +5,12 @@ namespace Tests\Feature;
 // use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-class ExampleTest extends TestCase
+class HomePageTest extends TestCase
 {
     /**
-     * A basic test example.
+     * The public home page loads.
      */
-    public function test_the_application_returns_a_successful_response(): void
+    public function test_the_home_page_loads(): void
     {
         $response = $this->get('/');
 

@@ -35,7 +35,7 @@ class BankAccountStoreTest extends TestCase
 
         $this->user = User::factory()->create([
             'full_name' => 'Jane Ann Doe',
-            'email' => 'tauseefchoohan0401@gmail.com',
+            'email' => 'michael.reed@example.com',
         ]);
     }
 

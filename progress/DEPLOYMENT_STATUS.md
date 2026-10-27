@@ -1,6 +1,10 @@
 # DEPLOYMENT STATUS — Time Vault
 
-**Last updated:** 2026-10-27: the pre-go-live fixes are committed and pushed as `a799a90`; `main` = `development` = origin. Ready for `./deploy.sh --branch main` (the user runs it). Previous: 2026-10-26 (fixes were uncommitted).
+**Last updated:** 2026-10-28 (2nd): name/dummy cleanup + `users:remove-test-accounts` + `stripe:reset-test-data`. Server order after `./deploy.sh --branch main`: plan seeder → `php artisan users:remove-test-accounts` (dry run) → same with `--keep=ID … --force` → 4242 deposit, webhook 200.
+
+Earlier 2026-10-28: new `stripe:reset-test-data` command. At the live switch, after the live keys + `config:cache`: `php artisan stripe:reset-test-data` (dry run), then `php artisan stripe:reset-test-data --force`, then the plan seeder. Production has only testers (user confirmed 2026-10-28).
+
+Previous, 2026-10-27: the pre-go-live fixes are committed and pushed as `a799a90`; `main` = `development` = origin. Ready for `./deploy.sh --branch main` (the user runs it). Previous: 2026-10-26 (fixes were uncommitted).
 - No migration and no `.env` change.
 - `routes/api.php` changed (throttle prefixes). `deploy.sh` runs `route:cache`/`optimize`, so that is fine.
 - Server steps are unchanged:

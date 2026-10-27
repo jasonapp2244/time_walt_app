@@ -36,7 +36,7 @@ class SubscriptionPaymentEmailTest extends TestCase
         $this->fakeStripe();
         config(['mail.admin_email' => 'admin@example.test']);
 
-        $this->user = User::factory()->create(['email' => 'tauseefchoohan0401@gmail.com', 'full_name' => 'Test User']);
+        $this->user = User::factory()->create(['email' => 'michael.reed@example.com', 'full_name' => 'Michael Reed']);
         $plan = SubscriptionPlan::factory()->create(['name' => 'Premium Monthly', 'price' => 4.99]);
         $this->subscription = Subscription::factory()->create([
             'user_id' => $this->user->id,
@@ -131,7 +131,7 @@ class SubscriptionPaymentEmailTest extends TestCase
 
         (new SendSubscriptionPaymentNotification($invoice))->handle();
 
-        Mail::assertSent(SubscriptionPaymentMail::class, fn ($m) => $m->hasTo('tauseefchoohan0401@gmail.com') && ! $m->isAdmin);
+        Mail::assertSent(SubscriptionPaymentMail::class, fn ($m) => $m->hasTo('michael.reed@example.com') && ! $m->isAdmin);
         Mail::assertSent(SubscriptionPaymentMail::class, fn ($m) => $m->hasTo('admin@example.test') && $m->isAdmin);
         Mail::assertSentCount(2);
     }
@@ -164,7 +164,7 @@ class SubscriptionPaymentEmailTest extends TestCase
         $this->assertStringContainsString('View receipt', $userHtml);
 
         $this->assertStringContainsString('Admin Notification', $adminHtml);
-        $this->assertStringContainsString('tauseefchoohan0401@gmail.com', $adminHtml);
+        $this->assertStringContainsString('michael.reed@example.com', $adminHtml);
         $this->assertStringNotContainsString('View receipt', $adminHtml);
     }
 
@@ -186,7 +186,7 @@ class SubscriptionPaymentEmailTest extends TestCase
 
         (new SendSubscriptionPaymentIssueNotification($this->subscription, 'failed', 'https://invoice.stripe.com/i/x'))->handle();
 
-        Mail::assertSent(SubscriptionPaymentIssueMail::class, fn ($m) => $m->hasTo('tauseefchoohan0401@gmail.com') && ! $m->isAdmin);
+        Mail::assertSent(SubscriptionPaymentIssueMail::class, fn ($m) => $m->hasTo('michael.reed@example.com') && ! $m->isAdmin);
         Mail::assertSent(SubscriptionPaymentIssueMail::class, fn ($m) => $m->hasTo('admin@example.test') && $m->isAdmin);
         $this->assertStringContainsString('[Admin]', (new SubscriptionPaymentIssueMail($this->subscription, 'failed', null, true))->envelope()->subject);
         $this->assertStringContainsString('Hi Admin', (new SubscriptionPaymentIssueMail($this->subscription, 'failed', null, true))->render());

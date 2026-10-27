@@ -1,6 +1,6 @@
 # TODO — Time Vault
 
-**Last updated:** 2026-10-27
+**Last updated:** 2026-10-28
 
 One line per item. Keep it honest: an item is only done when it has been verified working, not when it compiles.
 
@@ -8,8 +8,10 @@ One line per item. Keep it honest: an item is only done when it has been verifie
 
 ## IN PROGRESS
 
+- [ ] **Server, after this deploy (user runs it):** `php artisan users:remove-test-accounts` lists every non-admin account (dry run). Then `--keep=ID` for each US-named tester to keep, plus `--force`. Deleting cascades to the user's payments, holds, transfers, bank, Stripe rows, subscriptions, feedback and support. Admins are never touched. Rule from the user (2026-10-28): client-visible data uses US names + `@example.com`, no Asian names, no personal Gmail.
+- [ ] **At the live-key switch, run the cleanup (server, user runs it).** The user confirmed 2026-10-28: production has only testers, no real money. New command `php artisan stripe:reset-test-data` (dry run: counts only) then `--force`. It deletes transfers, payment_holds, payments, subscription_invoices, subscriptions, stripe_customers, stripe_connect_accounts, user_bank_accounts and stripe_webhook_events, and resets free-tier counters. It keeps users, plans, settings, feedback and support requests. It refuses while any saved customer or Connect account still exists under the current key, so it must run AFTER the live keys are in `.env` + `config:cache`. Testers must re-add their bank account after it.
 - [x] ~~**BLOCKER, client: Stripe Connect platform profile + Accounts v1 support (TEST mode)**~~: both saved by the client on 2026-10-27 (v1 first, then the platform profile). Custom, Express and v2 account creation all succeed now.
-  - Real withdrawal E2E passed the same day in test mode (`e2e_withdrawals.php`, user #61 `tauseefchoohan0401+withdraw@gmail.com`, Connect `acct_1UVDwpPPoYlIjstE`): bank add 201 → 2 locks ($10 + $15) → holds matured → withdrawals $5 and $7 (the $7 drew on 2 holds = 2 Stripe transfers, counted as 1 withdrawal) → 3rd → 402, no money moved → Monthly $4.99 paid → withdrawals $3 and $4 OK → $19 sent = the Connect account's Stripe balance, $6 left; over-ask → 400. Admin user page + transfers list show the same rows. Test subscription cancelled in Stripe afterwards.
+  - Real withdrawal E2E passed the same day in test mode (`e2e_withdrawals.php`, local test user #61, now `james.walker@example.com`, Connect `acct_1UVDwpPPoYlIjstE`): bank add 201 → 2 locks ($10 + $15) → holds matured → withdrawals $5 and $7 (the $7 drew on 2 holds = 2 Stripe transfers, counted as 1 withdrawal) → 3rd → 402, no money moved → Monthly $4.99 paid → withdrawals $3 and $4 OK → $19 sent = the Connect account's Stripe balance, $6 left; over-ask → 400. Admin user page + transfers list show the same rows. Test subscription cancelled in Stripe afterwards.
 - [ ] **Client checklist status (checked 2026-10-27 with the test key; no live key locally, so LIVE is unseen):**
   - TEST done: Connect (platform profile + Accounts v1), customer portal (card update, invoices, cancel at period end, no plan switch, links), `one_month` archived (old $4.99/mo product, unused by the app, 0 subscriptions).
   - TEST, Billing subscription status: done per the client's Dashboard text (2026-10-27): active when latest invoice settled; first renewal failure → past-due; all retries fail → cancel. "3D Secure for Radar-rule payments" left off (optional; the Payment Sheet + invoice.payment_action_required already handle 3DS).
@@ -77,7 +79,7 @@ One line per item. Keep it honest: an item is only done when it has been verifie
 - [ ] **Hand the Postman collection to whoever tests the API.** `TimeVault_Complete_Postman_Collection.json` plus one of the two environment files. Import both, pick the environment, run Signup → Verify OTP (or Login); the token is captured automatically.
 
 - [ ] **Update the stored privacy policy contact address.** The active row still reads `support@timevaultapp.com` (`.com`, not `.co`) from the original seed. `PrivacyPolicySeeder` now pulls from `SUPPORT_EMAIL`, but it only runs on a fresh seed — fix the live row at `/admin/privacy-policy`.
-- [ ] **Check that `admin@timevaultapp.co` and `support@timevaultapp.co` receive mail.** Sending is verified; mailbox existence on that domain is not. A bounce lands in `MAIL_USERNAME` (`tauseefchoohan0401@gmail.com`).
+- [ ] **Check that `admin@timevaultapp.co` and `support@timevaultapp.co` receive mail.** Sending is verified; mailbox existence on that domain is not. A bounce lands in `MAIL_USERNAME` (currently the developer's Gmail; the server must use the client's mailbox).
 - [ ] **Set `ADMIN_EMAIL` and `SUPPORT_EMAIL` in the production `.env`** before deploying. Missing keys mean the jobs log a warning and send nothing — deploy will still look green.
 - [ ] **Point the Flutter support screen at `POST /api/profile/support`.** Body: `subject` (max 150) + `message` (max 2000), Sanctum bearer token, `throttle:10,1`. Success returns `data.support_request`. No client calls it yet.
 - [ ] **Push `development` and `main`.** Superseded in part: feedback and support are committed, merged and on origin as of `e25dc2a`, and the API probe shows support live in production. What is *not* pushed is the 2026-09-22 tooling work — `f252a74`, `cdf24b7`, `b772e70`, `2f24292` (deploy.sh queue check, `deploy/` scripts, Postman collection). `main` is still at `e25dc2a`.
