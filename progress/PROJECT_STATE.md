@@ -1,5 +1,7 @@
 # PROJECT STATE — Time Vault
 
+**2026-10-28 (4th):** one-command deploy: `deploy.sh` extended (plan seeder, background jobs as root, stray-backup move, `deploy:check`, account list) + new `app/Console/Commands/DeployCheck.php`. See `DEPLOYMENT_STATUS.md` for the command. Uncommitted.
+
 **2026-10-28 (3rd), unused files removed (user request; uncommitted).** ~2,300 lines of dead code, nothing routed or called:
 - **Files deleted:**
   - `README.md` (stock Laravel text);

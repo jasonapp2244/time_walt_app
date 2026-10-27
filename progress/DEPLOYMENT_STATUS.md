@@ -1,6 +1,12 @@
 # DEPLOYMENT STATUS — Time Vault
 
-**Last updated:** 2026-10-28 (3rd): `5999ff5` is pushed (`development` = `main`). The unused-file cleanup on top is uncommitted. No migration and no route change; 4 `STRIPE_*_URL` env keys are no longer read.
+**Last updated:** 2026-10-28 (4th): one-command deploy (uncommitted until the user says commit). On the server, as root, in the app folder:
+
+    git -c safe.directory='*' fetch origin main && git -c safe.directory='*' show origin/main:deploy.sh > /tmp/tv-deploy.sh && APP_DIR=$PWD bash /tmp/tv-deploy.sh --branch main
+
+`deploy.sh` now also: runs the plan seeder; as root, runs `deploy/setup-background-jobs.sh` (systemd queue worker + scheduler cron, verified); moves stray `*.zip/*.sql/*.tar*` out of the app folder to `../backups` (the server has `time_vault_live_backup_28_sep.zip` in the app root); runs the new read-only `php artisan deploy:check` (APP_ENV/DEBUG/URL, Stripe key + mode + account activation, webhook endpoint for APP_URL with all 9 events, plan prices, mail); lists non-admin accounts (deletes nothing). The root run no longer `exec`s into the site user, so it can do the root-only steps afterwards. Dry-run verified locally on a clean copy; the root/systemd part cannot run on Windows.
+
+Earlier 2026-10-28 (3rd): `c6fc5f2` (unused-file cleanup) is pushed; `development` = `main` = origin. Ready for `./deploy.sh --branch main`. No migration and no route change; 4 `STRIPE_*_URL` env keys are no longer read.
 
 Earlier 2026-10-28 (2nd): name/dummy cleanup + `users:remove-test-accounts` + `stripe:reset-test-data`. Server order after `./deploy.sh --branch main`: plan seeder → `php artisan users:remove-test-accounts` (dry run) → same with `--keep=ID … --force` → 4242 deposit, webhook 200.
 

@@ -1,5 +1,17 @@
 # TEST STATUS — Time Vault
 
+**2026-10-28 live check of production (after the user's deploy), read-only:**
+- **Admin panel:** login OK. 24 pages, 22 user pages/stats and 18 exports (xlsx + pdf × 9 lists) → all 200, no "Server Error" (scratch `live_admin.php`).
+- **API without a token:**
+  - `/up`, `/` and `privacy-policy` → 200;
+  - wrong login → 401; empty signup and bad email → 422 with messages;
+  - 9 protected routes → 401 with no token or a fake token;
+  - unknown route → 404 JSON; no stack traces (debug off).
+- **FAIL: webhook.** It returns 400 "Webhook secret not configured"; Stripe has `pending_webhooks=1` on subscribed events since 2026-10-27.
+- **Not tested: logged-in API flows.** The local test accounts don't exist on the server, and a new account needs an emailed OTP.
+
+**2026-10-28 (4th):** `php artisan test` → **321 passed / 1219 assertions**; Pint pass. New `tests/Feature/DeployCheckTest.php` (4: correct setup passes; webhook missing events fails and names them; APP_DEBUG + log mailer fail; plan price missing fails). `deploy:check` run for real against the local test account: Stripe/plans/mail ok, environment FAILs as expected for a local .env. `bash -n deploy.sh` ok; `deploy.sh --dry-run` on a clean copy ran every step in order, including moving a stray zip.
+
 **2026-10-28 (3rd), after removing unused files:** `php artisan test` → **317 passed / 1210 assertions**; Pint pass (whole project); `route:list` 100 routes (unchanged).
 
 **2026-10-28 (2nd):** `php artisan test` → **317 passed / 1210 assertions**; Pint pass (whole project); `route:list` 100 routes (unchanged). New `tests/Feature/RemoveTestAccountsTest.php` (3); Unit stub deleted; `HomePageTest` renamed from ExampleTest. Admin `/admin/users` (HTTP, logged in) 200, shows only the 4 US testers; dashboard 200.

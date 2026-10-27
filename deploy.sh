@@ -7,10 +7,16 @@
 #   ./deploy.sh --rollback   return to the SHA recorded by the last deploy
 #   ./deploy.sh --dry-run    show what would happen, change nothing
 #
-# Bootstrapping on a server that does not have the script yet:
+# One command, as root, from the app folder (always uses the newest copy of
+# this script from origin/main, even if the server's copy is older):
 #
-#   curl -fsSL https://raw.githubusercontent.com/jasonapp2244/time_walt_app/main/deploy.sh -o /tmp/tv-deploy.sh \
-#     && APP_DIR=/home/timevaultapp-api/htdocs/api.timevaultapp.co bash /tmp/tv-deploy.sh
+#   git -c safe.directory='*' fetch origin main && git -c safe.directory='*' show origin/main:deploy.sh > /tmp/tv-deploy.sh && APP_DIR=$PWD bash /tmp/tv-deploy.sh --branch main
+#
+# What it does: pull, composer, migrations (with a DB backup first), caches,
+# plan prices (SubscriptionPlanSeeder), queue worker + scheduler (as root),
+# moves stray *.zip/*.sql backups out of the app folder, health check, then
+# `artisan deploy:check` (environment, Stripe keys, webhook, plans, mail) and a
+# list of non-admin accounts (nothing deleted).
 #
 # Safe to re-run. Every step is idempotent.
 #
@@ -64,6 +70,21 @@ die() {
 
 trap 'die "aborted at line $LINENO - if the app is still in maintenance mode, run: $PHP_BIN artisan up"' ERR
 
+# Queue worker (systemd) and scheduler (cron) need root. The setup script is
+# idempotent and verifies both, so it runs on every root deploy.
+root_background_jobs() {
+    step "Queue worker + scheduler (root)"
+    if [ ! -x "$APP_DIR/deploy/setup-background-jobs.sh" ] && [ ! -f "$APP_DIR/deploy/setup-background-jobs.sh" ]; then
+        warn "deploy/setup-background-jobs.sh not found - skipped"
+        return 0
+    fi
+    if APP_DIR="$APP_DIR" bash "$APP_DIR/deploy/setup-background-jobs.sh"; then
+        ok "queue worker and scheduler verified"
+    else
+        warn "background jobs not fully verified - see the FAIL lines above"
+    fi
+}
+
 # ------------------------------------------------------------------ args ----
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -74,7 +95,7 @@ while [ "$#" -gt 0 ]; do
             ;;
         --rollback) ROLLBACK=1; shift ;;
         --dry-run)  DRY_RUN=1; shift ;;
-        -h|--help)  sed -n '2,23p' "${BASH_SOURCE[0]}" | sed 's/^#\{1,\} \{0,1\}//'; exit 0 ;;
+        -h|--help)  sed -n '2,28p' "${BASH_SOURCE[0]}" | sed 's/^#\{1,\} \{0,1\}//'; exit 0 ;;
         *)          die "unknown option: $1" ;;
     esac
 done
@@ -105,14 +126,23 @@ if [ "$(id -u)" -eq 0 ] && [ "$SITE_USER" != "root" ] && [ "${TV_DEPLOY_REEXEC:-
 
     if command -v sudo >/dev/null 2>&1 && sudo -n -u "$SITE_USER" true >/dev/null 2>&1; then
         warn "running as root, but this site is owned by $SITE_USER"
-        warn "re-running as $SITE_USER so composer and artisan do not leave root-owned files"
-        exec sudo -u "$SITE_USER" -H env \
+        warn "running the deploy as $SITE_USER so composer and artisan do not leave root-owned files"
+        trap - ERR
+        DEPLOY_RC=0
+        sudo -u "$SITE_USER" -H env \
             TV_DEPLOY_REEXEC=1 \
             APP_DIR="$APP_DIR" \
             PHP_BIN="$PHP_BIN" \
             COMPOSER_BIN="$COMPOSER_BIN" \
             BACKUP_DIR="$BACKUP_DIR" \
-            bash "$SCRIPT_PATH" "$@"
+            bash "$SCRIPT_PATH" "$@" || DEPLOY_RC=$?
+        [ "$DEPLOY_RC" -eq 0 ] || exit "$DEPLOY_RC"
+        # Back as root: the parts that need root (systemd worker, cron) are
+        # only possible here, after the new code is in place.
+        if [ "$DRY_RUN" -eq 0 ] && [ "$ROLLBACK" -eq 0 ]; then
+            root_background_jobs
+        fi
+        exit 0
     else
         ROOT_FALLBACK=1
         warn "running as root and cannot switch to $SITE_USER (sudo unavailable or denied)"
@@ -176,6 +206,18 @@ fi
 APP_URL_VAL="$(env_get APP_URL)"
 APP_URL_VAL="${APP_URL_VAL%/}"
 [ -n "$APP_URL_VAL" ] || warn "APP_URL is empty - the health check will be skipped"
+
+# Backups and dumps do not belong in the code directory: they hold user data
+# and get copied along with it. Move them next to the deploy backups.
+for STRAY in ./*.zip ./*.sql ./*.sql.gz ./*.tar ./*.tar.gz ./*.tgz; do
+    [ -f "$STRAY" ] || continue
+    git ls-files --error-unmatch -- "$STRAY" >/dev/null 2>&1 && continue
+    if run mkdir -p "$BACKUP_DIR" && run mv -- "$STRAY" "$BACKUP_DIR/"; then
+        ok "moved $(basename "$STRAY") out of the app folder to $BACKUP_DIR/"
+    else
+        warn "could not move $(basename "$STRAY") to $BACKUP_DIR - move it out of the app folder by hand"
+    fi
+done
 
 # -------------------------------------------------------------- rollback ----
 if [ "$ROLLBACK" -eq 1 ]; then
@@ -380,6 +422,16 @@ else
 fi
 ok "caches rebuilt"
 
+# ------------------------------------------------------- plan prices -------
+# Idempotent: links each plan to its Stripe price in the account the current
+# keys belong to, creating the price only when it is missing there.
+step "Subscription plans (link to Stripe prices)"
+if run "$PHP_BIN" artisan db:seed --class=SubscriptionPlanSeeder --force; then
+    ok "plans linked"
+else
+    warn "plan seeder failed - subscriptions cannot be bought until it succeeds (see output above)"
+fi
+
 # ------------------------------------------------------------ permissions ---
 step "Permissions"
 case "$SITE_OWNER" in
@@ -473,6 +525,29 @@ else
         printf '\n  Roll back with:\n    cd %s && ./deploy.sh --rollback\n\n' "$APP_DIR"
         exit 1
     fi
+fi
+
+# ------------------------------------------------------ settings check ------
+step "Settings check (environment, Stripe, webhook, plans, mail)"
+SETTINGS_OK=1
+if [ "$DRY_RUN" -eq 1 ]; then
+    printf '       [dry-run] %s artisan deploy:check\n' "$PHP_BIN"
+elif ! "$PHP_BIN" artisan deploy:check; then
+    SETTINGS_OK=0
+    warn "fix the FAIL lines above in .env or the Stripe Dashboard, then: $PHP_BIN artisan config:cache && $PHP_BIN artisan deploy:check"
+fi
+
+# ----------------------------------------------------- tester accounts ------
+step "Non-admin accounts (listed only, nothing deleted)"
+if [ "$DRY_RUN" -eq 1 ]; then
+    printf '       [dry-run] %s artisan users:remove-test-accounts\n' "$PHP_BIN"
+else
+    "$PHP_BIN" artisan users:remove-test-accounts | sed 's/^/       /' || warn "could not list accounts"
+    printf '       To delete the testers: %s artisan users:remove-test-accounts --keep=ID --force\n' "$PHP_BIN"
+fi
+
+if [ "$(id -u)" -eq 0 ] && [ "$ROOT_FALLBACK" -eq 1 ] && [ "$DRY_RUN" -eq 0 ]; then
+    root_background_jobs
 fi
 
 ERR_COUNT="$(grep -c 'production.ERROR' storage/logs/laravel.log 2>/dev/null || true)"
