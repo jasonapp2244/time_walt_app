@@ -56,12 +56,10 @@ Check it with `systemctl status timevault-queue`, or drain a backlog by hand wit
 ### Payment Flow
 Stripe Payment Sheet flow: create Customer → create EphemeralKey → create PaymentIntent → confirm on device → webhook confirms → create PaymentHold with configurable hold duration. Users manually request withdrawals when holds mature (no auto-transfer).
 
-**Card data is saved in all 5 Payment::create flows:**
+**Card data is saved in all 3 Payment::create flows:**
 1. `PaymentSheetService::recordPayment()` — Payment Sheet verification
-2. `StripeController::verifyPayment()` — API verify endpoint
-3. `StripeController::handlePaymentReturn()` — Redirect return handler
-4. `WebhookService::handleCheckoutSessionCompleted()` — Checkout webhook
-5. `WebhookService::handlePaymentIntentSucceeded()` — PaymentIntent webhook
+2. `WebhookService::handleCheckoutSessionCompleted()` — Checkout webhook
+3. `WebhookService::handlePaymentIntentSucceeded()` — PaymentIntent webhook
 
 Card fields saved: `card_brand`, `card_last4`, `card_exp_month`, `card_exp_year`, `card_funding`, `card_country`, `payment_method_type`.
 

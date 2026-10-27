@@ -4,12 +4,8 @@ namespace App\Services;
 
 use App\Jobs\SendPaymentFailedNotification;
 use App\Jobs\SendPaymentSuccessNotification;
-use App\Jobs\SendTransferCompletedNotification;
-use App\Jobs\SendTransferFailedNotification;
 use App\Models\Payment;
 use App\Models\PaymentHold;
-use App\Models\StripeConnectAccount;
-use App\Models\Transfer;
 use App\Models\UserNotificationSetting;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -300,126 +296,6 @@ class WebhookService
     }
 
     /**
-     * Handle account.updated event.
-     */
-    public function handleAccountUpdated(array $eventData): void
-    {
-        $account = $eventData['data']['object'];
-        $accountId = $account['id'];
-
-        $connectAccount = StripeConnectAccount::where('connect_account_id_index', StripeConnectAccount::blindIndex($accountId))->first();
-
-        if ($connectAccount) {
-            $status = 'pending';
-            if ($account['charges_enabled'] && $account['payouts_enabled']) {
-                $status = 'verified';
-            } elseif ($account['restrictions']['charges'] ?? false) {
-                $status = 'restricted';
-            }
-
-            $connectAccount->update([
-                'status' => $status,
-                'payouts_enabled' => $account['payouts_enabled'] ?? false,
-                'stripe_data' => $account,
-                'verified_at' => ($status === 'verified' && ! $connectAccount->verified_at) ? now() : $connectAccount->verified_at,
-            ]);
-        }
-    }
-
-    /**
-     * Handle transfer.created event.
-     * NOTE: NOT USED - Transfers are handled via cronjob (verify:pending-transfers) only.
-     * This method is kept for potential future use but is not called from webhook handler.
-     */
-    public function handleTransferCreated(array $eventData): void
-    {
-        $transfer = $eventData['data']['object'];
-        $transferId = $transfer['id'];
-
-        $transferRecord = Transfer::where('stripe_transfer_id_index', Transfer::blindIndex($transferId))->first();
-
-        if ($transferRecord) {
-            $transferRecord->update([
-                'status' => 'completed',
-                'transferred_at' => now(),
-                'stripe_data' => $transfer,
-            ]);
-
-            // Update payment hold with remaining_amount calculation
-            $hold = $transferRecord->hold;
-            if ($hold) {
-                // Calculate remaining amount
-                $currentRemaining = $hold->remaining_amount ?? $hold->amount;
-                $newRemainingAmount = max(0, $currentRemaining - $transferRecord->amount);
-
-                // Update hold status and remaining_amount
-                $hold->update([
-                    'remaining_amount' => $newRemainingAmount,
-                    'status' => $newRemainingAmount <= 0 ? 'transferred' : 'partial_transferred',
-                    'transferred_at' => $newRemainingAmount <= 0 ? now() : $hold->transferred_at,
-                ]);
-            }
-
-            // Check for other recently completed transfers for the same user (within last 2 minutes)
-            // This batches transfers from the same withdrawal request
-            $recentTransfers = Transfer::where('user_id', $transferRecord->user_id)
-                ->where('status', 'completed')
-                ->where('transferred_at', '>=', now()->subMinutes(2))
-                ->where('transferred_at', '<=', now())
-                ->with(['hold.payment', 'user'])
-                ->orderBy('transferred_at', 'asc')
-                ->get();
-
-            // Send email notification (check both transaction_alert and email_alert)
-            $userSettings = UserNotificationSetting::where('user_id', $transferRecord->user_id)->first();
-            $shouldSendEmail = ! $userSettings || ($userSettings->transaction_alert && $userSettings->email_alert);
-
-            if ($shouldSendEmail) {
-                // If multiple transfers completed recently, send summary email
-                if ($recentTransfers->count() > 1) {
-                    $totalAmount = $recentTransfers->sum('amount');
-                    \App\Jobs\SendTransferCompletedSummaryNotification::dispatch(
-                        $transferRecord->user,
-                        $recentTransfers,
-                        $totalAmount
-                    );
-                } else {
-                    // Single transfer, send individual email
-                    SendTransferCompletedNotification::dispatch($transferRecord);
-                }
-            }
-        }
-    }
-
-    /**
-     * Handle transfer.failed event.
-     * NOTE: NOT USED - Transfers are handled via cronjob (verify:pending-transfers) only.
-     * This method is kept for potential future use but is not called from webhook handler.
-     */
-    public function handleTransferFailed(array $eventData): void
-    {
-        $transfer = $eventData['data']['object'];
-        $transferId = $transfer['id'];
-        $failureReason = $transfer['failure_message'] ?? 'Transfer failed';
-
-        $transferRecord = Transfer::where('stripe_transfer_id_index', Transfer::blindIndex($transferId))->first();
-
-        if ($transferRecord) {
-            $transferRecord->update([
-                'status' => 'failed',
-                'failure_reason' => $failureReason,
-                'stripe_data' => $transfer,
-            ]);
-
-            // Send email notification
-            $userSettings = UserNotificationSetting::where('user_id', $transferRecord->user_id)->first();
-            if (! $userSettings || $userSettings->email_alert) {
-                SendTransferFailedNotification::dispatch($transferRecord, $failureReason);
-            }
-        }
-    }
-
-    /**
      * Handle payment_intent.canceled event (when user cancels payment).
      */
     public function handlePaymentIntentCanceled(array $eventData): void
@@ -455,41 +331,6 @@ class WebhookService
         $userSettings = UserNotificationSetting::where('user_id', $payment->user_id)->first();
         if (! $userSettings || $userSettings->email_alert) {
             SendPaymentFailedNotification::dispatch($payment, $cancelReason);
-        }
-    }
-
-    /**
-     * Handle transfer.canceled event (when transfer is canceled mid-process).
-     * NOTE: NOT USED - Transfers are handled via cronjob (verify:pending-transfers) only.
-     * This method is kept for potential future use but is not called from webhook handler.
-     */
-    public function handleTransferCanceled(array $eventData): void
-    {
-        $transfer = $eventData['data']['object'];
-        $transferId = $transfer['id'];
-        $cancelReason = $transfer['failure_message'] ?? 'Transfer canceled';
-
-        $transferRecord = Transfer::where('stripe_transfer_id_index', Transfer::blindIndex($transferId))->first();
-
-        if ($transferRecord) {
-            $transferRecord->update([
-                'status' => 'canceled',
-                'failure_reason' => $cancelReason,
-                'stripe_data' => $transfer,
-            ]);
-
-            // Update payment hold status back to ready_for_transfer
-            if ($transferRecord->hold) {
-                $transferRecord->hold->update([
-                    'status' => 'ready_for_transfer',
-                ]);
-            }
-
-            // Send email notification
-            $userSettings = UserNotificationSetting::where('user_id', $transferRecord->user_id)->first();
-            if (! $userSettings || $userSettings->email_alert) {
-                SendTransferFailedNotification::dispatch($transferRecord, $cancelReason);
-            }
         }
     }
 }

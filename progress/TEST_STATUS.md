@@ -1,5 +1,7 @@
 # TEST STATUS — Time Vault
 
+**2026-10-28 (3rd), after removing unused files:** `php artisan test` → **317 passed / 1210 assertions**; Pint pass (whole project); `route:list` 100 routes (unchanged).
+
 **2026-10-28 (2nd):** `php artisan test` → **317 passed / 1210 assertions**; Pint pass (whole project); `route:list` 100 routes (unchanged). New `tests/Feature/RemoveTestAccountsTest.php` (3); Unit stub deleted; `HomePageTest` renamed from ExampleTest. Admin `/admin/users` (HTTP, logged in) 200, shows only the 4 US testers; dashboard 200.
 
 **2026-10-28:** `php artisan test` → **315 passed / 1199 assertions** (98s); Pint pass on the new files. New `tests/Feature/Stripe/ResetStripeTestDataTest.php` (4): dry run deletes nothing; `--force` empties the 9 Stripe/money tables, resets counters, keeps the user, plans and feedback; refuses when a saved id still exists under the current key; refuses when Stripe errors. Real dry run of `stripe:reset-test-data` on the local DB refused as designed (test key still set). No routes changed.

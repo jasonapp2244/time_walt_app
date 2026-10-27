@@ -92,26 +92,4 @@ class PaymentHoldService
 
         return $hold;
     }
-
-    /**
-     * Check and mark holds as ready for transfer (for cron job).
-     */
-    public function checkAndMarkReady(): int
-    {
-        $holds = PaymentHold::where('status', 'holding')
-            ->where('hold_end_at', '<=', now())
-            ->get();
-
-        $count = 0;
-
-        foreach ($holds as $hold) {
-            $hold->update([
-                'status' => 'ready_for_transfer',
-                'ready_at' => now(),
-            ]);
-            $count++;
-        }
-
-        return $count;
-    }
 }

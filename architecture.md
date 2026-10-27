@@ -127,7 +127,6 @@ time_vault_with_admin_panel/
 |   |   |   |   +-- AppConfigController.php
 |   |   |   |   +-- AuthController.php
 |   |   |   |   +-- BankAccountController.php      # Bank details + silent Stripe Custom Connect
-|   |   |   |   +-- DeviceController.php           (not routed)
 |   |   |   |   +-- NotificationController.php
 |   |   |   |   +-- PaymentHoldController.php
 |   |   |   |   +-- PaymentSheetController.php     # Payment Sheet (create-intent, confirm)
@@ -144,17 +143,13 @@ time_vault_with_admin_panel/
 |   |   |   +-- Admin/TransferRequest.php
 |   |   |   +-- Auth/ (7 files: Login, Signup, VerifyOtp, ResendOtp, ForgotPassword, ResetPassword, ChangePassword)
 |   |   |   +-- Bank/ (StoreBankAccountRequest)  # Bank details validation
-|   |   |   +-- Device/ (RegisterDeviceRequest, UpdateDeviceTokenRequest)  (not routed)
 |   |   |   +-- Notification/UpdateNotificationSettingsRequest.php
 |   |   |   +-- Payment/ (CreatePaymentIntentRequest, ConfirmPaymentRequest)  # Payment Sheet
 |   |   |   +-- PrivacyPolicy/ (Store, Update)
 |   |   |   +-- Profile/ (UpdateProfile, UpdateLanguage, UpdateTimezone)
-|   |   |   +-- Stripe/ (CreateConnectAccount, GetOnboardingLink, CreatePaymentIntent, TestPayment, WithdrawPayout)
+|   |   |   +-- Stripe/ (WithdrawPayout)
 |   |   +-- Resources/            # API response resource formatters
-|   |       +-- NotificationSettingsResource.php
 |   |       +-- PrivacyPolicyResource.php
-|   |       +-- TransactionResource.php
-|   |       +-- UserResource.php
 |   +-- Jobs/                     # Queued background jobs (8 notification jobs)
 |   |   +-- SendHoldPeriodEndedNotification.php
 |   |   +-- SendPaymentFailedNotification.php
@@ -162,7 +157,6 @@ time_vault_with_admin_panel/
 |   |   +-- SendPayoutRequestNotification.php
 |   |   +-- SendTransferCompletedNotification.php
 |   |   +-- SendTransferCompletedSummaryNotification.php
-|   |   +-- SendTransferFailedNotification.php
 |   |   +-- SendWithdrawalSummaryNotification.php
 |   +-- Mail/                     # Mailable classes + Blade email templates
 |   |   +-- OtpMail.php
@@ -175,10 +169,8 @@ time_vault_with_admin_panel/
 |   |       +-- PayoutRequestMail.php
 |   |       +-- TransferCompletedMail.php
 |   |       +-- TransferCompletedSummaryMail.php
-|   |       +-- TransferFailedMail.php
 |   |       +-- WithdrawalSummaryMail.php
 |   +-- Models/                   # Eloquent models (11 models)
-|   |   +-- PasswordResetToken.php       (empty placeholder)
 |   |   +-- Payment.php                  # + card detail fields (brand, last4, exp, funding, country, method)
 |   |   +-- PaymentHold.php
 |   |   +-- PrivacyPolicy.php
@@ -229,13 +221,12 @@ time_vault_with_admin_panel/
 |   |   |   +-- otp.blade.php
 |   |   |   +-- account-deletion-confirmation.blade.php
 |   |   |   +-- admin-account-deletion-notification.blade.php
-|   |   |   +-- stripe/ (8 templates: payment-success, payment-failed, hold-ended,
+|   |   |   +-- stripe/ (7 templates: payment-success, payment-failed, hold-ended,
 |   |   |   |          transfer-completed, transfer-completed-summary,
-|   |   |   |          transfer-failed, payout-request, withdrawal-summary)
+|   |   |   |          payout-request, withdrawal-summary)
 |   |   +-- layouts/              # Admin layout template
 |   |   |   +-- admin.blade.php
 |   |   |   +-- partials/ (footer, footer_script, header, header_script, sidebar)
-|   |   +-- home.blade.php
 |   |   +-- welcome.blade.php
 |   +-- css/app.css               # Tailwind CSS entry
 |   +-- js/app.js                 # JS entry (Axios)
@@ -512,7 +503,7 @@ PaymentHold (1)----(1) Transfer (via hold_id FK)
 
 ---
 
-#### PasswordResetToken (`password_reset_tokens` table)
+#### `password_reset_tokens` table (no model)
 
 | Field      | Type     | Notes           |
 |------------|----------|-----------------|
@@ -701,10 +692,6 @@ PaymentHold (1)----(1) Transfer (via hold_id FK)
 | `payment_intent.succeeded`      | handlePaymentIntentSucceeded      | Update Payment status, create hold        |
 | `payment_intent.payment_failed` | handlePaymentIntentFailed         | Mark Payment failed + notify              |
 | `payment_intent.canceled`       | handlePaymentIntentCanceled       | Cancel Payment + PaymentHold              |
-| `account.updated`               | handleAccountUpdated              | Update Connect account status             |
-| `transfer.created`              | handleTransferCreated             | Mark Transfer completed + notify          |
-| `transfer.failed`               | handleTransferFailed              | Mark Transfer failed + notify (future)    |
-| `transfer.canceled`             | handleTransferCanceled            | Cancel Transfer, revert hold (future)     |
 
 > **Note:** `transfer.created`, `transfer.failed`, and `transfer.canceled` webhook handlers exist but transfers are primarily handled by the `verify:pending-transfers` cron job.
 
@@ -766,8 +753,6 @@ USD, EUR, GBP
 
 | Method                              | Description                                                              |
 |-------------------------------------|--------------------------------------------------------------------------|
-| `createConnectAccount(User, data)`  | Creates Stripe Custom Connect account silently (no onboarding redirect)  |
-| `getOnboardingLink(StripeConnectAccount)` | Generates Stripe AccountLink URL, caches for 24h (legacy, not used with Custom) |
 | `createTransfer(PaymentHold, type)` | Executes Stripe Transfer to Connect account, handles partial transfers   |
 | `getHoldPeriodData(paymentIntentId)` | Retrieves hold data from cache or Stripe metadata                       |
 
@@ -776,7 +761,6 @@ USD, EUR, GBP
 | Method                              | Description                                                              |
 |-------------------------------------|--------------------------------------------------------------------------|
 | `createFromPayment(Payment, data)`  | Creates PaymentHold from Payment with hold period configuration          |
-| `checkAndMarkReady()`               | Marks expired holds as `ready_for_transfer`, returns count               |
 
 ### WebhookService
 
@@ -786,10 +770,6 @@ USD, EUR, GBP
 | `handlePaymentIntentSucceeded()`    | Updates Payment status, creates hold if missing                          |
 | `handlePaymentIntentFailed()`       | Marks Payment failed, dispatches failure notification                    |
 | `handlePaymentIntentCanceled()`     | Cancels Payment + Hold, dispatches notification                          |
-| `handleAccountUpdated()`            | Updates Connect account status (pending/verified/restricted)             |
-| `handleTransferCreated()`           | Marks Transfer completed, batches notifications (2-min window)           |
-| `handleTransferFailed()`            | Marks Transfer failed, dispatches notification                           |
-| `handleTransferCanceled()`          | Cancels Transfer, reverts hold to ready_for_transfer                     |
 
 **Dependencies:** WebhookService injects PaymentHoldService and StripeService.
 
@@ -808,7 +788,6 @@ USD, EUR, GBP
 | SendHoldPeriodEndedNotification             | Hold period expires            | Email + push notification     |
 | SendTransferCompletedNotification           | Single transfer completes      | Email + push notification     |
 | SendTransferCompletedSummaryNotification    | Batch transfers complete       | Summary email + push          |
-| SendTransferFailedNotification              | Transfer fails                 | Email + push notification     |
 | SendPayoutRequestNotification               | User requests payout           | Email + push notification     |
 | SendWithdrawalSummaryNotification           | Withdrawal summary             | Email + push notification     |
 
@@ -908,7 +887,6 @@ Also removes: `X-Powered-By`, `Server` headers.
 | PaymentFailedMail                       | Payment fails               | emails/stripe/payment-failed          |
 | HoldPeriodEndedMail                     | Hold matures                | emails/stripe/hold-ended              |
 | TransferCompletedMail                   | Transfer succeeds           | emails/stripe/transfer-completed      |
-| TransferFailedMail                      | Transfer fails              | emails/stripe/transfer-failed         |
 | TransferCompletedSummaryMail            | Batch transfer summary      | emails/stripe/transfer-completed-summary |
 | PayoutRequestMail                       | User requests payout        | emails/stripe/payout-request          |
 | WithdrawalSummaryMail                   | Withdrawal summary          | emails/stripe/withdrawal-summary      |
@@ -917,19 +895,7 @@ Also removes: `X-Powered-By`, `Server` headers.
 
 ## 15. Unrouted / Unused Files
 
-The following files exist in the codebase but are **not currently wired to any route**:
-
-| File | Notes |
-|------|-------|
-| `Api/DeviceController.php` | Device registration & FCM token updates - not routed |
-| `Requests/Device/RegisterDeviceRequest.php` | Validation for device registration - not routed |
-| `Requests/Device/UpdateDeviceTokenRequest.php` | Validation for FCM token update - not routed |
-| `Requests/Stripe/TestPaymentRequest.php` | Test payment validation - not routed |
-| `Requests/Stripe/CreateConnectAccountRequest.php` | Old Connect account validation - not routed |
-| `Requests/Stripe/GetOnboardingLinkRequest.php` | Old onboarding link validation - not routed |
-| `Requests/Stripe/CreatePaymentIntentRequest.php` | Old Checkout Session validation - not routed (replaced by Payment/CreatePaymentIntentRequest) |
-| `Requests/Stripe/WithdrawPayoutRequest.php` | Withdraw payout validation - used by PaymentHoldController::withdraw() |
-| `Models/PasswordResetToken.php` | Empty placeholder model |
+None. The old unrouted files (device registration, old Checkout/Connect onboarding endpoints and their requests, unused API resources, the placeholder PasswordResetToken model, the unused home view, the unreachable transfer/account webhook handlers and the transfer-failed email) were removed on 2026-10-28. `StripeController` now only handles the webhook.
 
 ---
 

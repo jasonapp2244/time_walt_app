@@ -1,6 +1,8 @@
 # DEPLOYMENT STATUS — Time Vault
 
-**Last updated:** 2026-10-28 (2nd): name/dummy cleanup + `users:remove-test-accounts` + `stripe:reset-test-data`. Server order after `./deploy.sh --branch main`: plan seeder → `php artisan users:remove-test-accounts` (dry run) → same with `--keep=ID … --force` → 4242 deposit, webhook 200.
+**Last updated:** 2026-10-28 (3rd): `5999ff5` is pushed (`development` = `main`). The unused-file cleanup on top is uncommitted. No migration and no route change; 4 `STRIPE_*_URL` env keys are no longer read.
+
+Earlier 2026-10-28 (2nd): name/dummy cleanup + `users:remove-test-accounts` + `stripe:reset-test-data`. Server order after `./deploy.sh --branch main`: plan seeder → `php artisan users:remove-test-accounts` (dry run) → same with `--keep=ID … --force` → 4242 deposit, webhook 200.
 
 Earlier 2026-10-28: new `stripe:reset-test-data` command. At the live switch, after the live keys + `config:cache`: `php artisan stripe:reset-test-data` (dry run), then `php artisan stripe:reset-test-data --force`, then the plan seeder. Production has only testers (user confirmed 2026-10-28).
 

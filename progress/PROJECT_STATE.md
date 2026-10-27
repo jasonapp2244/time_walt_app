@@ -1,5 +1,29 @@
 # PROJECT STATE — Time Vault
 
+**2026-10-28 (3rd), unused files removed (user request; uncommitted).** ~2,300 lines of dead code, nothing routed or called:
+- **Files deleted:**
+  - `README.md` (stock Laravel text);
+  - `Api/DeviceController` and `Requests/Device/*`;
+  - `Requests/PrivacyPolicy/{Store,Update}PrivacyPolicyRequest`;
+  - `Requests/Stripe/{CreateConnectAccount,CreatePaymentIntent,GetOnboardingLink}Request`;
+  - `Resources/{NotificationSettings,Transaction,User}Resource`;
+  - `Models/PasswordResetToken` (empty);
+  - `views/home.blade.php` (extended a layout that does not exist);
+  - `SendTransferFailedNotification` job, `TransferFailedMail` and its view;
+  - 4 `.map` source-map files in `public/admin`.
+- **Methods removed:**
+  - `StripeController`: the 6 old Checkout/Connect methods (only `handleWebhook` is routed);
+  - `StripeService`: `createConnectAccount`, `getOnboardingLink`, `createPaymentIntent` (Checkout Session);
+  - `WebhookService`: `handleAccountUpdated` and `handleTransfer{Created,Failed,Canceled}` (no webhook case reached them);
+  - `PaymentHoldService::checkAndMarkReady` (the cron uses its own query).
+- **Config:** `services.stripe.{connect_return,payment_return,payment_success,payment_failed}_url` removed, so the server `.env` can drop `STRIPE_CONNECT_RETURN_URL`, `STRIPE_PAYMENT_RETURN_URL`, `STRIPE_PAYMENT_SUCCESS_URL` and `STRIPE_PAYMENT_FAILED_URL`.
+- **Kept on purpose:**
+  - `FundTestBalance` (needed while in test mode);
+  - `FixHoldRemainingAmount` (manual repair tool);
+  - `deploy/*`, `docs/*`, Postman, `welcome.blade.php` (the `/` route);
+  - untracked `.cursor/` and `boost.json` (local editor tooling, not in git).
+- `architecture.md` and `CLAUDE.md` were updated to match.
+
 **2026-10-28 (2nd), client-ready cleanup (user request):**
 - **Personal Gmail removed from tracked files.** Postman (regenerated from `docs/postman/build_collection.php`; coverage check: 44 paths, none missing), tests, progress → `michael.reed@example.com` / US names.
 - **Deleted:** `tests/Unit/ExampleTest.php` (and the Unit suite in `phpunit.xml`), the unused `app/Http/Requests/Stripe/TestPaymentRequest.php`, and the demo "Test User" row in `DatabaseSeeder`. `tests/Feature/ExampleTest.php` renamed `HomePageTest.php`.
