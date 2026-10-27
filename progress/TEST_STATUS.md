@@ -1,5 +1,19 @@
 # TEST STATUS — Time Vault
 
+**2026-10-27 (checklist pass):** user #61 local subscription was `active` while Stripe said `canceled` (the test cancelled it in Stripe with no webhook forwarding; `subscriptions:sync` only rechecks rows near period end). Repaired via `syncFromStripe`: `/api/subscription/status` → is_subscribed=false, withdrawals 2/2; admin `?status=canceled` lists #61, `?status=active` does not; user page "Free tier (last subscription: Monthly, ended)". No app code changed.
+
+**2026-10-27 (later): real withdrawals in Stripe TEST mode, now that the client saved the Connect settings.**
+- `php artisan test` → **311 passed / 1173 assertions** (no code changed).
+- Scratch `e2e_withdrawals.php` against `artisan serve :8020`, new user #61 `tauseefchoohan0401+withdraw@gmail.com`:
+  - bank add → 201, Custom Connect `acct_1UVDwpPPoYlIjstE` with the bank ****6789, `transfers` capability active;
+  - 2 locks paid, holds matured (hold_end_at moved to the past, then `check:payment-holds` → ready_for_transfer);
+  - withdrawal 1 $5 and 2 $7 → 200; the $7 drew on two holds ($5 + $2, two Stripe transfers) and counted as ONE free withdrawal;
+  - withdrawal 3 → **402** "subscribe to continue", no transfer created;
+  - Monthly $4.99 paid with 4242 → withdrawals $3 and $4 → 200;
+  - totals: $19 sent (= the Connect account's Stripe balance), $6 left; asking for $50 → 400 "Available: $6".
+  - The first run reported 2 FAILs that were script bugs (bank add returns 201, not 200; a split withdrawal has 2 transfers); every transfer was then checked by hand in Stripe and the script fixed.
+- Admin (HTTP, logged in): `/admin/users/61` shows the bank and transfers #00054–#00058; `/admin/transfers` shows them; subscriptions and dashboard 200.
+
 **2026-10-27:** 311/1173 green again right before commit `a799a90`.
 
 **Re-run 2026-10-26 (after the user edited `.env`):**
@@ -31,7 +45,7 @@
   - cancel at period end → ends, no charge → back to 402;
   - `subscriptions:sync` repairs a missed renewal.
 - **Admin panel, Playwright:** all subscription pages and user pages show matching data. Reset free usage, a free-tier limit change seen by the API, a refused price edit, cancel-now (Stripe = canceled) and all 6 exports work.
-- **Not testable yet:** a real bank add / payout (the Stripe Connect settings block it).
+- ~~**Not testable yet:** a real bank add / payout~~: tested for real on 2026-10-27 (see the top of this file).
 
 Previous: 2026-10-23. Latest run: `php artisan test` → **301 passed / 1131 assertions**, `pint --test` pass, `route:list` 100 routes, `composer audit` 0.
 - **New test files:**

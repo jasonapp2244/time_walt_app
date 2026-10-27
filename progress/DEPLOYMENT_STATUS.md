@@ -67,7 +67,7 @@ A command completing is not a successful deployment. Nothing goes in the VERIFIE
     - `STRIPE_PORTAL_RETURN_URL=https://timevaultapp.co/`;
     - keep `STRIPE_AUTO_TRANSFER` off.
   - **After deploy:** run `php artisan db:seed --class=SubscriptionPlanSeeder --force`.
-  - **Withdrawals stay broken on the new account** until the client completes Connect → Platform profile in the Stripe Dashboard.
+  - **Withdrawals on the new account:** working in TEST mode since 2026-10-27 (client saved Connect platform profile + Accounts v1 support; real withdrawal E2E passed). The client must save the SAME two settings in LIVE mode before go-live.
 
 - 2026-10-07 (2nd pass) — **5th migration** `create_subscription_invoices_table`.
   - **Composer adds 7 packages** (barryvdh/laravel-dompdf, dompdf/*, openspout/openspout, masterminds/html5, sabberworm/php-css-parser); they need the PHP extensions `zip`, `gd`, `dom` and `mbstring` on the server.

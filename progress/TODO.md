@@ -8,23 +8,26 @@ One line per item. Keep it honest: an item is only done when it has been verifie
 
 ## IN PROGRESS
 
-- [ ] **BLOCKER, client: Stripe Connect platform profile.**
-  - On the new account Stripe refuses to create Custom Connect accounts with: "Please review the responsibilities of collecting requirements for connected accounts at https://dashboard.stripe.com/settings/connect/platform-profile".
-  - Until the client completes that page (test mode, then live), no user can add a bank, so **no withdrawal works**.
-  - Then re-test the bank add (routing 110000000 / account 000123456789) and 2 withdrawals → the 3rd returns 402.
-  - Re-checked 2026-10-24 and 2026-10-26: still refused. Countries: USA only (the app is USD/US-bank only; non-US needs a code change).
-  - 2026-10-26: this account ALSO blocks Accounts v1 creation ("Stripe no longer recommends Accounts v1…"). The client must enable **Accounts v1 support** at `dashboard.stripe.com/test/settings/developers/api-policies` (then live), or the app moves to Accounts v2 (a bigger code change).
+- [x] ~~**BLOCKER, client: Stripe Connect platform profile + Accounts v1 support (TEST mode)**~~: both saved by the client on 2026-10-27 (v1 first, then the platform profile). Custom, Express and v2 account creation all succeed now.
+  - Real withdrawal E2E passed the same day in test mode (`e2e_withdrawals.php`, user #61 `tauseefchoohan0401+withdraw@gmail.com`, Connect `acct_1UVDwpPPoYlIjstE`): bank add 201 → 2 locks ($10 + $15) → holds matured → withdrawals $5 and $7 (the $7 drew on 2 holds = 2 Stripe transfers, counted as 1 withdrawal) → 3rd → 402, no money moved → Monthly $4.99 paid → withdrawals $3 and $4 OK → $19 sent = the Connect account's Stripe balance, $6 left; over-ask → 400. Admin user page + transfers list show the same rows. Test subscription cancelled in Stripe afterwards.
+- [ ] **Client checklist status (checked 2026-10-27 with the test key; no live key locally, so LIVE is unseen):**
+  - TEST done: Connect (platform profile + Accounts v1), customer portal (card update, invoices, cancel at period end, no plan switch, links), `one_month` archived (old $4.99/mo product, unused by the app, 0 subscriptions).
+  - TEST, Billing subscription status: done per the client's Dashboard text (2026-10-27): active when latest invoice settled; first renewal failure → past-due; all retries fail → cancel. "3D Secure for Radar-rule payments" left off (optional; the Payment Sheet + invoice.payment_action_required already handle 3DS).
+  - ~~TEST open: Public details support email~~ DONE 2026-10-27: a fresh test invoice now shows `admin@timevaultapp.co`. Server/local `.env`: set `SUPPORT_EMAIL=admin@timevaultapp.co` (or remove it to fall back to ADMIN_EMAIL). History: it was still the agency contact's personal email (seen on a brand-new test invoice made and voided 2026-10-27, so it is the live setting, not a stale copy). Must become `support@timevaultapp.co`; public name shows "TimeVault App".
+  - LIVE open: all of the above + a live webhook endpoint with its own secret at go-live.
+  - User #61's local subscription showed `active` after the script cancelled it straight in Stripe (no local webhook). Repaired with `SubscriptionService::syncFromStripe`; status API, admin filter and user page now show it ended. The script now cancels via `cancelNow()`.
+- [ ] **Client, LIVE mode:** repeat both Connect settings (platform profile: US, platform collects requirements, platform covers losses; Accounts v1 support ON) before go-live, or live withdrawals fail exactly as test mode did.
 - [x] ~~Commit the 2026-10-26 pre-go-live fixes~~: committed and pushed as `a799a90` on 2026-10-27 (`development` = `main`). Next: deploy `main`.
 - [ ] Known, low priority (from review 2026-10-26):
   - a "Renewals" count includes `subscription_update` invoices;
   - a Stripe failure in the middle of a plan sync can orphan a Product or Price;
   - `subscriptions:sync` keeps retrying rows that no longer exist in Stripe;
   - the template's PerfectScrollbar console error on every admin page.
-- [ ] **Client: Stripe Dashboard edits did not save** (read back over the API on 2026-10-23, again on 2026-10-26: unchanged, so they were made in live mode or a sandbox):
-  - Customer portal: privacy `https://timevaultapp.co/privacy-policy/`, terms `https://timevaultapp.co/terms-conditions/`, redirect `https://timevaultapp.co/`, "switch plans" off;
+- [ ] **Client: Stripe Dashboard edits did not save (portal + one_month now applied by API, see below)** (read back over the API on 2026-10-23, again on 2026-10-26 and 2026-10-27: unchanged; portal config last updated 2026-10-23. Public details cannot be read over the API (platform account hides business_profile), so that item needs a Dashboard screenshot; statement descriptor is TIMEVAULT APP. The edits were most likely made in live mode, a sandbox or another account):
+  - [x] ~~Customer portal links + "switch plans" off~~: applied over the API in test mode on 2026-10-27 (privacy `/privacy-policy/`, terms `/terms-conditions/`, return `https://timevaultapp.co/`, switch off). Live mode still to do.
   - Public details: name, support email, website;
   - Billing: Smart Retries → cancel, 3-D Secure emails, renewal reminders;
-  - archive `one_month`.
+  - [x] ~~archive `one_month`~~: archived in test mode over the API on 2026-10-27. Live mode still to do.
 - [ ] **Server: switch `.env` to the new Stripe keys, deploy, seed the plans:** `php artisan db:seed --class=SubscriptionPlanSeeder --force`. Commands are in PROJECT_STATE → EXACT NEXT TASK.
 - [ ] **Client decision, recommended:** the new account offers redirect and pay-later methods (Klarna, Affirm, Afterpay, Cash App, Amazon Pay…) in the Payment Sheet.
   - For deposits that are later withdrawn to a bank, cards + Apple Pay + Google Pay only is safer.
