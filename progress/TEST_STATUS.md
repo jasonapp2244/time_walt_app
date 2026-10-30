@@ -1,4 +1,10 @@
+2026-10-31 (2nd): 328 passed / 1239 assertions, Pint clean (+1 ResetStripeTestDataTest: test-mode account under live key).
+
+2026-10-31: full suite 327 passed / 1236 assertions (MySQL time_walt_test), Pint clean. +2 RemoveTestAccountsTest cases (--keep-since, token cleanup, bad date).
+
 # TEST STATUS — Time Vault
+
+**2026-10-30:** extended `deploy:check` (Stripe Dashboard settings). `tests/Feature/DeployCheckTest.php` 4 → 8 tests (missing portal fails; portal differences named; cards off fails + Google Pay off warns; transfers inactive + Connect missing fail). Full suite: **325 passed / 1229 assertions**; Pint pass. Real run against the client's TEST account: every readable Dashboard check ok; the env FAILs are expected locally. LIVE mode not checked: no live key on this PC.
 
 **2026-10-28 live check of production (after the user's deploy), read-only:**
 - **Admin panel:** login OK. 24 pages, 22 user pages/stats and 18 exports (xlsx + pdf × 9 lists) → all 200, no "Server Error" (scratch `live_admin.php`).

@@ -1,5 +1,11 @@
 # PROJECT STATE — Time Vault
 
+**2026-10-31 (2nd):** Server is on LIVE keys; deploy:check all ok after the plan seeder (live prices price_1UWMwl...). `stripe:reset-test-data` dry run aborted on the server: Stripe answers a test-mode Connect account read with a live key with an invalid_request_error that has no code ('...can only be used with testmode keys'). Fixed: that message now counts as stale (ResetStripeTestData::isOtherModeObject) + test. Uncommitted; needs deploy before the reset can run.
+
+**2026-10-31:** `users:remove-test-accounts` gained `--keep-since=YYYY-MM-DD` (keeps accounts created on/after the date) and now also deletes the deleted users' sessions and every API token whose user no longer exists (personal_access_tokens has no FK). Production dump checked: keeping Oct 2026 = users #56-#60 + admin #42; 36 older non-admin accounts go. Uncommitted, not on the server yet.
+
+**2026-10-30:** `deploy:check` now also checks the Stripe Dashboard settings the API exposes: card_payments + transfers capabilities, Connect enabled, branding, Customer portal (saved; payment method/invoices/cancel at period end on; plan switching off; privacy + terms links), and Cards/Apple Pay/Google Pay on. The settings the API cannot read (Connect platform profile + Accounts v1 support, Smart Retries/cancel/3DS emails, Apple Pay iOS cert, public support email) print as "check" lines. Purpose: after the live-key switch, one run on the server lists exactly what the client still has to set in LIVE mode. Real run against the client's TEST account: all Dashboard checks ok. Uncommitted.
+
 **2026-10-28 (4th):** one-command deploy: `deploy.sh` extended (plan seeder, background jobs as root, stray-backup move, `deploy:check`, account list) + new `app/Console/Commands/DeployCheck.php`. See `DEPLOYMENT_STATUS.md` for the command. Uncommitted.
 
 **2026-10-28 (3rd), unused files removed (user request; uncommitted).** ~2,300 lines of dead code, nothing routed or called:

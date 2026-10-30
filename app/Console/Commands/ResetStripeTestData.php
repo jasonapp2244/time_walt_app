@@ -129,7 +129,7 @@ class ResetStripeTestData extends Command
                 try {
                     $object = $retrieve($id);
                 } catch (\Stripe\Exception\InvalidRequestException $e) {
-                    if ($e->getStripeCode() === 'resource_missing') {
+                    if ($e->getStripeCode() === 'resource_missing' || $this->isOtherModeObject($e)) {
                         continue;
                     }
                     throw $e;
@@ -143,5 +143,19 @@ class ResetStripeTestData extends Command
         }
 
         return $found;
+    }
+
+    /**
+     * A test-mode Connect account read with a live key (or the reverse) comes
+     * back without an error code, only "... was a test account created with a
+     * testmode key, and therefore can only be used with testmode keys." That
+     * still proves the id is not in the current mode.
+     */
+    private function isOtherModeObject(\Stripe\Exception\InvalidRequestException $e): bool
+    {
+        $message = strtolower($e->getMessage());
+
+        return str_contains($message, 'can only be used with testmode keys')
+            || str_contains($message, 'can only be used with livemode keys');
     }
 }

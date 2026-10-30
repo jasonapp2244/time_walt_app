@@ -64,4 +64,35 @@ class RemoveTestAccountsTest extends TestCase
 
         $this->assertSame([$this->admin->id], User::pluck('id')->all());
     }
+
+    public function test_keep_since_keeps_recent_accounts_and_removes_tokens_of_deleted_users(): void
+    {
+        DB::table('users')->where('id', $this->tester->id)->update(['created_at' => '2026-09-15 10:00:00']);
+        DB::table('users')->where('id', $this->kept->id)->update(['created_at' => '2026-10-20 10:00:00']);
+        $this->tester->createToken('auth_token');
+        $this->kept->createToken('auth_token');
+        DB::table('personal_access_tokens')->insert([
+            'tokenable_type' => User::class, 'tokenable_id' => 999999, 'name' => 'auth_token',
+            'token' => str_repeat('a', 64), 'abilities' => '["*"]', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->artisan('users:remove-test-accounts', ['--keep-since' => '2026-10-01', '--force' => true])
+            ->expectsOutputToContain('Deleted 1 accounts and 2 API tokens.')
+            ->assertSuccessful();
+
+        $this->assertDatabaseMissing('users', ['id' => $this->tester->id]);
+        $this->assertDatabaseHas('users', ['id' => $this->kept->id]);
+        $this->assertSame(
+            [$this->kept->id],
+            DB::table('personal_access_tokens')->pluck('tokenable_id')->map(fn ($id) => (int) $id)->all()
+        );
+    }
+
+    public function test_a_bad_keep_since_date_fails_without_deleting(): void
+    {
+        $this->artisan('users:remove-test-accounts', ['--keep-since' => 'last month', '--force' => true])
+            ->assertFailed();
+
+        $this->assertDatabaseCount('users', 3);
+    }
 }

@@ -7,7 +7,8 @@ use Illuminate\Console\Command;
 
 /**
  * Post-deploy check of the settings the app cannot run correctly without:
- * environment, Stripe keys, the webhook endpoint, plan prices and mail.
+ * environment, Stripe keys, the webhook endpoint, plan prices, the Stripe
+ * Dashboard settings the API exposes, and mail.
  * Reads only; changes nothing. Exits non-zero when anything FAILs, so
  * deploy.sh can point at it.
  */
@@ -15,7 +16,7 @@ class DeployCheck extends Command
 {
     protected $signature = 'deploy:check';
 
-    protected $description = 'Check environment, Stripe, webhook, plans and mail settings after a deploy (read-only)';
+    protected $description = 'Check environment, Stripe, webhook, plans, Dashboard and mail settings after a deploy (read-only)';
 
     /** Events WebhookService handles; the endpoint must send all of them. */
     public const WEBHOOK_EVENTS = [
@@ -42,6 +43,8 @@ class DeployCheck extends Command
 
     private int $warnings = 0;
 
+    private ?\Stripe\Account $account = null;
+
     public function handle(): int
     {
         $this->checkEnvironment();
@@ -49,6 +52,7 @@ class DeployCheck extends Command
         if ($stripeReady) {
             $this->checkWebhook();
             $this->checkPlans();
+            $this->checkDashboardSettings();
         }
         $this->checkMail();
 
@@ -97,6 +101,7 @@ class DeployCheck extends Command
 
             return false;
         }
+        $this->account = $account;
         $this->okLine("Stripe account {$account->id} ({$mode} mode)");
         if ($mode === 'live') {
             $this->expect((bool) $account->charges_enabled && (bool) $account->payouts_enabled, 'live account can take payments and pay out', 'the live Stripe account is not fully activated (charges or payouts disabled)');
@@ -148,6 +153,98 @@ class DeployCheck extends Command
                 $this->failLine("{$plan->name}: price not found in this Stripe account - run: php artisan db:seed --class=SubscriptionPlanSeeder --force");
             }
         }
+    }
+
+    /**
+     * The Dashboard settings Stripe exposes through the API. The rest cannot
+     * be read, so they are printed as "check" lines for a person to confirm.
+     */
+    private function checkDashboardSettings(): void
+    {
+        $this->section('Stripe Dashboard settings');
+
+        $capabilities = isset($this->account->capabilities) ? $this->account->capabilities->toArray() : [];
+        $this->expect(($capabilities['card_payments'] ?? null) === 'active', 'card payments capability active',
+            'card_payments capability is '.($capabilities['card_payments'] ?? 'missing').' - finish account activation in the Dashboard');
+        $this->expect(($capabilities['transfers'] ?? null) === 'active', 'transfers capability active (withdrawals)',
+            'transfers capability is '.($capabilities['transfers'] ?? 'missing').' - withdrawals cannot be paid out');
+
+        $branding = isset($this->account->settings) ? $this->account->settings->branding : null;
+        $branding?->logo || $branding?->icon
+            ? $this->okLine('branding logo/icon set')
+            : $this->warnLine('no logo or icon in Settings > Business > Branding - receipts and invoices show none');
+
+        try {
+            \Stripe\Account::all(['limit' => 1]);
+            $this->okLine('Connect is enabled on this account');
+        } catch (\Throwable $e) {
+            $this->failLine('Connect is not set up - bank accounts and withdrawals will fail: '.$e->getMessage());
+        }
+
+        $this->checkCustomerPortal();
+        $this->checkPaymentMethods();
+
+        $this->line('  <fg=cyan>check</> not readable by the API, confirm in the Dashboard (this mode):');
+        foreach ([
+            'Connect > Platform profile saved, and Settings > Developers > API policies > "Accounts v1 support" on (a first bank add answering 201 proves both)',
+            'Billing > Subscriptions and emails: Smart Retries on, "if all retries fail" = Cancel the subscription, 3-D Secure emails on',
+            'Payment methods > Apple Pay: iOS certificate for the app\'s merchant ID uploaded',
+            'Settings > Business > Public details: support email and phone',
+        ] as $item) {
+            $this->line("          - {$item}");
+        }
+    }
+
+    private function checkCustomerPortal(): void
+    {
+        try {
+            $portal = \Stripe\BillingPortal\Configuration::all(['is_default' => true, 'limit' => 1])->data[0] ?? null;
+        } catch (\Throwable $e) {
+            $this->failLine('could not read the Customer portal settings: '.$e->getMessage());
+
+            return;
+        }
+        if (! $this->expect($portal !== null && $portal->active, 'Customer portal configured',
+            'Customer portal is not saved - "Manage payment method" fails. Save Settings > Billing > Customer portal')) {
+            return;
+        }
+
+        $features = $portal->features;
+        $problems = array_keys(array_filter([
+            'payment method update off' => ! $features->payment_method_update->enabled,
+            'invoice history off' => ! $features->invoice_history->enabled,
+            'cancel subscription off' => ! $features->subscription_cancel->enabled,
+            'cancel should be "at end of period"' => $features->subscription_cancel->enabled && $features->subscription_cancel->mode !== 'at_period_end',
+            'plan switching should be off' => $features->subscription_update->enabled,
+            'privacy policy link missing' => empty($portal->business_profile->privacy_policy_url),
+            'terms of service link missing' => empty($portal->business_profile->terms_of_service_url),
+        ]));
+        $problems === []
+            ? $this->okLine('Customer portal: payment method, invoices, cancel at period end, links')
+            : $this->warnLine('Customer portal: '.implode(', ', $problems));
+    }
+
+    private function checkPaymentMethods(): void
+    {
+        try {
+            $config = collect(\Stripe\PaymentMethodConfiguration::all(['limit' => 100])->data)->first(fn ($c) => $c->is_default && $c->application === null);
+        } catch (\Throwable $e) {
+            $this->failLine('could not read the payment method settings: '.$e->getMessage());
+
+            return;
+        }
+        if ($config === null) {
+            $this->warnLine('no default payment method configuration found - check Settings > Payment methods');
+
+            return;
+        }
+
+        $isOn = fn (string $method) => ($config->{$method}->display_preference->value ?? 'off') === 'on';
+        $this->expect($isOn('card'), 'Cards on', 'Cards are off in Settings > Payment methods - the Payment Sheet cannot take a card');
+        $wallets = array_values(array_filter(['apple_pay' => 'Apple Pay', 'google_pay' => 'Google Pay'], fn ($label, $method) => ! $isOn($method), ARRAY_FILTER_USE_BOTH));
+        $wallets === []
+            ? $this->okLine('Apple Pay and Google Pay on')
+            : $this->warnLine(implode(' and ', $wallets).' off in Settings > Payment methods');
     }
 
     private function checkMail(): void

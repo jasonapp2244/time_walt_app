@@ -99,6 +99,20 @@ class ResetStripeTestDataTest extends TestCase
         $this->assertDatabaseCount('transfers', 1);
     }
 
+    public function test_a_test_mode_connect_account_read_with_a_live_key_counts_as_stale(): void
+    {
+        $this->stripe->respond('GET /v1/customers/cus_old', $this->missing(), 404);
+        $this->stripe->respond('GET /v1/accounts/acct_old', ['error' => [
+            'type' => 'invalid_request_error',
+            'message' => 'The account acct_old was a test account created with a testmode key, and therefore can only be used with testmode keys.',
+        ]], 400);
+
+        $this->artisan('stripe:reset-test-data', ['--force' => true])->assertSuccessful();
+
+        $this->assertDatabaseCount('stripe_connect_accounts', 0);
+        $this->assertDatabaseCount('transfers', 0);
+    }
+
     public function test_refuses_when_stripe_cannot_be_reached(): void
     {
         $this->stripe->respond('GET /v1/customers/cus_old', ['error' => ['type' => 'api_error', 'message' => 'Stripe is down']], 500);
