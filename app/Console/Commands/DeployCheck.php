@@ -20,6 +20,7 @@ class DeployCheck extends Command
 
     /** Events WebhookService handles; the endpoint must send all of them. */
     public const WEBHOOK_EVENTS = [
+        'checkout.session.completed',
         'payment_intent.succeeded',
         'payment_intent.payment_failed',
         'payment_intent.canceled',

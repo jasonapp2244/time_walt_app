@@ -1,3 +1,5 @@
+2026-11-02: full suite **340 passed / 1289 assertions**, Pint pass, `route:list --path=stripe` 3 routes. New `WebhookEndpointTest` (13): GET 405, missing secret 500, unsigned/tampered 400, unhandled event 200, duplicate skipped, in-flight 409, stale pending reclaimed, failure → 500 `failed` → retry 200, checkout payment/duplicate-receipt/subscription-mode. Real Stripe CLI (TEST mode) → local: 12 signed deliveries (payment_intent.succeeded/payment_failed, checkout.session.completed, invoice.paid/payment_failed, customer.subscription.created/deleted) all 200, all rows `processed`. `composer audit`: 1 advisory (symfony/mime CVE-2026-45070), not part of this change.
+
 2026-10-31 (2nd): 328 passed / 1239 assertions, Pint clean (+1 ResetStripeTestDataTest: test-mode account under live key).
 
 2026-10-31: full suite 327 passed / 1236 assertions (MySQL time_walt_test), Pint clean. +2 RemoveTestAccountsTest cases (--keep-since, token cleanup, bad date).

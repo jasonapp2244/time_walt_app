@@ -53,6 +53,19 @@ class WebhookService
 
         $session = $eventData['data']['object'];
         $sessionId = $session['id'] ?? null;
+
+        // Only one-off payment sessions are deposits. A subscription or setup
+        // session has no deposit to record; its invoice.* and
+        // customer.subscription.* events carry the state.
+        if (($session['mode'] ?? 'payment') !== 'payment') {
+            Log::info('Ignoring checkout.session.completed that is not a payment', [
+                'session_suffix' => substr((string) $sessionId, -6),
+                'mode' => $session['mode'],
+            ]);
+
+            return;
+        }
+
         $paymentIntentId = $session['payment_intent'] ?? null;
 
         if (! $paymentIntentId) {
@@ -97,6 +110,11 @@ class WebhookService
             'card_country' => $cardDetails->country ?? null,
             'payment_method_type' => $cardDetails?->wallet?->type ?? 'card',
         ];
+
+        // /confirm-payment or payment_intent.succeeded may have recorded the
+        // deposit and sent the receipt already; only send one if this event
+        // is what settled it.
+        $alreadySucceeded = $payment && $payment->status === 'succeeded';
 
         if (! $payment) {
             // Create payment record
@@ -149,6 +167,10 @@ class WebhookService
         // Create payment hold if hold period data exists and hold doesn't exist
         if ($holdPeriodData) {
             $this->createHoldOnce($payment, $holdPeriodData);
+        }
+
+        if ($alreadySucceeded) {
+            return;
         }
 
         // Send email notification (check both transaction_alert and email_alert)

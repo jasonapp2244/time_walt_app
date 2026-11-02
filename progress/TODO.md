@@ -1,3 +1,10 @@
+- [ ] Deploy the 2026-11-02 webhook release on the server (`deploy.sh --branch main`).
+- [ ] LIVE Stripe Dashboard: add `checkout.session.completed` to the webhook endpoint (10 events); 'Send test event' → expect 200.
+- [ ] `composer audit`: new advisory CVE-2026-45070 in symfony/mime (reported 2026-10-28) — separate dependency update.
+
+- [ ] LIVE Stripe Dashboard (client): save Customer portal (deploy:check FAIL), turn on Google Pay, then confirm the 'check' items; re-run `php artisan deploy:check` until OK.
+- [ ] Prove the live webhook secret: one real small deposit, expect HTTP 200 on the endpoint in Stripe.
+- [ ] Look at the 5 `production.ERROR` lines in storage/logs/laravel.log.
 # TODO — Time Vault
 
 **Last updated:** 2026-10-28

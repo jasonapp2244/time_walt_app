@@ -1,6 +1,8 @@
 # DEPLOYMENT STATUS — Time Vault
 
-**Last updated:** 2026-10-28 (4th): one-command deploy (uncommitted until the user says commit). On the server, as root, in the app folder:
+**2026-11-02:** webhook hardening release (code + tests only; no migration, no `.env` key, no route change). After pushing, deploy with the command below (rollback point: `75aaa20`). After deploy: `deploy:check` will now FAIL the webhook line until `checkout.session.completed` is added to the LIVE endpoint in Stripe; then send a test event from the Dashboard and expect 200.
+
+**Last updated:** 2026-10-31: 75aaa20 is LIVE on api.timevaultapp.co (main = development = origin). Live Stripe keys in use; test data and pre-October accounts removed. Rollback point before this deploy: 7f9e5ca (`./deploy.sh --rollback`). Deploy command, on the server as root in the app folder:
 
     git -c safe.directory='*' fetch origin main && git -c safe.directory='*' show origin/main:deploy.sh > /tmp/tv-deploy.sh && APP_DIR=$PWD bash /tmp/tv-deploy.sh --branch main
 
