@@ -27,15 +27,16 @@ class ClarityReport
             'sessions' => self::num($traffic, ['totalSessionCount', 'sessionsCount']),
             'bot_sessions' => self::num($traffic, ['totalBotSessionCount']),
             'users' => self::num($traffic, ['distantUserCount', 'distinctUserCount', 'userCount']),
-            'screens_per_session' => self::num($traffic, ['PagesPerSessionPercentage', 'pagesPerSession']),
+            'screens_per_session' => self::num($traffic, ['screensPerSessionPercentage', 'screensPerSession', 'PagesPerSessionPercentage', 'pagesPerSession']),
             'active_time' => self::num($engagement, ['activeTime', 'averageActiveTime']),
             'total_time' => self::num($engagement, ['totalTime', 'averageTotalTime']),
             'scroll_depth' => self::num($scroll, ['averageScrollDepth', 'scrollDepth']),
-            'rage_taps_pct' => self::percent($payload, 'RageClickCount'),
-            'dead_taps_pct' => self::percent($payload, 'DeadClickCount'),
-            'quick_backs_pct' => self::percent($payload, 'QuickbackClick'),
-            'error_taps_pct' => self::percent($payload, 'ErrorClickCount'),
-            'app_errors_pct' => self::percent($payload, 'ScriptErrorCount'),
+            // Mobile projects (this app) send the *Tap / Application* names; the web names stay as fallbacks.
+            'rage_taps_pct' => self::percent($payload, ['RageTapCount', 'RageClickCount']),
+            'dead_taps_pct' => self::percent($payload, ['DeadTapCount', 'DeadClickCount']),
+            'quick_backs_pct' => self::percent($payload, ['QuickbackTap', 'QuickbackClick']),
+            'error_taps_pct' => self::percent($payload, ['ErrorTapCount', 'ErrorClickCount']),
+            'app_errors_pct' => self::percent($payload, ['ApplicationErrorCount', 'ScriptErrorCount']),
             'excessive_scroll_pct' => self::percent($payload, 'ExcessiveScroll'),
         ];
     }
@@ -44,16 +45,16 @@ class ClarityReport
     public static function popularScreens(array $payload): array
     {
         $out = [];
-        foreach (self::rows($payload, 'PopularPages') as $row) {
+        foreach (self::rows($payload, ['PopularScreens', 'PopularPages']) as $row) {
             if (! is_array($row)) {
                 continue;
             }
-            $screen = self::str($row, ['url', 'name', 'pageTitle', 'screenName', 'page']);
+            $screen = self::str($row, ['screenName', 'screen', 'url', 'name', 'pageTitle', 'page']);
             if ($screen === null) {
                 continue;
             }
             $out[$screen] = ($out[$screen] ?? 0)
-                + (int) (self::num($row, ['visitsCount', 'visits', 'sessionsCount', 'count']) ?? 0);
+                + (int) (self::num($row, ['visitsCount', 'visits', 'screensViews', 'screenViews', 'sessionsCount', 'count']) ?? 0);
         }
 
         return self::ranked($out, 'screen', 'visits');
@@ -79,20 +80,31 @@ class ClarityReport
         return self::ranked($out, 'label', 'sessions');
     }
 
-    /** @return array<int, mixed> The rows of one metric group. */
-    public static function rows(array $payload, string $metric): array
+    /**
+     * The rows of the first metric group whose name matches one of [$metric].
+     *
+     * @param  string|array<int, string>  $metric
+     * @return array<int, mixed>
+     */
+    public static function rows(array $payload, string|array $metric): array
     {
-        foreach ($payload as $group) {
-            if (is_array($group) && self::key((string) ($group['metricName'] ?? '')) === self::key($metric)) {
-                return is_array($group['information'] ?? null) ? array_values($group['information']) : [];
+        foreach ((array) $metric as $name) {
+            foreach ($payload as $group) {
+                if (is_array($group) && self::key((string) ($group['metricName'] ?? '')) === self::key($name)) {
+                    return is_array($group['information'] ?? null) ? array_values($group['information']) : [];
+                }
             }
         }
 
         return [];
     }
 
-    /** Share of sessions (0–100) that had the frustration signal. */
-    private static function percent(array $payload, string $metric): ?float
+    /**
+     * Share of sessions (0–100) that had the frustration signal.
+     *
+     * @param  string|array<int, string>  $metric
+     */
+    private static function percent(array $payload, string|array $metric): ?float
     {
         $row = self::rows($payload, $metric)[0] ?? [];
 

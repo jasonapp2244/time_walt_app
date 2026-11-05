@@ -223,6 +223,34 @@ class AdminAnalyticsTest extends TestCase
         );
     }
 
+    /** Metric and field names exactly as Clarity returned them for this mobile project (2026-11-05 sync). */
+    public function test_clarity_summary_reads_mobile_project_names(): void
+    {
+        $info = fn (float $pct) => [['sessionsCount' => 4, 'sessionsWithMetricPercentage' => $pct, 'sessionsWithoutMetricPercentage' => 100 - $pct, 'screensViews' => 9, 'subTotal' => 4]];
+        $payload = [
+            ['metricName' => 'DeadTapCount', 'information' => $info(7.5)],
+            ['metricName' => 'RageTapCount', 'information' => $info(2.5)],
+            ['metricName' => 'ApplicationErrorCount', 'information' => $info(1.25)],
+            ['metricName' => 'Traffic', 'information' => [['totalSessionCount' => 80, 'totalBotSessionCount' => 0, 'distinctUserCount' => 33, 'screensPerSessionPercentage' => 4.2]]],
+            ['metricName' => 'EngagementTime', 'information' => [['totalTime' => 300, 'activeTime' => 120]]],
+            ['metricName' => 'PopularScreens', 'information' => [['screenName' => 'home', 'visitsCount' => 50], ['screenName' => 'withdraw', 'visitsCount' => 12]]],
+        ];
+
+        $s = ClarityReport::summary($payload);
+
+        $this->assertSame(80.0, $s['sessions']);
+        $this->assertSame(33.0, $s['users']);
+        $this->assertSame(4.2, $s['screens_per_session']);
+        $this->assertSame(120.0, $s['active_time']);
+        $this->assertSame(2.5, $s['rage_taps_pct']);
+        $this->assertSame(7.5, $s['dead_taps_pct']);
+        $this->assertSame(1.25, $s['app_errors_pct']);
+        $this->assertSame(
+            [['screen' => 'home', 'visits' => 50], ['screen' => 'withdraw', 'visits' => 12]],
+            ClarityReport::popularScreens($payload),
+        );
+    }
+
     public function test_clarity_summary_survives_garbage(): void
     {
         $s = ClarityReport::summary([null, 'x', ['metricName' => 'Traffic', 'information' => 'nope']]);
