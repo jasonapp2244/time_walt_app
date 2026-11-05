@@ -1,5 +1,7 @@
 # DEPLOYMENT STATUS — Time Vault
 
+**2026-11-05:** `feat/admin-analytics` is local and uncommitted. When it ships: `deploy.sh` runs the new migration (mysqldump first); scheduler cron already present (`schedule:list | grep analytics:sync-clarity`); `.env` keys CLARITY_API_TOKEN / GA4_PROPERTY_ID / GA4_CREDENTIALS_PATH stay empty until the owner configures them — the page then shows setup notes, nothing breaks.
+
 **2026-11-02:** webhook hardening release (code + tests only; no migration, no `.env` key, no route change). After pushing, deploy with the command below (rollback point: `75aaa20`). After deploy: `deploy:check` will now FAIL the webhook line until `checkout.session.completed` is added to the LIVE endpoint in Stripe; then send a test event from the Dashboard and expect 200.
 
 **Last updated:** 2026-10-31: 75aaa20 is LIVE on api.timevaultapp.co (main = development = origin). Live Stripe keys in use; test data and pre-October accounts removed. Rollback point before this deploy: 7f9e5ca (`./deploy.sh --rollback`). Deploy command, on the server as root in the app folder:

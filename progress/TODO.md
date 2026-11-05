@@ -1,3 +1,7 @@
+- [ ] App Analytics: user says commit → commit `feat/admin-analytics` (Conventional Commit), merge, deploy (adds migration `clarity_snapshots`).
+- [ ] Clarity token in `.env` → ONE `php artisan analytics:sync-clarity --show` → fix field names in `ClarityReport.php` if cards show '–'.
+- [ ] GA4: link Google Analytics in Firebase (time-vault-cbd41), enable Analytics Data API, new service account + Viewer, key at storage/app/private/ga4-service-account.json (chmod 600), GA4_PROPERTY_ID.
+
 - [ ] Deploy the 2026-11-02 webhook release on the server (`deploy.sh --branch main`).
 - [ ] LIVE Stripe Dashboard: add `checkout.session.completed` to the webhook endpoint (10 events); 'Send test event' → expect 200.
 - [ ] `composer audit`: new advisory CVE-2026-45070 in symfony/mime (reported 2026-10-28) — separate dependency update.

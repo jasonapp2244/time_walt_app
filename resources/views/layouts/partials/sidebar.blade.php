@@ -25,6 +25,13 @@
             </a>
         </li>
 
+        <li class="{{ request()->routeIs('admin.analytics*') ? 'mm-active' : '' }}">
+            <a href="{{ route('admin.analytics') }}" class="{{ request()->routeIs('admin.analytics*') ? 'active' : '' }}">
+                <div class="parent-icon"><i class='bx bx-line-chart'></i></div>
+                <div class="menu-title">App Analytics</div>
+            </a>
+        </li>
+
         <li class="{{ request()->routeIs('admin.users.*') ? 'mm-active' : '' }}">
             <a href="{{ route('admin.users.index') }}" class="{{ request()->routeIs('admin.users.*') ? 'active' : '' }}">
                 <div class="parent-icon"><i class='bx bxs-user-account'></i></div>

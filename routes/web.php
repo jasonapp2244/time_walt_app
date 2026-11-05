@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AnalyticsDashboardController;
 use App\Http\Controllers\Admin\Auth\AdminLoginController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\FeedbackController;
@@ -30,6 +31,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::middleware('admin')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
         Route::get('/dashboard/stats', [DashboardController::class, 'stats'])->name('dashboard.stats');
+
+        // App analytics (Microsoft Clarity + Firebase/GA4) - docs/admin-analytics.md
+        Route::get('/analytics', [AnalyticsDashboardController::class, 'index'])->name('analytics');
+        Route::get('/analytics.json', [AnalyticsDashboardController::class, 'json'])->name('analytics.json');
 
         // Users
         Route::get('/users', [UserController::class, 'index'])->name('users.index');

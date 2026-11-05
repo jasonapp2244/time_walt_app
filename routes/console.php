@@ -33,3 +33,10 @@ Schedule::command('subscriptions:sync')
     ->hourly()
     ->withoutOverlapping()
     ->description('Re-read subscriptions due for renewal from Stripe, in case a webhook was missed');
+
+// Cron 5: Store yesterday's Microsoft Clarity metrics (its API keeps only 3 days) for the admin App Analytics page
+Schedule::command('analytics:sync-clarity')
+    ->dailyAt('00:15')
+    ->timezone('UTC')
+    ->withoutOverlapping()
+    ->description('Store yesterday\'s Microsoft Clarity metrics for the admin App Analytics page');
