@@ -26,6 +26,8 @@ class AdminAnalyticsTest extends TestCase
 
     private const GA4_REPORT = 'https://analyticsdata.googleapis.com/v1beta/properties/123456789:runReport';
 
+    private const GA4_REALTIME = 'https://analyticsdata.googleapis.com/v1beta/properties/123456789:runRealtimeReport';
+
     private ?string $keyFile = null;
 
     private string $publicKey = '';
@@ -160,11 +162,37 @@ class AdminAnalyticsTest extends TestCase
         ];
     }
 
+    /** Answers each runRealtimeReport: one iOS user, Firebase's automatic events plus one app event. */
+    private function ga4RealtimeResponse(array $body): array
+    {
+        $dims = array_column($body['dimensions'] ?? [], 'name');
+        $mets = array_column($body['metrics'] ?? [], 'name');
+        $row = static fn (array $d, array $m): array => [
+            'dimensionValues' => array_map(static fn ($v) => ['value' => (string) $v], $d),
+            'metricValues' => array_map(static fn ($v) => ['value' => (string) $v], $m),
+        ];
+
+        $rows = match ($dims) {
+            [] => [$row([], [1, 7])],
+            ['minutesAgo'] => [$row(['00'], [1]), $row(['04'], [1]), $row(['45'], [9])], // 45 is outside the window
+            ['eventName'] => [$row(['screen_view'], [3]), $row(['login'], [1]), $row(['session_start'], [1])],
+            ['platform'] => [$row(['iOS'], [1])],
+            default => [],
+        };
+
+        return [
+            'dimensionHeaders' => array_map(static fn ($n) => ['name' => $n], $dims),
+            'metricHeaders' => array_map(static fn ($n) => ['name' => $n, 'type' => 'TYPE_INTEGER'], $mets),
+            'rows' => $rows,
+        ];
+    }
+
     private function fakeGa4(): void
     {
         Http::fake([
             self::GA4_TOKEN => Http::response(['access_token' => 'ya29.test', 'expires_in' => 3600]),
             self::GA4_REPORT => fn (Request $request) => Http::response($this->ga4Response($request->data())),
+            self::GA4_REALTIME => fn (Request $request) => Http::response($this->ga4RealtimeResponse($request->data())),
         ]);
     }
 
@@ -390,9 +418,24 @@ class AdminAnalyticsTest extends TestCase
         $this->assertSame(2, end($fb['daily'])['lock_created']);
         $this->assertNull($fb['failure_reasons']);
 
+        $live = $fb['realtime'];
+        $this->assertSame('ok', $live['status']);
+        $this->assertSame(1, $live['active_users']);
+        $this->assertSame(7, $live['event_count']);
+        $this->assertCount(30, $live['per_minute']);
+        $this->assertSame(1, $live['per_minute'][29]); // minutesAgo 00 = the newest bar
+        $this->assertSame(1, $live['per_minute'][25]); // minutesAgo 04
+        $this->assertSame(2, array_sum($live['per_minute'])); // minutesAgo 45 is dropped
+        $this->assertSame(['event' => 'login', 'count' => 1, 'tracked' => true], $live['events'][1]);
+        $this->assertFalse($live['events'][0]['tracked']); // screen_view is Firebase's own event
+        $this->assertSame([['label' => 'iOS', 'users' => 1]], $live['platforms']);
+
         $this->actingAs($admin)
             ->get('/admin/analytics?days=30')
             ->assertOk()
+            ->assertSee('Right now')
+            ->assertSee('screen_view')
+            ->assertSee('The cards below use processed data')
             ->assertSee('$3,150.75')
             ->assertSee('Lock funds funnel')
             ->assertSee('iPhone 13')
@@ -413,6 +456,26 @@ class AdminAnalyticsTest extends TestCase
         $this->assertSame('error', $json['firebase']['status']);
         $this->assertStringContainsString('403', $json['firebase']['message']);
         $this->assertSame('ok', $json['clarity']['status']);
+    }
+
+    public function test_realtime_failure_keeps_the_processed_report(): void
+    {
+        $this->configureGa4();
+        Http::fake([
+            self::GA4_TOKEN => Http::response(['access_token' => 'ya29.test', 'expires_in' => 3600]),
+            self::GA4_REPORT => fn (Request $request) => Http::response($this->ga4Response($request->data())),
+            self::GA4_REALTIME => Http::response(['error' => ['message' => 'Quota exceeded']], 429),
+        ]);
+        $admin = $this->admin();
+
+        $fb = $this->actingAs($admin)->getJson('/admin/analytics.json')->assertOk()->json('firebase');
+
+        $this->assertSame('ok', $fb['status']);
+        $this->assertSame(50, $fb['overview']['active_users']);
+        $this->assertSame('error', $fb['realtime']['status']);
+        $this->assertStringContainsString('429', $fb['realtime']['message']);
+
+        $this->actingAs($admin)->get('/admin/analytics')->assertOk()->assertSee("The realtime view didn't load", false);
     }
 
     public function test_unknown_range_falls_back_to_seven_days(): void

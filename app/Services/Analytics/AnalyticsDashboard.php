@@ -15,6 +15,9 @@ use Throwable;
  */
 class AnalyticsDashboard
 {
+    /** The page polls the JSON endpoint at this interval to refresh the "right now" strip. */
+    public const REALTIME_CACHE_SECONDS = 60;
+
     public function __construct(
         private ClarityClient $clarity,
         private Ga4Client $ga4,
@@ -89,16 +92,41 @@ class AnalyticsDashboard
         }
 
         try {
-            return Cache::remember(
+            $report = Cache::remember(
                 "tv-analytics:ga4:{$days}",
                 now()->addMinutes((int) config('timevault_analytics.ga4.cache_minutes', 60)),
                 fn (): array => ['status' => 'ok'] + $this->firebase->build($days),
             );
         } catch (Throwable $e) {
             report($e);
-
-            return ['status' => 'error', 'message' => Str::limit(class_basename($e).': '.$e->getMessage(), 300)];
+            $report = ['status' => 'error', 'message' => self::errorMessage($e)];
         }
+
+        return $report + ['realtime' => $this->realtime()];
+    }
+
+    /**
+     * The "right now" strip. Cached for a minute only, and failing on its own,
+     * so it never takes the processed report down with it.
+     */
+    private function realtime(): array
+    {
+        try {
+            return Cache::remember(
+                'tv-analytics:ga4:realtime',
+                now()->addSeconds(self::REALTIME_CACHE_SECONDS),
+                fn (): array => ['status' => 'ok', 'fetched_at' => now()->toIso8601String()] + $this->firebase->realtime(),
+            );
+        } catch (Throwable $e) {
+            report($e);
+
+            return ['status' => 'error', 'message' => self::errorMessage($e)];
+        }
+    }
+
+    private static function errorMessage(Throwable $e): string
+    {
+        return Str::limit(class_basename($e).': '.$e->getMessage(), 300);
     }
 
     /**

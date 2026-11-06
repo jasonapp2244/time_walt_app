@@ -93,6 +93,60 @@ class FirebaseReport
         ];
     }
 
+    /**
+     * The last 30 minutes, from GA4's realtime API. Unlike build(), this has
+     * no processing delay, so it shows that events are arriving at all.
+     *
+     * @return array<string, mixed>
+     */
+    public function realtime(): array
+    {
+        $totals = Ga4Client::rows($this->ga4->runRealtimeReport([
+            'metrics' => self::names(['activeUsers', 'eventCount']),
+        ]))[0] ?? [];
+
+        // minutesAgo "00" is the current minute; the chart runs oldest → newest.
+        $perMinute = array_fill(0, 30, 0);
+        foreach (Ga4Client::rows($this->ga4->runRealtimeReport([
+            'dimensions' => self::names(['minutesAgo']),
+            'metrics' => self::names(['activeUsers']),
+        ])) as $row) {
+            $ago = (int) $row['minutesAgo'];
+            if ($ago >= 0 && $ago < 30) {
+                $perMinute[29 - $ago] = (int) $row['activeUsers'];
+            }
+        }
+
+        $events = Ga4Client::rows($this->ga4->runRealtimeReport([
+            'dimensions' => self::names(['eventName']),
+            'metrics' => self::names(['eventCount']),
+            'orderBys' => [['metric' => ['metricName' => 'eventCount'], 'desc' => true]],
+            'limit' => 10,
+        ]));
+
+        $platforms = Ga4Client::rows($this->ga4->runRealtimeReport([
+            'dimensions' => self::names(['platform']),
+            'metrics' => self::names(['activeUsers']),
+        ]));
+
+        $tracked = array_merge(...array_values((array) config('timevault_analytics.event_groups')));
+
+        return [
+            'active_users' => (int) ($totals['activeUsers'] ?? 0),
+            'event_count' => (int) ($totals['eventCount'] ?? 0),
+            'per_minute' => $perMinute,
+            'events' => array_map(static fn (array $r): array => [
+                'event' => $r['eventName'],
+                'count' => (int) $r['eventCount'],
+                'tracked' => in_array($r['eventName'], $tracked, true),
+            ], $events),
+            'platforms' => array_map(static fn (array $r): array => [
+                'label' => $r['platform'],
+                'users' => (int) $r['activeUsers'],
+            ], $platforms),
+        ];
+    }
+
     private function money(array $byEvent): array
     {
         $out = [];

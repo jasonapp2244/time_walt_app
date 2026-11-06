@@ -11,7 +11,8 @@ The **App Analytics** page in the admin panel (`/admin/analytics`, sidebar item 
   - money locked, withdrawn and earned;
   - four funnels: lock, withdraw, subscribe, add bank;
   - all 23 app events in their 6 groups;
-  - top screens and platforms, and an optional "why things fail" table.
+  - top screens and platforms, and an optional "why things fail" table;
+  - a **Right now** strip: active users, events and platforms in the last 30 minutes, from GA4's realtime API. It has no processing delay and refreshes every minute.
 
 Each source reports its own status (`ok`, `no_data`, `not_configured` or `error`). One source that is down or not configured never blanks the other. Until a source is set up, the page shows what to configure.
 
@@ -111,6 +112,9 @@ Tokens and keys are only read from `.env` or the key file. They are never logged
 - **Clarity "Avg daily users"** is the average of each day's distinct users. One person active on 3 days counts on each of those days.
 - **Clarity rates and times** over a range are averages weighted by sessions, so a busy day counts more than a quiet one.
 - **GA4 processing delay:** GA4 needs a few hours, so today's numbers fill in during the day.
+- **Right now vs the cards:** the strip reads raw events from the last 30 minutes, and the cards read processed data. Events appear in the strip within a minute or two, but in the cards only hours later.
+  - Gold chips are the app's own tracked events; grey chips are Firebase's automatic ones (`screen_view`, `session_start`, `user_engagement`).
+  - If only grey chips ever appear, the app isn't logging its own events under the names in `config/timevault_analytics.php`.
 
 ## 5. Production
 

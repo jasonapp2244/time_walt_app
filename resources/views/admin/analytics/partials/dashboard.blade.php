@@ -3,6 +3,19 @@
     $f = $data['firebase'];
     $cOk = $c['status'] === 'ok';
     $fOk = $f['status'] === 'ok';
+    $rt = $f['realtime'] ?? null;
+    $rtOk = ($rt['status'] ?? null) === 'ok';
+
+    // The strip's footnote; the same three texts are used when the page refreshes it.
+    $liveNotes = [
+        'empty' => 'No activity in the last 30 minutes. Open the app on a phone and it shows up here within a minute or two.',
+        'auto' => "Only Firebase's automatic events so far. The app's own events (login, lock_created, withdraw_completed…) haven't arrived: check the app logs them with exactly these names.",
+        'ok' => 'The cards below use processed data, which GA4 publishes a few hours after the events arrive.',
+    ];
+    $liveNote = static function (array $live) use ($liveNotes): string {
+        if (($live['event_count'] ?? 0) === 0) return $liveNotes['empty'];
+        return collect($live['events'] ?? [])->contains('tracked', true) ? $liveNotes['ok'] : $liveNotes['auto'];
+    };
 
     $n = static fn ($v, int $dec = 0) => $v === null ? '–' : number_format((float) $v, $dec);
     $pct = static fn ($v) => $v === null ? '–' : number_format((float) $v, 1).'%';
@@ -33,7 +46,10 @@
         return round(100 * ((float) $values[$count - 1] - (float) $values[$count - 2]) / (float) $values[$count - 2], 1);
     };
 
-    $chartData = ['palette' => $palette, 'clarity' => null, 'firebase' => null];
+    $chartData = [
+        'palette' => $palette, 'clarity' => null, 'firebase' => null,
+        'live' => $rtOk ? ['per_minute' => $rt['per_minute'], 'poll' => route('admin.analytics.json', ['days' => $data['days']]), 'every' => \App\Services\Analytics\AnalyticsDashboard::REALTIME_CACHE_SECONDS, 'notes' => $liveNotes] : null,
+    ];
 
     if ($cOk) {
         $chartData['clarity'] = [
@@ -106,6 +122,27 @@
     .tva-hero dt { font-size: 12px; font-weight: 400; color: #b5a88f; }
     .tva-hero dd { margin: 2px 0 0; font-size: 18px; font-weight: 600; color: #fff; font-variant-numeric: tabular-nums; }
     .tva-hero .plot { position: relative; height: 250px; min-width: 0; }
+
+    /* "right now" strip: GA4 realtime, refreshed every minute */
+    .tva-live { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 16px 20px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.04); }
+    .tva-live-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+    .tva-live-head h3 { font-size: 15px; font-weight: 600; margin: 0; color: #111827; }
+    .tva-live-head .when { font-size: 12px; color: var(--muted); }
+    .tva-live .dot { width: 9px; height: 9px; border-radius: 50%; background: #9aa3ae; flex: none; }
+    .tva-live .dot.on { background: var(--good); animation: tva-pulse 2s ease-out infinite; }
+    @keyframes tva-pulse { 0% { box-shadow: 0 0 0 0 rgba(47,133,90,.45); } 70%, 100% { box-shadow: 0 0 0 8px rgba(47,133,90,0); } }
+    @media (prefers-reduced-motion: reduce) { .tva-live .dot.on { animation: none; } }
+    .tva-live-body { display: grid; grid-template-columns: auto auto minmax(0, 1.2fr) minmax(0, 1fr); gap: 12px 28px; align-items: center; margin-top: 12px; }
+    .tva-live .stat .v { font-size: 30px; line-height: 1.1; font-weight: 700; color: #111827; font-variant-numeric: tabular-nums; }
+    .tva-live .stat .k { font-size: 12px; color: var(--muted); }
+    .tva-live .bars { position: relative; height: 72px; min-width: 0; }
+    .tva-live .chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+    .tva-live .chips li { font-size: 12px; padding: 3px 9px; border-radius: 99px; background: var(--soft); color: var(--muted); }
+    .tva-live .chips li.t { background: var(--gold-pale); color: #6b4a1c; font-weight: 600; }
+    .tva-live .chips b { margin-left: 4px; font-variant-numeric: tabular-nums; }
+    .tva-live .plat { font-size: 12px; color: var(--muted); margin-top: 8px; }
+    .tva-live .note { font-size: 12px; color: var(--muted); margin: 12px 0 0; }
+    .tva-live.err { border-color: rgba(192,57,43,.35); background: #fdf3f1; }
 
     /* cards */
     .tva-grid { display: grid; gap: 14px; margin-top: 14px; }
@@ -183,11 +220,15 @@
     .tva .empty { font-size: 13px; color: var(--muted); padding: 24px 0; text-align: center; }
 
     @media (max-width: 1199.98px) {
+        .tva-live-body { grid-template-columns: auto auto minmax(0, 1fr); }
+        .tva-live .lists { grid-column: 1 / -1; }
         .tva-grid.k4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .tva-grid.c3, .tva-grid.k3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .tva-grid.wide { grid-template-columns: 1fr; }
     }
     @media (max-width: 767.98px) {
+        .tva-live-body { grid-template-columns: 1fr 1fr; }
+        .tva-live .bars { grid-column: 1 / -1; }
         .tva-hero { grid-template-columns: 1fr; padding: 18px; }
         .tva-hero .big { font-size: 38px; }
         .tva-hero .plot { height: 210px; }
@@ -370,6 +411,41 @@
         <a class="tva-ext" href="{{ $data['links']['firebase'] }}" target="_blank" rel="noopener">Open the Firebase console ↗</a>
     </div>
 
+    @if ($rtOk)
+        <section class="tva-live" aria-label="Firebase activity in the last 30 minutes" aria-live="polite">
+            <div class="tva-live-head">
+                <span class="dot {{ $rt['active_users'] > 0 ? 'on' : '' }}" data-live="dot" aria-hidden="true"></span>
+                <h3>Right now</h3>
+                <span class="when" data-live="when">Last 30 minutes, checked {{ \Illuminate\Support\Carbon::parse($rt['fetched_at'])->diffForHumans() }}. Refreshes every minute.</span>
+            </div>
+            <div class="tva-live-body">
+                <div class="stat"><div class="v" data-live="users">{{ $n($rt['active_users']) }}</div><div class="k">active users</div></div>
+                <div class="stat"><div class="v" data-live="events">{{ $n($rt['event_count']) }}</div><div class="k">events</div></div>
+                <div class="bars"><canvas id="tva-f-live" role="img" aria-label="Active users per minute, last 30 minutes"></canvas></div>
+                <div class="lists">
+                    <ul class="chips" data-live="eventlist" aria-label="Events in the last 30 minutes">
+                        @forelse ($rt['events'] as $e)
+                            <li class="{{ $e['tracked'] ? 't' : '' }}">{{ $e['event'] }}<b>{{ $n($e['count']) }}</b></li>
+                        @empty
+                            <li>No events yet</li>
+                        @endforelse
+                    </ul>
+                    <div class="plat" data-live="platforms">
+                        @if ($rt['platforms'])
+                            {{ collect($rt['platforms'])->map(fn ($p) => $p['label'].' '.$p['users'])->implode(', ') }}
+                        @endif
+                    </div>
+                </div>
+            </div>
+            <p class="note" data-live="note">{{ $liveNote($rt) }}</p>
+        </section>
+    @elseif ($rt)
+        <section class="tva-live err" aria-label="Firebase activity in the last 30 minutes">
+            <div class="tva-live-head"><span class="dot" aria-hidden="true"></span><h3>Right now</h3></div>
+            <p class="note">The realtime view didn't load: {{ $rt['message'] }}</p>
+        </section>
+    @endif
+
     @if ($f['status'] === 'not_configured')
         <div class="tva-setup">
             <div>
@@ -535,7 +611,7 @@
     @endif
 </div>
 
-@if ($cOk || $fOk)
+@if ($cOk || $fOk || $rtOk)
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"
             integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4"
             crossorigin="anonymous"></script>
@@ -642,6 +718,53 @@
                 hbar('tva-f-screens', F.screens, P[0]);
                 donut('tva-f-platforms', F.platforms);
                 hbar('tva-f-reasons', F.reasons, '#c0392b');
+            }
+
+            // "Right now": per-minute bars, then a quiet refresh from the JSON endpoint.
+            var L = D.live;
+            if (L) {
+                var minuteLabels = L.per_minute.map(function (_, i) { var ago = 29 - i; return ago === 0 ? 'This minute' : ago + ' min ago'; });
+                var liveCanvas = el('tva-f-live');
+                var liveChart = liveCanvas ? new Chart(liveCanvas, { type: 'bar', data: { labels: minuteLabels, datasets: [{
+                    data: L.per_minute, backgroundColor: rgba('#2f855a', .75), hoverBackgroundColor: '#2f855a', borderRadius: 3, maxBarThickness: 12
+                }] }, options: { responsive: true, maintainAspectRatio: false, animation: false,
+                    plugins: { legend: { display: false }, tooltip: { displayColors: false, callbacks: { label: function (c) { return ' ' + c.parsed.y + ' active user' + (c.parsed.y === 1 ? '' : 's'); } } } },
+                    scales: {
+                        x: { grid: { display: false }, border: { color: '#e5dccd' },
+                            ticks: { autoSkip: false, maxRotation: 0, font: { size: 11 }, callback: function (_, i) { return i === 0 ? '30 min ago' : (i === 29 ? 'now' : ''); } } },
+                        y: { display: false, beginAtZero: true, suggestedMax: 1 }
+                    } } }) : null;
+
+                var live = function (name) { return document.querySelector('.tva-live [data-live="' + name + '"]'); };
+                var chip = function (text, count, tracked) {
+                    var li = document.createElement('li');
+                    if (tracked) li.className = 't';
+                    li.appendChild(document.createTextNode(text));
+                    if (count !== null) { var b = document.createElement('b'); b.textContent = count.toLocaleString(); li.appendChild(b); }
+                    return li;
+                };
+                var render = function (r) {
+                    if (!r || r.status !== 'ok') return;
+                    live('users').textContent = r.active_users.toLocaleString();
+                    live('events').textContent = r.event_count.toLocaleString();
+                    live('dot').classList.toggle('on', r.active_users > 0);
+                    live('when').textContent = 'Last 30 minutes, checked ' + new Date(r.fetched_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + '. Refreshes every minute.';
+                    var list = live('eventlist');
+                    list.replaceChildren.apply(list, r.events.length
+                        ? r.events.map(function (e) { return chip(e.event, e.count, e.tracked); })
+                        : [chip('No events yet', null, false)]);
+                    live('platforms').textContent = r.platforms.map(function (p) { return p.label + ' ' + p.users; }).join(', ');
+                    live('note').textContent = r.event_count === 0 ? L.notes.empty
+                        : (r.events.some(function (e) { return e.tracked; }) ? L.notes.ok : L.notes.auto);
+                    if (liveChart) { liveChart.data.datasets[0].data = r.per_minute; liveChart.update(); }
+                };
+                setInterval(function () {
+                    if (document.hidden) return;
+                    fetch(L.poll, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
+                        .then(function (res) { return res.ok ? res.json() : null; })
+                        .then(function (d) { if (d && d.firebase) render(d.firebase.realtime); })
+                        .catch(function () {});
+                }, L.every * 1000);
             }
         })();
     </script>

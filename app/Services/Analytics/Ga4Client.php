@@ -29,15 +29,26 @@ class Ga4Client
         return filled(config('timevault_analytics.ga4.property_id')) && $path !== '' && is_readable($path);
     }
 
-    /** @return array<string, mixed> The raw runReport response. */
+    /** @return array<string, mixed> The raw runReport response (processed data, a few hours behind). */
     public function runReport(array $body): array
+    {
+        return $this->call('runReport', $body);
+    }
+
+    /** @return array<string, mixed> The raw runRealtimeReport response (the last 30 minutes, unprocessed). */
+    public function runRealtimeReport(array $body): array
+    {
+        return $this->call('runRealtimeReport', $body);
+    }
+
+    private function call(string $method, array $body): array
     {
         $property = preg_replace('/\D/', '', (string) config('timevault_analytics.ga4.property_id'));
 
         $response = Http::withToken($this->accessToken())
             ->acceptJson()
             ->timeout(30)
-            ->post(self::API.$property.':runReport', $body);
+            ->post(self::API.$property.':'.$method, $body);
         $response->throw();
 
         return $response->json() ?? [];
