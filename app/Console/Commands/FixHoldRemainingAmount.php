@@ -50,7 +50,9 @@ class FixHoldRemainingAmount extends Command
                 ->whereIn('status', Refund::ACTIVE_STATUSES)
                 ->sum('amount');
 
-            $actualRemaining = max(0, round($hold->amount - $totalTransferred - $totalRefunded, 2));
+            $totalDisputed = \App\Models\Dispute::lostVaultTotal($hold->id);
+
+            $actualRemaining = max(0, round($hold->amount - $totalTransferred - $totalRefunded - $totalDisputed, 2));
 
             // Check if there's a data inconsistency
             $needsFix = false;

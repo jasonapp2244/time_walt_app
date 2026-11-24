@@ -216,6 +216,7 @@ Only the admin can refund, from the admin panel: all of a deposit or part of it 
 - A hold with status `refunded` (fully refunded) → show a **"Refunded"** badge on that lock (purple/grey), no countdown, no withdraw.
 - A partly refunded hold keeps its normal status (`holding`, `ready_for_transfer`, …) and its smaller remaining amount, so the countdown and withdraw keep working for what is left. Show "Partly refunded" from `refund_status` (below).
 - Treat any unknown hold status as a neutral badge, never a crash.
+- **Chargebacks:** if the user disputes a deposit with their bank, that deposit is frozen until the bank decides. `GET /api/payment-holds/summary` → `summary.total_disputed_amount` (new, additive); frozen money is not counted in `total_ready_for_transfer_amount`, and a withdraw that needs it returns 400 "Insufficient available funds". Optional: show "On hold (bank dispute) $X" when it is above 0.
 - `GET /api/payment-holds` → `summary.total_refunded_amount` (new). `summary.pending_balance` already leaves refunded money out.
 - `GET /api/transactions/all` and `/checkouts` → `summary.total_refunded_amount` (new); each checkout row has `refunded_amount` (number) and `refund_status` (`null`, `refunded` or `partially_refunded`). When `refund_status` is not null, show "Refunded $X to your card" under that deposit.
 - The user also gets a refund email ("Your refund of $X is on its way", 5–10 business days). All new fields are additive; older app versions keep working.

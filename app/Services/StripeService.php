@@ -59,6 +59,11 @@ class StripeService
                     throw new \Exception("Hold #{$locked->id} has nothing left to transfer.");
                 }
 
+                // A chargeback is open: the bank may give this money back to the customer.
+                if ($locked->disputed_at !== null) {
+                    throw new \Exception("Hold #{$locked->id} is frozen by an open chargeback (dispute).");
+                }
+
                 // Get currency from payment
                 $payment = $locked->payment;
                 $currency = $payment ? strtolower($payment->currency) : 'usd';

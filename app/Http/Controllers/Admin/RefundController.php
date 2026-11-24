@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Exceptions\RefundException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\RefundRequest;
+use App\Models\Dispute;
 use App\Models\PaymentHold;
 use App\Models\Refund;
 use App\Services\RefundService;
@@ -88,7 +89,20 @@ class RefundController extends Controller
 
         $auditMismatches = Cache::get(self::AUDIT_CACHE_KEY, []);
 
-        return view('admin.refunds.index', compact('refundsList', 'totals', 'auditMismatches'));
+        // Chargebacks: every open one, plus the latest decided ones.
+        $disputes = Dispute::with(['user', 'hold'])
+            ->where(fn ($q) => $q->where('outcome', 'open')->orWhere('needs_attention', true))
+            ->latest()
+            ->get()
+            ->merge(Dispute::with(['user', 'hold'])->where('outcome', '!=', 'open')->where('needs_attention', false)->latest()->limit(10)->get());
+        $disputeTotals = [
+            'open' => Dispute::where('outcome', 'open')->count(),
+            'open_amount' => (float) Dispute::where('outcome', 'open')->sum('amount'),
+            'lost_amount' => (float) Dispute::where('outcome', 'lost')->sum('amount'),
+            'won' => Dispute::where('outcome', 'won')->count(),
+        ];
+
+        return view('admin.refunds.index', compact('refundsList', 'totals', 'auditMismatches', 'disputes', 'disputeTotals'));
     }
 
     public function export(Request $request): Response

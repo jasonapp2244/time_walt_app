@@ -64,6 +64,77 @@
             </div>
         </div>
 
+        {{-- Chargebacks (Stripe disputes) --}}
+        <div class="card mb-4" id="chargebacks">
+            <div class="card-header py-3 px-4 d-flex align-items-center flex-wrap gap-2">
+                <h6 class="mb-0" style="color:#111827; font-weight:700;">
+                    <i class='bx bx-shield-x me-2' style="color:#c82333;"></i>Chargebacks
+                </h6>
+                <span class="ms-auto" style="font-size:12px; color:#374151; font-weight:600;">
+                    <span style="color:#c82333;">{{ $disputeTotals['open'] }} open (${{ number_format($disputeTotals['open_amount'], 2) }} frozen)</span>
+                    · {{ $disputeTotals['won'] }} won
+                    · ${{ number_format($disputeTotals['lost_amount'], 2) }} lost
+                </span>
+            </div>
+            <div class="card-body p-0">
+                @if($disputes->isEmpty())
+                    <div class="text-center py-4" style="color:#6b7280; font-size:13px;">
+                        No chargebacks. If a customer disputes a deposit with their bank, it appears here and the deposit is frozen automatically.
+                    </div>
+                @else
+                <div class="table-responsive">
+                    <table class="table mb-0 tv-table">
+                        <thead>
+                            <tr>
+                                <th>Opened</th>
+                                <th>User</th>
+                                <th>Deposit</th>
+                                <th>Amount</th>
+                                <th>Reason</th>
+                                <th>Result</th>
+                                <th>Evidence due</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($disputes as $dispute)
+                            <tr>
+                                <td style="color:#4b5563; font-size:12px;">{{ $dispute->created_at?->setTimezone(config('app.admin_timezone'))->format('d M Y, h:i A') }}</td>
+                                <td>
+                                    @if($dispute->user_id)
+                                        <a href="{{ route('admin.users.show', $dispute->user_id) }}" style="color:#111827; font-weight:600; font-size:13px; text-decoration:none;">{{ $dispute->user?->displayName('Unknown') ?? 'Deleted user' }}</a>
+                                    @else
+                                        <span style="color:#6b7280;">Deleted user</span>
+                                    @endif
+                                </td>
+                                <td style="font-size:12px; font-weight:600; color:#374151;">{{ $dispute->payment_hold_id ? '#'.str_pad((string) $dispute->payment_hold_id, 5, '0', STR_PAD_LEFT) : '—' }}</td>
+                                <td style="color:#92621a; font-weight:700;">${{ number_format((float) $dispute->amount, 2) }}</td>
+                                <td style="font-size:12px; color:#374151;">{{ $dispute->reasonLabel() }}</td>
+                                <td>
+                                    @php
+                                        [$label, $badge] = match ($dispute->outcome) {
+                                            'won' => ['Won', 'completed'],
+                                            'lost' => ['Lost', 'failed'],
+                                            default => ['Open · deposit frozen', 'pending'],
+                                        };
+                                    @endphp
+                                    <span class="tv-badge badge-{{ $badge }}">{{ $label }}</span>
+                                    @if($dispute->needs_attention)
+                                        <div style="font-size:11px; color:#c82333; max-width:260px;"><i class='bx bxs-bell-ring'></i> {{ $dispute->note }}</div>
+                                    @endif
+                                </td>
+                                <td style="font-size:12px; color:{{ $dispute->outcome === 'open' ? '#c82333' : '#6b7280' }}; font-weight:600;">
+                                    {{ $dispute->outcome === 'open' ? ($dispute->evidence_due_by?->setTimezone(config('app.admin_timezone'))->format('d M Y') ?? '—') : '—' }}
+                                </td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                <div style="font-size:12px; color:#6b7280; padding:10px 16px;">Answer open chargebacks in the Stripe Dashboard (Payments → Disputes) before the evidence date.</div>
+                @endif
+            </div>
+        </div>
+
         <form method="GET" class="filter-bar">
             <label style="color:#374151; font-size:13px; font-weight:600;">Status:</label>
             <select name="status" class="form-select" style="max-width:160px;">

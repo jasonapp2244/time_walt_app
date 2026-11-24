@@ -262,6 +262,10 @@ class UserController extends Controller
             'payments' => $grouped(\App\Models\Payment::class, self::PAYMENT_STATUSES),
             'transfers' => $transfers,
             'refunds' => $refunds,
+            'disputes' => [
+                'open' => \App\Models\Dispute::where('user_id', $user->id)->where('outcome', 'open')->count(),
+                'lost' => \App\Models\Dispute::where('user_id', $user->id)->where('outcome', 'lost')->count(),
+            ],
             'stripe' => [
                 'connected' => $connect !== null,
                 'status' => $connect?->status,

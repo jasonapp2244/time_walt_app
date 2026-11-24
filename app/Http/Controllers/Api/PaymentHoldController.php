@@ -293,7 +293,13 @@ class PaymentHoldController extends Controller
 
             // READY FOR TRANSFER: Money that completed hold period (can be withdrawn)
             // Includes: status='ready_for_transfer' OR status='partial_transferred' OR status='holding' with completed period
+            // Frozen by an open chargeback: reported apart, never as withdrawable.
+            $disputedAmount = $holds
+                ->whereNotNull('disputed_at')
+                ->sum(fn ($hold) => max(0, (float) ($hold->remaining_amount ?? $hold->amount)));
+
             $readyForTransferAmount = $holds
+                ->whereNull('disputed_at')
                 ->filter(function ($hold) {
                     return $hold->status === 'ready_for_transfer'
                         || $hold->status === 'partial_transferred'
@@ -322,6 +328,7 @@ class PaymentHoldController extends Controller
                     'total_balance' => (float) $calculatedBalance,
                     'total_locked_amount' => (float) $lockedAmount,
                     'total_ready_for_transfer_amount' => (float) $totalReadyForTransfer,
+                    'total_disputed_amount' => (float) $disputedAmount,
                     'currency' => 'USD',
                 ],
             ]);
@@ -347,6 +354,7 @@ class PaymentHoldController extends Controller
             // Find all available holds for this user
             // Include holds with remaining_amount > 0, regardless of status (as long as hold period is complete)
             $availableHolds = PaymentHold::where('user_id', $user->id)
+                ->whereNull('disputed_at') // frozen by an open chargeback
                 ->where(function ($query) {
                     // Status-based conditions
                     $query->where('status', 'ready_for_transfer')
@@ -376,7 +384,8 @@ class PaymentHoldController extends Controller
                         $refundedAmount = (float) \App\Models\Refund::where('payment_hold_id', $hold->id)
                             ->whereIn('status', \App\Models\Refund::ACTIVE_STATUSES)
                             ->sum('amount');
-                        $hold->remaining_amount = max(0, round($hold->amount - $transferredAmount - $refundedAmount, 2));
+                        $disputedAmount = \App\Models\Dispute::lostVaultTotal($hold->id);
+                        $hold->remaining_amount = max(0, round($hold->amount - $transferredAmount - $refundedAmount - $disputedAmount, 2));
                         // Update the hold if remaining_amount was null
                         if ($hold->remaining_amount !== $hold->amount) {
                             $hold->update(['remaining_amount' => $hold->remaining_amount]);
@@ -471,7 +480,7 @@ class PaymentHoldController extends Controller
                 $totalAvailableLocked = 0;
                 foreach ($lockedHolds as $hold) {
                     $remaining = (float) ($hold->remaining_amount ?? $hold->amount);
-                    if ($remaining > 0 && $hold->status !== 'transferred') {
+                    if ($remaining > 0 && $hold->status !== 'transferred' && $hold->disputed_at === null) {
                         $totalAvailableLocked += $remaining;
                     }
                 }
@@ -506,8 +515,9 @@ class PaymentHoldController extends Controller
                     // Get available amount directly without recalculating
                     $availableInHold = (float) ($hold->remaining_amount ?? $hold->amount);
 
-                    // Skip if no amount available in this hold
-                    if ($availableInHold <= 0) {
+                    // Skip if no amount available in this hold, or a chargeback
+                    // was opened on it after the list above was read
+                    if ($availableInHold <= 0 || $hold->disputed_at !== null) {
                         continue;
                     }
 

@@ -28,9 +28,10 @@ class RefundsAudit extends Command
         $holds = PaymentHold::query()
             ->where(function ($query) {
                 $query->whereHas('refunds')
+                    ->orWhereHas('disputes', fn ($d) => $d->where('outcome', 'lost'))
                     ->orWhereHas('transfers', fn ($t) => $t->where('reversed_amount', '>', 0));
             })
-            ->with(['transfers', 'refunds'])
+            ->with(['transfers', 'refunds', 'disputes'])
             ->get();
 
         $mismatches = [];
@@ -44,7 +45,12 @@ class RefundsAudit extends Command
                 ->whereIn('status', Refund::ACTIVE_STATUSES)
                 ->sum(fn ($r) => $this->cents($r->amount));
 
-            $accounted = $this->cents($hold->remaining_amount ?? 0) + $transfers + $refunds;
+            // A lost chargeback took its vault part out (the rest was already withdrawn).
+            $disputes = $hold->disputes
+                ->where('outcome', 'lost')
+                ->sum(fn ($d) => $this->cents($d->vault_amount));
+
+            $accounted = $this->cents($hold->remaining_amount ?? 0) + $transfers + $refunds + $disputes;
             $difference = $this->cents($hold->amount) - $accounted;
 
             if ($difference !== 0) {

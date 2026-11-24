@@ -20,6 +20,7 @@ class Payment extends Model
         'amount',
         'refunded_amount',
         'refunded_at',
+        'disputed_amount',
         'currency',
         'status',
         'paid_at',
@@ -43,6 +44,7 @@ class Payment extends Model
         return [
             'amount' => 'decimal:2',
             'refunded_amount' => 'decimal:2',
+            'disputed_amount' => 'decimal:2',
             'refunded_at' => 'datetime',
             'status' => 'string',
             'paid_at' => 'datetime',

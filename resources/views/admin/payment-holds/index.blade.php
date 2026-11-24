@@ -193,6 +193,11 @@
                                     @if($hold->status !== 'refunded' && (float) ($hold->payment?->refunded_amount ?? 0) > 0)
                                         <div><span class="tv-badge badge-refunded mt-1" style="font-size:10px;">Refunded ${{ number_format((float) $hold->payment->refunded_amount, 2) }}</span></div>
                                     @endif
+                                    @if($hold->disputed_at)
+                                        <div><span class="tv-badge badge-failed mt-1" style="font-size:10px;" title="Open chargeback: no withdrawal or refund until the bank decides"><i class='bx bx-lock-alt'></i> Disputed · frozen</span></div>
+                                    @elseif((float) ($hold->payment?->disputed_amount ?? 0) > 0)
+                                        <div><span class="tv-badge badge-failed mt-1" style="font-size:10px;">Chargeback lost ${{ number_format((float) $hold->payment->disputed_amount, 2) }}</span></div>
+                                    @endif
                                 </td>
                                 <td>
                                     @php $refundBlock = $refundBlocks[$hold->id] ?? null; @endphp

@@ -378,6 +378,10 @@ class RefundService
             throw new RefundException('This deposit was canceled, so there is nothing to refund.');
         }
 
+        if ($hold->disputed_at !== null) {
+            throw new RefundException('This deposit has an open chargeback (dispute). It is frozen until the bank decides.');
+        }
+
         if ($hold->refunds()->where('status', 'pending')->exists()) {
             throw new RefundException('A refund for this deposit is already in progress. Wait for it to finish.');
         }
@@ -413,7 +417,8 @@ class RefundService
             'payment_intent' => $paymentIntent,
             'currency' => strtolower($payment->currency ?: 'usd'),
             'vault_cents' => $this->vaultCents($hold, $transfers),
-            'charge_left_cents' => max(0, $this->cents($payment->amount) - $this->cents($payment->refunded_amount)),
+            // Money lost to a chargeback has already gone back to the customer.
+            'charge_left_cents' => max(0, $this->cents($payment->amount) - $this->cents($payment->refunded_amount) - $this->cents($payment->disputed_amount)),
             'reversible_cents' => array_sum(array_column($reversible, 'net_cents')),
             'reversible' => $reversible,
         ];
@@ -519,8 +524,21 @@ class RefundService
         // amount = remaining + (transfers − reversed) + refunds, so the full
         // refund amount (vault part + reversed part) comes off here.
         $refunded = $hold->refunds()->whereIn('status', Refund::ACTIVE_STATUSES)->sum('amount');
+        $disputed = \App\Models\Dispute::lostVaultTotal($hold->id);
 
-        return max(0, $this->cents($hold->amount) - $out - $this->cents($refunded));
+        return max(0, $this->cents($hold->amount) - $out - $this->cents($refunded) - $this->cents($disputed));
+    }
+
+    /** Money still in the vault for this hold, in cents (shared with DisputeService). */
+    public function vaultCentsOf(PaymentHold $hold): int
+    {
+        return $this->vaultCents($hold, $hold->transfers()->get());
+    }
+
+    /** The hold status that matches where its money is (shared with DisputeService). */
+    public function statusFor(PaymentHold $hold, int $remainingCents): string
+    {
+        return $this->settledStatus($hold, $remainingCents);
     }
 
     /** @return array<string, int> reversible cents per Connect account */

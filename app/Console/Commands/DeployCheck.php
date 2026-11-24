@@ -34,6 +34,9 @@ class DeployCheck extends Command
         'refund.created',
         'refund.updated',
         'refund.failed',
+        'charge.dispute.created',
+        'charge.dispute.updated',
+        'charge.dispute.closed',
     ];
 
     /** Keys the app stopped reading; harmless, but they can be removed from .env. */

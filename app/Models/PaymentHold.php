@@ -28,6 +28,7 @@ class PaymentHold extends Model
         'ready_at',
         'transferred_at',
         'abandoned_at',
+        'disputed_at',
     ];
 
     protected function casts(): array
@@ -44,6 +45,7 @@ class PaymentHold extends Model
             'ready_at' => 'datetime',
             'transferred_at' => 'datetime',
             'abandoned_at' => 'datetime',
+            'disputed_at' => 'datetime',
         ];
     }
 
@@ -74,6 +76,11 @@ class PaymentHold extends Model
     /**
      * Get the refunds of this hold's deposit.
      */
+    public function disputes(): HasMany
+    {
+        return $this->hasMany(Dispute::class, 'payment_hold_id');
+    }
+
     public function refunds(): HasMany
     {
         return $this->hasMany(Refund::class, 'payment_hold_id');

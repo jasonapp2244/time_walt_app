@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\StripeWebhookEvent;
+use App\Services\DisputeService;
 use App\Services\RefundService;
 use App\Services\WebhookService;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -180,6 +181,12 @@ class StripeController extends Controller
 
             case 'charge.refunded':
                 $this->refundService->syncFromCharge($event['data']['object']);
+                break;
+
+            case 'charge.dispute.created':
+            case 'charge.dispute.updated':
+            case 'charge.dispute.closed':
+                app(DisputeService::class)->sync($event['data']['object']);
                 break;
 
             default:

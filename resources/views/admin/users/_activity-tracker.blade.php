@@ -41,6 +41,8 @@
         'failed refund(s)' => $activity['refunds']['statuses']['failed']['count'] + $activity['refunds']['statuses']['canceled']['count'],
         'refund(s) need attention' => $activity['refunds']['attention'],
         'abandoned deposit(s)' => $activity['holds']['abandoned'],
+        'open chargeback(s), deposit frozen' => $activity['disputes']['open'],
+        'lost chargeback(s)' => $activity['disputes']['lost'],
     ]);
 @endphp
 
