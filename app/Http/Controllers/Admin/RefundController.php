@@ -97,7 +97,8 @@ class RefundController extends Controller
             ->merge(Dispute::with(['user', 'hold'])->where('outcome', '!=', 'open')->where('needs_attention', false)->latest()->limit(10)->get());
         $disputeTotals = [
             'open' => Dispute::where('outcome', 'open')->count(),
-            'open_amount' => (float) Dispute::where('outcome', 'open')->sum('amount'),
+            // Only deposit chargebacks freeze vault money.
+            'open_amount' => (float) Dispute::where('outcome', 'open')->whereNotNull('payment_id')->sum('amount'),
             'lost_amount' => (float) Dispute::where('outcome', 'lost')->sum('amount'),
             'won' => Dispute::where('outcome', 'won')->count(),
         ];

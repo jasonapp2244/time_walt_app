@@ -48,7 +48,7 @@ class SubscriptionPaymentController extends Controller
 
     private function filteredQuery(Request $request): Builder
     {
-        $query = SubscriptionInvoice::with(['user', 'subscription.plan']);
+        $query = SubscriptionInvoice::with(['user', 'subscription.plan', 'disputes']);
 
         match ($request->input('type')) {
             'new' => $query->where('billing_reason', 'subscription_create'),

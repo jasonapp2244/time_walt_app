@@ -37,6 +37,7 @@ class DeployCheck extends Command
         'charge.dispute.created',
         'charge.dispute.updated',
         'charge.dispute.closed',
+        'transfer.reversed',
     ];
 
     /** Keys the app stopped reading; harmless, but they can be removed from .env. */

@@ -23,6 +23,7 @@ class Dispute extends Model
 
     protected $fillable = [
         'payment_id',
+        'subscription_invoice_id',
         'payment_hold_id',
         'user_id',
         'stripe_dispute_id',
@@ -52,6 +53,11 @@ class Dispute extends Model
     public function payment(): BelongsTo
     {
         return $this->belongsTo(Payment::class);
+    }
+
+    public function subscriptionInvoice(): BelongsTo
+    {
+        return $this->belongsTo(SubscriptionInvoice::class);
     }
 
     public function hold(): BelongsTo

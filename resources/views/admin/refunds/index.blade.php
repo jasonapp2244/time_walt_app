@@ -106,7 +106,13 @@
                                         <span style="color:#6b7280;">Deleted user</span>
                                     @endif
                                 </td>
-                                <td style="font-size:12px; font-weight:600; color:#374151;">{{ $dispute->payment_hold_id ? '#'.str_pad((string) $dispute->payment_hold_id, 5, '0', STR_PAD_LEFT) : '—' }}</td>
+                                <td style="font-size:12px; font-weight:600; color:#374151;">
+                                    @if($dispute->subscription_invoice_id)
+                                        <span class="tv-badge badge-active" style="font-size:10px;">Subscription</span>
+                                    @else
+                                        {{ $dispute->payment_hold_id ? '#'.str_pad((string) $dispute->payment_hold_id, 5, '0', STR_PAD_LEFT) : '—' }}
+                                    @endif
+                                </td>
                                 <td style="color:#92621a; font-weight:700;">${{ number_format((float) $dispute->amount, 2) }}</td>
                                 <td style="font-size:12px; color:#374151;">{{ $dispute->reasonLabel() }}</td>
                                 <td>
@@ -114,7 +120,7 @@
                                         [$label, $badge] = match ($dispute->outcome) {
                                             'won' => ['Won', 'completed'],
                                             'lost' => ['Lost', 'failed'],
-                                            default => ['Open · deposit frozen', 'pending'],
+                                            default => [$dispute->subscription_invoice_id ? 'Open' : 'Open · deposit frozen', 'pending'],
                                         };
                                     @endphp
                                     <span class="tv-badge badge-{{ $badge }}">{{ $label }}</span>

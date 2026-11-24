@@ -111,6 +111,11 @@
                                 </td>
                                 <td style="color:#1e8c3a; font-weight:700; font-size:15px;">
                                     ${{ number_format($transfer->amount, 2) }}
+                                    @if((float) $transfer->manual_reversed_amount > 0)
+                                        <div><span class="tv-badge badge-failed mt-1" style="font-size:10px;" title="Reversed by hand in the Stripe Dashboard; the money went back to the user's vault">Reversed in Stripe ${{ number_format((float) $transfer->manual_reversed_amount, 2) }}</span></div>
+                                    @elseif((float) $transfer->reversed_amount > 0)
+                                        <div><span class="tv-badge badge-refunded mt-1" style="font-size:10px;">Pulled back for refund ${{ number_format((float) $transfer->reversed_amount, 2) }}</span></div>
+                                    @endif
                                 </td>
                                 <td style="color:#374151; font-size:12px; font-weight:500;">
                                     @if($transfer->bankAccount)

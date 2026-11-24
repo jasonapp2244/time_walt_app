@@ -6,6 +6,7 @@ use App\Jobs\SendDisputeNotification;
 use App\Models\Dispute;
 use App\Models\Payment;
 use App\Models\PaymentHold;
+use App\Models\SubscriptionInvoice;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -39,15 +40,26 @@ class DisputeService
             return;
         }
 
-        $payment = $this->findPayment($stripeDispute);
+        $paymentIntent = $this->paymentIntentOf($stripeDispute);
+        $payment = $paymentIntent
+            ? Payment::where('payment_intent_id_index', Payment::blindIndex($paymentIntent))->first()
+            : null;
+        $outcome = $this->outcome((string) ($stripeDispute['status'] ?? ''));
 
         if ($payment === null) {
-            Log::info('Dispute webhook for a payment that is not a deposit; ignored', ['dispute' => substr($disputeId, -8)]);
+            // Not a deposit: a chargeback on a subscription payment is recorded for the admin.
+            $invoice = app(SubscriptionChargeService::class)->findInvoice($paymentIntent);
+
+            if ($invoice === null) {
+                Log::info('Dispute webhook for a payment that is neither a deposit nor a subscription; ignored', ['dispute' => substr($disputeId, -8)]);
+
+                return;
+            }
+
+            $this->syncSubscription($invoice, $stripeDispute, $outcome);
 
             return;
         }
-
-        $outcome = $this->outcome((string) ($stripeDispute['status'] ?? ''));
 
         try {
             [$dispute, $event] = DB::transaction(fn () => $this->apply($payment, $stripeDispute, $outcome));
@@ -173,7 +185,59 @@ class DisputeService
         };
     }
 
-    private function findPayment(array $stripeDispute): ?Payment
+    /**
+     * A chargeback on a subscription payment: no vault money is involved, so
+     * it is only recorded (Chargebacks panel, Subscription Payments page) and
+     * the admin is emailed when it opens and when it is decided.
+     */
+    private function syncSubscription(SubscriptionInvoice $invoice, array $stripeDispute, string $outcome): void
+    {
+        $dueBy = $stripeDispute['evidence_details']['due_by'] ?? null;
+        $details = [
+            'stripe_status' => (string) ($stripeDispute['status'] ?? 'unknown'),
+            'reason' => isset($stripeDispute['reason']) ? mb_substr((string) $stripeDispute['reason'], 0, 50) : null,
+            'evidence_due_by' => is_numeric($dueBy) ? Carbon::createFromTimestamp((int) $dueBy) : null,
+        ];
+
+        $apply = function () use ($invoice, $stripeDispute, $outcome, $details) {
+            $dispute = Dispute::where('stripe_dispute_id', $stripeDispute['id'])->lockForUpdate()->first();
+            $event = null;
+
+            if ($dispute === null) {
+                $dispute = Dispute::create($details + [
+                    'subscription_invoice_id' => $invoice->id,
+                    'user_id' => $invoice->user_id,
+                    'stripe_dispute_id' => $stripeDispute['id'],
+                    'amount' => ((int) ($stripeDispute['amount'] ?? 0)) / 100,
+                    'currency' => strtolower((string) ($stripeDispute['currency'] ?? $invoice->currency ?? 'usd')),
+                    'outcome' => 'open',
+                ]);
+                $event = 'opened';
+            } else {
+                $dispute->fill($details)->save();
+            }
+
+            if ($dispute->outcome === 'open' && $outcome !== 'open') {
+                $dispute->update(['outcome' => $outcome, 'closed_at' => now()]);
+                $event = $outcome;
+            }
+
+            return [$dispute, $event];
+        };
+
+        try {
+            [$dispute, $event] = DB::transaction($apply);
+        } catch (UniqueConstraintViolationException) {
+            [$dispute, $event] = DB::transaction($apply);
+        }
+
+        if ($event !== null) {
+            Log::warning('Subscription payment dispute '.$event, ['dispute_id' => $dispute->id, 'invoice_id' => $invoice->id]);
+            SendDisputeNotification::dispatch($dispute, $event);
+        }
+    }
+
+    private function paymentIntentOf(array $stripeDispute): ?string
     {
         $paymentIntent = $stripeDispute['payment_intent'] ?? null;
 
@@ -188,10 +252,6 @@ class DisputeService
             );
         }
 
-        if (! is_string($paymentIntent) || $paymentIntent === '') {
-            return null;
-        }
-
-        return Payment::where('payment_intent_id_index', Payment::blindIndex($paymentIntent))->first();
+        return is_string($paymentIntent) && $paymentIntent !== '' ? $paymentIntent : null;
     }
 }

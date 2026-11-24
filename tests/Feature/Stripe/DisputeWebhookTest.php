@@ -195,6 +195,7 @@ class DisputeWebhookTest extends TestCase
     public function test_a_dispute_on_an_unknown_payment_is_ignored(): void
     {
         $hold = $this->deposit(50);
+        $this->stripe->respond('GET /v1/invoice_payments', ['object' => 'list', 'has_more' => false, 'data' => []]); // not a subscription either
 
         $this->dispute($hold, 'charge.dispute.created', 'needs_response', ['payment_intent' => 'pi_not_ours']);
 

@@ -20,6 +20,7 @@ class Transfer extends Model
         'stripe_connect_account_id',
         'amount',
         'reversed_amount',
+        'manual_reversed_amount',
         'currency',
         'status',
         'transferred_at',
@@ -42,6 +43,7 @@ class Transfer extends Model
         return [
             'amount' => 'decimal:2',
             'reversed_amount' => 'decimal:2',
+            'manual_reversed_amount' => 'decimal:2',
             'status' => 'string',
             'transferred_at' => 'datetime',
             'abandoned_at' => 'datetime',

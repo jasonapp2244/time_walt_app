@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SubscriptionInvoice extends Model
 {
@@ -19,6 +20,8 @@ class SubscriptionInvoice extends Model
         'invoice_number',
         'billing_reason',
         'amount',
+        'refunded_amount',
+        'refunded_at',
         'currency',
         'period_end',
         'hosted_invoice_url',
@@ -35,6 +38,8 @@ class SubscriptionInvoice extends Model
         return [
             'stripe_invoice_id' => 'encrypted',
             'amount' => 'decimal:2',
+            'refunded_amount' => 'decimal:2',
+            'refunded_at' => 'datetime',
             'period_end' => 'datetime',
             'paid_at' => 'datetime',
         ];
@@ -52,6 +57,12 @@ class SubscriptionInvoice extends Model
     public static function blindIndex(string $value): string
     {
         return hash_hmac('sha256', $value, config('app.key'));
+    }
+
+    /** Chargebacks on this subscription payment. */
+    public function disputes(): HasMany
+    {
+        return $this->hasMany(Dispute::class);
     }
 
     public function subscription(): BelongsTo

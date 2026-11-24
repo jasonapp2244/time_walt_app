@@ -192,6 +192,7 @@ class RefundWebhookTest extends TestCase
 
     public function test_a_refund_for_an_unknown_payment_is_ignored(): void
     {
+        $this->stripe->respond('GET /v1/invoice_payments', ['object' => 'list', 'has_more' => false, 'data' => []]); // not a subscription either
         $this->postStripeWebhook($this->stripeEvent('refund.created', [
             'id' => 're_other', 'object' => 'refund', 'amount' => 999, 'currency' => 'usd', 'payment_intent' => 'pi_not_a_deposit', 'status' => 'succeeded',
         ]))->assertOk();

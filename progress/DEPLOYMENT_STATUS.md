@@ -1,5 +1,7 @@
 # DEPLOYMENT STATUS — Time Vault
 
+**2026-11-25 outside-Stripe release:** adds migration 2026_11_25_000002 (additive). Stripe LIVE webhook needs 8 new events in total: charge.refunded, refund.created, refund.updated, refund.failed, charge.dispute.created, charge.dispute.updated, charge.dispute.closed, transfer.reversed (deploy:check requires 18). Not deployed yet.
+
 **2026-11-25 chargeback release (on top of e7170df):** adds migration 2026_11_25_000001_create_disputes_table (additive). Stripe LIVE webhook must also get charge.dispute.created, charge.dispute.updated, charge.dispute.closed (deploy:check now requires 17 events). Same deploy command; not deployed yet.
 
 **2026-11-25 RELEASE (refunds + tracking + Stripe hold label):** committed on `feature/admin-refund`, fast-forwarded to `development` and `main`, pushed. Rollback point: `1fe2c3a` (`./deploy.sh --rollback`). Includes the 3 analytics commits (page hidden from the sidebar). Pre-push evidence: 405 tests pass, Pint pass, 106 routes, refunds migration up/down/up clean on time_walt_test, independent review = no blocker, browser smoke of dashboard/users/payment-holds(refund popup)/refunds/payments/transfers OK.

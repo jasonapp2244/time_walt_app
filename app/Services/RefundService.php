@@ -260,6 +260,16 @@ class RefundService
      */
     public function syncFromCharge(array $charge): void
     {
+        // Not a deposit: it may be a subscription payment refunded in Stripe.
+        $paymentIntent = $charge['payment_intent'] ?? null;
+
+        if (is_string($paymentIntent) && $paymentIntent !== ''
+            && ! Payment::where('payment_intent_id_index', Payment::blindIndex($paymentIntent))->exists()) {
+            app(SubscriptionChargeService::class)->recordFromCharge($charge);
+
+            return;
+        }
+
         foreach ($charge['refunds']['data'] ?? [] as $stripeRefund) {
             if (is_array($stripeRefund) && isset($stripeRefund['id'])) {
                 $this->syncFromStripe($stripeRefund);
@@ -922,7 +932,10 @@ class RefundService
         $payment = Payment::where('payment_intent_id_index', Payment::blindIndex($paymentIntent))->first();
 
         if ($payment === null) {
-            Log::info('Refund webhook for a payment that is not a deposit; ignored', ['refund' => substr((string) ($stripeRefund['id'] ?? ''), -8)]);
+            // Not a deposit: record it on the subscription payment if it is one.
+            if (! app(SubscriptionChargeService::class)->recordFromRefund($stripeRefund)) {
+                Log::info('Refund webhook for a payment that is neither a deposit nor a subscription; ignored', ['refund' => substr((string) ($stripeRefund['id'] ?? ''), -8)]);
+            }
 
             return;
         }

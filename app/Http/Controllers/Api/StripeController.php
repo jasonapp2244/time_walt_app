@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\StripeWebhookEvent;
 use App\Services\DisputeService;
 use App\Services\RefundService;
+use App\Services\TransferReversalService;
 use App\Services\WebhookService;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
@@ -187,6 +188,10 @@ class StripeController extends Controller
             case 'charge.dispute.updated':
             case 'charge.dispute.closed':
                 app(DisputeService::class)->sync($event['data']['object']);
+                break;
+
+            case 'transfer.reversed':
+                app(TransferReversalService::class)->sync($event['data']['object']);
                 break;
 
             default:

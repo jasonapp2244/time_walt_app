@@ -11,6 +11,7 @@
     $colour = $event === 'won' ? '#1e8c3a' : '#c82333';
     $title = match ($event) { 'won' => 'Chargeback Won', 'lost' => 'Chargeback Lost', default => 'Chargeback Opened' };
     $deposit = $dispute->payment_hold_id ? '#'.str_pad((string) $dispute->payment_hold_id, 5, '0', STR_PAD_LEFT) : '—';
+    $isSubscription = $dispute->subscription_invoice_id !== null;
 @endphp
 <div style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
 
@@ -25,7 +26,7 @@
     <div style="padding: 35px 30px;">
         <p style="color: #333333; font-size: 16px; margin-top: 0;">
             {{ $user?->displayName('Unknown') ?? 'Deleted user' }} (user #{{ $dispute->user_id ?? '—' }}) disputed
-            <strong>${{ number_format((float) $dispute->amount, 2) }}</strong> of deposit {{ $deposit }} with their bank.
+            <strong>${{ number_format((float) $dispute->amount, 2) }}</strong> of {{ $isSubscription ? 'a subscription payment' : 'deposit '.$deposit }} with their bank.
         </p>
 
         <div style="background-color: #fff8e8; border-left: 4px solid #935510; padding: 15px 20px; border-radius: 4px; margin: 20px 0;">
@@ -38,7 +39,15 @@
         </div>
 
         <p style="color: #333333; font-size: 15px; line-height: 1.8;">
-            @if($event === 'opened')
+            @if($isSubscription)
+                @if($event === 'opened')
+                    This is a subscription payment, so no vault money is involved. Answer the dispute in the Stripe Dashboard (Payments → Disputes) before the deadline.
+                @elseif($event === 'won')
+                    The bank decided for Time Vault. The subscription payment stands.
+                @else
+                    The bank returned this subscription payment to the customer.
+                @endif
+            @elseif($event === 'opened')
                 <strong>This deposit is now frozen:</strong> the user cannot withdraw it and it cannot be refunded until the bank decides.
                 Answer the dispute in the Stripe Dashboard (Payments → Disputes) before the deadline.
             @elseif($event === 'won')

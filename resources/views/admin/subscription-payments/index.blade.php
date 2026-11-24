@@ -111,6 +111,12 @@
                                 </td>
                                 <td style="color:#1e8c3a; font-size:13px; font-weight:700;">
                                     {{ strtoupper($payment->currency) }} {{ number_format($payment->amount, 2) }}
+                                    @if((float) $payment->refunded_amount > 0)
+                                        <div><span class="tv-badge badge-refunded mt-1" style="font-size:10px;">Refunded in Stripe {{ number_format((float) $payment->refunded_amount, 2) }}</span></div>
+                                    @endif
+                                    @foreach($payment->disputes as $dispute)
+                                        <div><span class="tv-badge {{ $dispute->outcome === 'won' ? 'badge-completed' : 'badge-failed' }} mt-1" style="font-size:10px;">Chargeback {{ $dispute->outcome === 'open' ? 'open' : $dispute->outcome }}</span></div>
+                                    @endforeach
                                 </td>
                                 <td style="font-size:12px;">
                                     @if($payment->hosted_invoice_url)
