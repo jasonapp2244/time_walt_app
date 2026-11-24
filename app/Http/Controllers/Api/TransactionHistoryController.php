@@ -569,7 +569,7 @@ class TransactionHistoryController extends Controller
             'payment_details' => [
                 'payment_id' => $hold->payment?->id,
                 'payment_intent_id' => $hold->payment?->payment_intent_id,
-                'hold_status' => $hold->status,
+                'hold_status' => $hold->appStatus(),
                 'paid_at' => $hold->payment?->paid_at?->toIso8601String(),
             ],
             ...$this->getHoldTimeFields($hold),
@@ -633,7 +633,7 @@ class TransactionHistoryController extends Controller
                 'hold_id' => $hold->id,
                 'original_amount' => (float) $hold->amount,
                 'remaining_amount' => (float) ($hold->remaining_amount ?? $hold->amount),
-                'hold_status' => $hold->status,
+                'hold_status' => $hold->appStatus(),
                 'payment_id' => $hold->payment?->id,
                 'payment_intent_id' => $hold->payment?->payment_intent_id,
             ];
@@ -686,7 +686,7 @@ class TransactionHistoryController extends Controller
                     'hold_id' => $hold->id,
                     'original_amount' => (float) $hold->amount,
                     'remaining_amount' => (float) ($hold->remaining_amount ?? $hold->amount),
-                    'hold_status' => $hold->status,
+                    'hold_status' => $hold->appStatus(),
                 ] : null,
             ];
         }
@@ -731,7 +731,7 @@ class TransactionHistoryController extends Controller
             'remaining_amount' => (float) $remainingAmount,
             'amount' => (float) $remainingAmount,
             'currency' => $hold->payment ? strtoupper($hold->payment->currency) : 'USD',
-            'status' => $hold->status,
+            'status' => $hold->appStatus(),
             'hold_period' => [
                 'hold_days' => $hold->hold_days,
                 'hold_hours' => $hold->hold_hours ?? 0,
@@ -775,7 +775,7 @@ class TransactionHistoryController extends Controller
             'already_withdrawn' => (float) $alreadyWithdrawn,
             'amount' => (float) $remainingAmount,
             'currency' => $hold->payment ? strtoupper($hold->payment->currency) : 'USD',
-            'status' => $hold->status,
+            'status' => $hold->appStatus(),
             'can_withdraw' => true,
             'hold_period' => [
                 'hold_days' => $hold->hold_days,

@@ -76,6 +76,17 @@ class PaymentHold extends Model
     /**
      * Get the refunds of this hold's deposit.
      */
+    /**
+     * The status the mobile app is given. A fully refunded deposit is shown
+     * to the app as `canceled` (no countdown, no withdraw, money gone), a
+     * status every released app version already handles; `refunded` stays an
+     * admin-only status in the database and the admin panel.
+     */
+    public function appStatus(): ?string
+    {
+        return $this->status === 'refunded' ? 'canceled' : $this->status;
+    }
+
     public function disputes(): HasMany
     {
         return $this->hasMany(Dispute::class, 'payment_hold_id');

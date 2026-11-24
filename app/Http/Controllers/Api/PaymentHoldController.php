@@ -60,7 +60,7 @@ class PaymentHoldController extends Controller
                     'payment_details' => [
                         'payment_id' => $hold->payment->id,
                         'payment_intent_id' => $hold->payment->payment_intent_id,
-                        'hold_status' => $hold->status,
+                        'hold_status' => $hold->appStatus(),
                         'can_request_payout' => $this->canRequestPayout($hold),
                     ],
                 ];
@@ -431,7 +431,7 @@ class PaymentHoldController extends Controller
                     'hold_id' => $hold->id,
                     'original_amount' => (float) $hold->amount,
                     'remaining_amount' => (float) ($hold->remaining_amount ?? $hold->amount),
-                    'status' => $hold->status,
+                    'status' => $hold->appStatus(),
                 ];
             }
 

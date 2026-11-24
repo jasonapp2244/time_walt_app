@@ -338,7 +338,7 @@ class PaymentSheetService
         return [
             'id' => $hold->id,
             'amount' => (float) $hold->amount,
-            'status' => $hold->status,
+            'status' => $hold->appStatus(),
             'hold_start_at' => $hold->hold_start_at->toIso8601String(),
             'hold_end_at' => $hold->hold_end_at->toIso8601String(),
             'hold_days' => $hold->hold_days,

@@ -209,17 +209,15 @@ The server takes the money from several matured locks (oldest first). **It count
 `POST /api/payment-holds/{hold_id}/request-payout` (no body) sends that lock's whole remaining amount. 200 `data.status` is `pending`. Errors: 404 "Payment hold not found.", 400 "Payout already completed…", 400 "Payout request already exists…", 400 "Hold period not completed yet…" (`data.days_remaining/hours_remaining/minutes_remaining`), 500 generic (also happens when no bank account is set — check the bank list first).
 
 ### History
-`GET /api/payment-holds?page=1&per_page=15` → `summary`, `transactions[]`, `pagination{current_page,last_page,has_more_pages,...}` (no `data` wrapper). Rows have `transaction_type` `checkout` (lock, with `hold_duration` countdown and `payment_details.can_request_payout`) or `transfer` (withdrawal). Hold statuses: `holding`, `ready_for_transfer`, `partial_transferred`, `transferred`, `canceled`, `refunded`.
+`GET /api/payment-holds?page=1&per_page=15` → `summary`, `transactions[]`, `pagination{current_page,last_page,has_more_pages,...}` (no `data` wrapper). Rows have `transaction_type` `checkout` (lock, with `hold_duration` countdown and `payment_details.can_request_payout`) or `transfer` (withdrawal). Hold statuses: `holding`, `ready_for_transfer`, `partial_transferred`, `transferred`, `canceled`. (The API never sends any other value.)
 
-### Refunded deposits (admin refunds)
-Only the admin can refund, from the admin panel: all of a deposit or part of it (several partial refunds are allowed), always back to the card that paid it. The app has no refund button. It only needs to show the refund:
-- A hold with status `refunded` (fully refunded) → show a **"Refunded"** badge on that lock (purple/grey), no countdown, no withdraw.
-- A partly refunded hold keeps its normal status (`holding`, `ready_for_transfer`, …) and its smaller remaining amount, so the countdown and withdraw keep working for what is left. Show "Partly refunded" from `refund_status` (below).
-- Treat any unknown hold status as a neutral badge, never a crash.
-- **Chargebacks:** if the user disputes a deposit with their bank, that deposit is frozen until the bank decides. `GET /api/payment-holds/summary` → `summary.total_disputed_amount` (new, additive); frozen money is not counted in `total_ready_for_transfer_amount`, and a withdraw that needs it returns 400 "Insufficient available funds". Optional: show "On hold (bank dispute) $X" when it is above 0.
-- `GET /api/payment-holds` → `summary.total_refunded_amount` (new). `summary.pending_balance` already leaves refunded money out.
-- `GET /api/transactions/all` and `/checkouts` → `summary.total_refunded_amount` (new); each checkout row has `refunded_amount` (number) and `refund_status` (`null`, `refunded` or `partially_refunded`). When `refund_status` is not null, show "Refunded $X to your card" under that deposit.
-- The user also gets a refund email ("Your refund of $X is on its way", 5–10 business days). All new fields are additive; older app versions keep working.
+### Refunded deposits and chargebacks: NO APP CHANGE NEEDED
+Refunds (admin only, all or part of a deposit, back to the paying card) and bank chargebacks are tracked on the admin side only. The current app keeps working as it is:
+- A fully refunded deposit reaches the app as status `canceled` (no countdown, no withdraw, money gone) — a status the app already handles. The real status `refunded` is admin-only.
+- A partly refunded deposit keeps its normal status with a smaller remaining amount.
+- A deposit under a bank chargeback is frozen: its money is not counted as withdrawable, and a withdraw that needs it gets the existing 400 "Insufficient available funds" message.
+- New response fields are additive and can be ignored: `summary.total_refunded_amount`, `summary.total_disputed_amount`, and per checkout row `refunded_amount` and `refund_status`.
+- The user gets a refund email ("Your refund of $X is on its way", 5–10 business days).
 
 ## Feature G — Bank accounts (several per user)
 
