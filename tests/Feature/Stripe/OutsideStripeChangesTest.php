@@ -135,13 +135,77 @@ class OutsideStripeChangesTest extends TestCase
         $this->transferReversed([['id' => 'trr_hand_1', 'object' => 'transfer_reversal', 'amount' => 2000, 'metadata' => []]]);
 
         $mail = new AdminManualReversalMail($transfer->fresh(), 20.0);
-        $this->assertSame("[Admin] Withdrawal reversed in Stripe: \$20.00 back in Brian Foster's vault", $mail->envelope()->subject);
+        $this->assertSame('[Admin] Withdrawal reversed in Stripe: $20.00 for Brian Foster', $mail->envelope()->subject);
         $mail->assertSeeInHtml('it was put back in the user');
 
         $admin = User::factory()->create(['role' => 'admin', 'email' => 'megan.carter@example.com']);
         $this->actingAs($admin)->get(route('admin.transfers.index'))
             ->assertOk()
             ->assertSee('Reversed in Stripe $20.00');
+    }
+
+    public function test_reversing_withdrawn_money_owed_for_a_lost_chargeback_does_not_refill_the_vault(): void
+    {
+        [$hold, $transfer] = $this->withdrawnDeposit(); // $100: $30 in vault, $70 withdrawn
+        $this->postStripeWebhook($this->stripeEvent('charge.dispute.closed', [
+            'id' => 'dp_owed', 'object' => 'dispute', 'amount' => 10000, 'currency' => 'usd',
+            'payment_intent' => $hold->payment->payment_intent_id, 'status' => 'lost', 'reason' => 'fraudulent',
+        ]))->assertOk();
+        $this->assertTrue(Dispute::sole()->needs_attention); // $70 owed by the user
+
+        // The admin recovers the $70 by reversing the user's transfer in Stripe.
+        $this->transferReversed([['id' => 'trr_recover', 'object' => 'transfer_reversal', 'amount' => 7000, 'metadata' => []]]);
+
+        $dispute = Dispute::sole();
+        $this->assertSame('100.00', $dispute->vault_amount);
+        $this->assertFalse($dispute->needs_attention);
+        $this->assertSame('Recovered by a transfer reversal in Stripe.', $dispute->note);
+        $this->assertSame('0.00', $hold->refresh()->remaining_amount, 'the recovered money is not withdrawable again');
+        $this->assertSame('70.00', $transfer->refresh()->reversed_amount);
+        $this->assertSame(0, Artisan::call('refunds:audit'));
+        Queue::assertPushed(SendManualReversalNotification::class, fn ($job) => $job->amount === 0.0 && $job->covered === 70.0);
+    }
+
+    public function test_reversing_after_a_dashboard_refund_covers_it_whatever_the_click_order(): void
+    {
+        [$hold] = $this->withdrawnDeposit();
+        $refund = ['id' => 're_dash_big', 'object' => 'refund', 'amount' => 10000, 'currency' => 'usd',
+            'payment_intent' => $hold->payment->payment_intent_id, 'status' => 'succeeded', 'metadata' => []];
+
+        // Refund first (the vault covers only $30, so it is flagged) ...
+        $this->postStripeWebhook($this->stripeEvent('refund.created', $refund))->assertOk();
+        $this->assertTrue(\App\Models\Refund::sole()->needs_attention);
+        $this->assertSame(1, Artisan::call('refunds:audit'), 'uncovered refund shows as a mismatch');
+
+        // ... then reverse $50 of the transfer: it covers part of the $70 owed, nothing reaches the vault.
+        $this->transferReversed([['id' => 'trr_part', 'object' => 'transfer_reversal', 'amount' => 5000, 'metadata' => []]]);
+        $row = \App\Models\Refund::sole();
+        $this->assertSame('50.00', $row->reversed_amount);
+        $this->assertTrue($row->needs_attention);
+        $this->assertSame('0.00', $hold->refresh()->remaining_amount);
+
+        // The last $20 settles it, and any extra would go to the vault.
+        $this->transferReversed([
+            ['id' => 'trr_part', 'object' => 'transfer_reversal', 'amount' => 5000, 'metadata' => []],
+            ['id' => 'trr_rest', 'object' => 'transfer_reversal', 'amount' => 2000, 'metadata' => []],
+        ]);
+        $row->refresh();
+        $this->assertSame('70.00', $row->reversed_amount);
+        $this->assertFalse($row->needs_attention);
+        $this->assertSame('0.00', $hold->refresh()->remaining_amount);
+        $this->assertSame(0, Artisan::call('refunds:audit'));
+    }
+
+    public function test_a_stripe_outage_during_lookup_makes_stripe_retry_the_event(): void
+    {
+        $this->stripe->respond('GET /v1/invoice_payments', ['error' => ['type' => 'api_error', 'message' => 'Stripe is down']], 500);
+
+        $this->postStripeWebhook($this->stripeEvent('charge.dispute.created', [
+            'id' => 'dp_retry', 'object' => 'dispute', 'amount' => 999, 'currency' => 'usd',
+            'payment_intent' => 'pi_sub_retry', 'status' => 'needs_response',
+        ]))->assertStatus(500);
+
+        $this->assertSame(0, Dispute::count());
     }
 
     // ─── Gap 2: subscription payments ────────────────────────────────────────

@@ -15,7 +15,8 @@ class AdminManualReversalMail extends Mailable
 
     public function __construct(
         public Transfer $transfer,
-        public float $amount
+        public float $amount,
+        public float $covered = 0.0
     ) {}
 
     public function envelope(): Envelope
@@ -23,7 +24,7 @@ class AdminManualReversalMail extends Mailable
         $user = $this->transfer->user?->displayName('Unknown user') ?? 'Deleted user';
 
         return new Envelope(
-            subject: '[Admin] Withdrawal reversed in Stripe: $'.number_format($this->amount, 2).' back in '.$user."'s vault",
+            subject: '[Admin] Withdrawal reversed in Stripe: $'.number_format($this->amount + $this->covered, 2).' for '.$user,
         );
     }
 
@@ -31,7 +32,7 @@ class AdminManualReversalMail extends Mailable
     {
         return new Content(
             view: 'emails.stripe.admin-manual-reversal',
-            with: ['transfer' => $this->transfer, 'amount' => $this->amount],
+            with: ['transfer' => $this->transfer, 'amount' => $this->amount, 'covered' => $this->covered],
         );
     }
 

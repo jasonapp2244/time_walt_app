@@ -22,7 +22,7 @@
 
     <div style="padding: 35px 30px;">
         <p style="color: #333333; font-size: 16px; margin-top: 0;">
-            Someone reversed <strong>${{ number_format($amount, 2) }}</strong> of withdrawal #{{ str_pad((string) $transfer->id, 5, '0', STR_PAD_LEFT) }}
+            Someone reversed <strong>${{ number_format($amount + $covered, 2) }}</strong> of withdrawal #{{ str_pad((string) $transfer->id, 5, '0', STR_PAD_LEFT) }}
             directly in the Stripe Dashboard. It was not done from the admin panel.
         </p>
 
@@ -34,8 +34,14 @@
         </div>
 
         <p style="color: #333333; font-size: 15px; line-height: 1.8;">
-            The money is back in the platform balance, so it was put back in the user's vault: the user can withdraw it again.
-            If this reversal was a mistake, contact the user. Use the admin panel for refunds next time.
+            @if($covered > 0)
+                <strong>${{ number_format($covered, 2) }}</strong> settled money the user owed on this deposit (a lost chargeback or a refund the vault could not cover); it is not withdrawable.
+            @endif
+            @if($amount > 0)
+                <strong>${{ number_format($amount, 2) }}</strong> is back in the platform balance, so it was put back in the user's vault: the user can withdraw it again.
+                If this reversal was a mistake, contact the user.
+            @endif
+            Use the admin panel for refunds next time.
         </p>
 
         @if($user)

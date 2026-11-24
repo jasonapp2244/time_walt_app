@@ -27,13 +27,8 @@ class SubscriptionChargeService
 
         $this->setStripe();
 
-        try {
-            $refundedCents = (int) \Stripe\Charge::retrieve($stripeRefund['charge'])->amount_refunded;
-        } catch (\Stripe\Exception\ApiErrorException $e) {
-            Log::warning('Could not read a refunded subscription charge from Stripe', ['error' => $e->getMessage()]);
-
-            return true; // It is a subscription payment; charge.refunded will set the total.
-        }
+        // A Stripe error propagates: the webhook answers 500 and Stripe retries it.
+        $refundedCents = (int) \Stripe\Charge::retrieve($stripeRefund['charge'])->amount_refunded;
 
         $this->setRefunded($invoice, $refundedCents);
 
@@ -63,16 +58,12 @@ class SubscriptionChargeService
 
         $this->setStripe();
 
-        try {
-            $payments = \Stripe\InvoicePayment::all([
-                'payment' => ['type' => 'payment_intent', 'payment_intent' => $paymentIntent],
-                'limit' => 1,
-            ])->toArray()['data'] ?? [];
-        } catch (\Stripe\Exception\ApiErrorException $e) {
-            Log::warning('Could not look up the invoice of a payment in Stripe', ['error' => $e->getMessage()]);
-
-            return null;
-        }
+        // A Stripe error propagates: the webhook answers 500 and Stripe retries
+        // it, so a refund or chargeback is never dropped because Stripe was down.
+        $payments = \Stripe\InvoicePayment::all([
+            'payment' => ['type' => 'payment_intent', 'payment_intent' => $paymentIntent],
+            'limit' => 1,
+        ])->toArray()['data'] ?? [];
 
         $invoiceId = $payments[0]['invoice'] ?? null;
         $invoiceId = is_array($invoiceId) ? ($invoiceId['id'] ?? null) : $invoiceId;
@@ -84,7 +75,8 @@ class SubscriptionChargeService
 
     private function setRefunded(SubscriptionInvoice $invoice, int $refundedCents): void
     {
-        if ($refundedCents <= 0 || (int) round((float) $invoice->refunded_amount * 100) === $refundedCents) {
+        // Refunds only grow; a late (older) event never lowers the total.
+        if ($refundedCents <= (int) round((float) $invoice->refunded_amount * 100)) {
             return;
         }
 

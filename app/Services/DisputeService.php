@@ -245,11 +245,8 @@ class DisputeService
         if ((! is_string($paymentIntent) || $paymentIntent === '') && is_string($stripeDispute['charge'] ?? null)) {
             \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
 
-            $paymentIntent = rescue(
-                fn () => \Stripe\Charge::retrieve($stripeDispute['charge'])->payment_intent,
-                null,
-                fn ($e) => Log::warning('Could not read the disputed charge from Stripe', ['error' => $e->getMessage()]),
-            );
+            // A Stripe error propagates: the webhook answers 500 and Stripe retries it.
+            $paymentIntent = \Stripe\Charge::retrieve($stripeDispute['charge'])->payment_intent;
         }
 
         return is_string($paymentIntent) && $paymentIntent !== '' ? $paymentIntent : null;

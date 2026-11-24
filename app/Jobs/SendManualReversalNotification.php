@@ -12,8 +12,8 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Mail;
 
 /**
- * Tells the admin that a withdrawal was reversed by hand in Stripe and the
- * money went back into the user's vault.
+ * Tells the admin that a withdrawal was reversed by hand in Stripe: what went
+ * back into the user's vault, and what settled money the user owed.
  */
 class SendManualReversalNotification implements ShouldQueue
 {
@@ -21,7 +21,8 @@ class SendManualReversalNotification implements ShouldQueue
 
     public function __construct(
         public Transfer $transfer,
-        public float $amount
+        public float $amount,
+        public float $covered = 0.0
     ) {}
 
     public function handle(): void
@@ -29,7 +30,7 @@ class SendManualReversalNotification implements ShouldQueue
         if ($adminEmail = config('mail.admin_email')) {
             $this->transfer->loadMissing(['user', 'hold']);
 
-            Mail::to($adminEmail)->send(new AdminManualReversalMail($this->transfer, $this->amount));
+            Mail::to($adminEmail)->send(new AdminManualReversalMail($this->transfer, $this->amount, $this->covered));
         }
     }
 }
