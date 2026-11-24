@@ -27,7 +27,7 @@
 
         {{-- User Amount Summary --}}
         <div class="row g-3 mb-4">
-            <div class="col-12 col-md-4">
+            <div class="col-12 col-md-6 col-xl-3">
                 <div style="background:#ffffff; border:1px solid rgba(255,152,0,0.25); border-radius:10px; padding:14px 18px; display:flex; align-items:center; gap:12px; box-shadow:0 1px 4px rgba(0,0,0,0.04);">
                     <div style="width:40px; height:40px; border-radius:10px; background:rgba(255,152,0,0.12); display:flex; align-items:center; justify-content:center; font-size:18px; color:#c87000; flex-shrink:0;">
                         <i class='bx bxs-lock-alt'></i>
@@ -38,7 +38,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-12 col-md-4">
+            <div class="col-12 col-md-6 col-xl-3">
                 <div style="background:#ffffff; border:1px solid rgba(189,126,46,0.25); border-radius:10px; padding:14px 18px; display:flex; align-items:center; gap:12px; box-shadow:0 1px 4px rgba(0,0,0,0.04);">
                     <div style="width:40px; height:40px; border-radius:10px; background:rgba(189,126,46,0.12); display:flex; align-items:center; justify-content:center; font-size:18px; color:#92621a; flex-shrink:0;">
                         <i class='bx bxs-lock-open-alt'></i>
@@ -49,7 +49,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-12 col-md-4">
+            <div class="col-12 col-md-6 col-xl-3">
                 <div style="background:#ffffff; border:1px solid rgba(40,167,69,0.25); border-radius:10px; padding:14px 18px; display:flex; align-items:center; gap:12px; box-shadow:0 1px 4px rgba(0,0,0,0.04);">
                     <div style="width:40px; height:40px; border-radius:10px; background:rgba(40,167,69,0.12); display:flex; align-items:center; justify-content:center; font-size:18px; color:#1e8c3a; flex-shrink:0;">
                         <i class='bx bxs-send'></i>
@@ -60,7 +60,24 @@
                     </div>
                 </div>
             </div>
+            <div class="col-12 col-md-6 col-xl-3">
+                <div style="background:#fffaf0; border:1px solid rgba(146,98,26,0.35); border-radius:10px; padding:14px 18px; display:flex; align-items:center; gap:12px; box-shadow:0 1px 4px rgba(0,0,0,0.04);">
+                    <div style="width:40px; height:40px; border-radius:10px; background:rgba(146,98,26,0.14); display:flex; align-items:center; justify-content:center; font-size:18px; color:#92621a; flex-shrink:0;">
+                        <i class='bx bxs-bank'></i>
+                    </div>
+                    <div>
+                        <div style="font-size:17px; font-weight:700; color:#92621a;" data-stat="total_amount">${{ number_format($userAmounts['total_amount'], 2) }}</div>
+                        <div style="font-size:11px; color:#374151; font-weight:600; text-transform:uppercase; letter-spacing:0.6px;">Total Amount <span style="text-transform:none; font-weight:500; color:#6b7280;">(hold + transfer)</span></div>
+                        <div style="font-size:11px; color:#6b7280; font-weight:500;">
+                            <span data-stat="holds_count">{{ $userAmounts['holds_count'] }}</span> holds ·
+                            <span data-stat="transfers_count">{{ $userAmounts['transfers_count'] }}</span> transactions
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
+
+        @include('admin.users._activity-tracker')
 
         <div class="row g-3">
 
@@ -182,12 +199,18 @@
             {{-- Activity --}}
             <div class="col-12 col-lg-8">
 
-                <div class="card mb-3">
-                    <div class="card-header py-3 px-4">
+                <div class="card mb-3" id="holds">
+                    <div class="card-header py-3 px-4 d-flex align-items-center">
                         <h6 class="mb-0" style="color:#111827; font-weight:700;">
                             <i class='bx bxs-lock-alt me-2' style="color:var(--tv-gold);"></i>
                             Payment Holds ({{ $paymentHolds->total() }})
                         </h6>
+                        @if($holdStatus)
+                            <span class="ms-auto" style="font-size:12px; color:#374151;">
+                                Showing: <strong>{{ \App\Http\Controllers\Admin\UserController::HOLD_STATUSES[$holdStatus] }}</strong>
+                                <a href="{{ route('admin.users.show', array_filter(['user' => $user->id, 'transfer_status' => $transferStatus])) }}#holds" class="ms-2" style="color:#92621a; font-weight:700;">Show all</a>
+                            </span>
+                        @endif
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
@@ -375,12 +398,18 @@
                 </div>
                 @endforeach
 
-                <div class="card">
-                    <div class="card-header py-3 px-4">
+                <div class="card" id="transfers">
+                    <div class="card-header py-3 px-4 d-flex align-items-center">
                         <h6 class="mb-0" style="color:#111827; font-weight:700;">
                             <i class='bx bxs-send me-2' style="color:var(--tv-gold);"></i>
                             Transfers ({{ $transfers->total() }})
                         </h6>
+                        @if($transferStatus)
+                            <span class="ms-auto" style="font-size:12px; color:#374151;">
+                                Showing: <strong>{{ \App\Http\Controllers\Admin\UserController::TRANSFER_STATUSES[$transferStatus] }}</strong>
+                                <a href="{{ route('admin.users.show', array_filter(['user' => $user->id, 'hold_status' => $holdStatus])) }}#transfers" class="ms-2" style="color:#92621a; font-weight:700;">Show all</a>
+                            </span>
+                        @endif
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
@@ -509,6 +538,9 @@
             flash(document.querySelector('[data-stat="total_held"]'),      fmtMoney(data.total_held));
             flash(document.querySelector('[data-stat="total_ready"]'),     fmtMoney(data.total_ready));
             flash(document.querySelector('[data-stat="total_withdrawn"]'), fmtMoney(data.total_withdrawn));
+            flash(document.querySelector('[data-stat="total_amount"]'),    fmtMoney(data.total_amount));
+            flash(document.querySelector('[data-stat="holds_count"]'),     String(data.holds_count));
+            flash(document.querySelector('[data-stat="transfers_count"]'), String(data.transfers_count));
 
             const changed = data.holds_count         !== initialSnapshot.holds_count
                          || data.transfers_count     !== initialSnapshot.transfers_count

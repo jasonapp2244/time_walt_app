@@ -19,6 +19,14 @@
             </div>
         </div>
 
+        @if(session('success'))
+            <div class="alert-success-tv mb-4"><i class='bx bx-check-circle me-2'></i>{{ session('success') }}</div>
+        @endif
+
+        @if($errors->any())
+            <div class="alert-error-tv mb-4"><i class='bx bx-error-circle me-2'></i>{{ $errors->first() }}</div>
+        @endif
+
         {{-- Amount Summary Banner --}}
         <div class="row g-3 mb-3">
             <div class="col-12 col-md-4">
@@ -104,6 +112,7 @@
                 <option value="ready_for_transfer" {{ request('status') == 'ready_for_transfer' ? 'selected' : '' }}>Ready for Transfer</option>
                 <option value="transferred" {{ request('status') == 'transferred' ? 'selected' : '' }}>Transferred</option>
                 <option value="partial_transferred" {{ request('status') == 'partial_transferred' ? 'selected' : '' }}>Partial Transferred</option>
+                <option value="refunded" {{ request('status') == 'refunded' ? 'selected' : '' }}>Refunded</option>
             </select>
             <button type="submit" class="btn-tv">Filter</button>
             @if(request('status'))
@@ -129,6 +138,7 @@
                                 <th>Lock Date</th>
                                 <th>Unlock Date</th>
                                 <th>Status</th>
+                                <th>Action</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -180,11 +190,32 @@
                                     <span class="tv-badge badge-{{ str_replace('_','-',$hold->status) }}">
                                         {{ ucwords(str_replace('_', ' ', $hold->status)) }}
                                     </span>
+                                    @if($hold->status !== 'refunded' && (float) ($hold->payment?->refunded_amount ?? 0) > 0)
+                                        <div><span class="tv-badge badge-refunded mt-1" style="font-size:10px;">Refunded ${{ number_format((float) $hold->payment->refunded_amount, 2) }}</span></div>
+                                    @endif
+                                </td>
+                                <td>
+                                    @php $refundBlock = $refundBlocks[$hold->id] ?? null; @endphp
+                                    @if($refundBlock === null)
+                                        <button type="button" class="btn btn-sm"
+                                            style="background:rgba(220,53,69,0.08); color:#c82333; font-weight:600; font-size:11px; border:1px solid rgba(220,53,69,0.25); border-radius:6px; padding:4px 12px;"
+                                            data-bs-toggle="modal" data-bs-target="#refundModal"
+                                            data-preview-url="{{ route('admin.payment-holds.refund-preview', $hold->id) }}">
+                                            <i class='bx bx-undo me-1'></i>Refund
+                                        </button>
+                                    @else
+                                        <span class="d-inline-block" tabindex="0" title="{{ $refundBlock }}" data-bs-toggle="tooltip">
+                                            <button type="button" class="btn btn-sm" disabled
+                                                style="background:#f3f4f6; color:#9ca3af; font-weight:600; font-size:11px; border:1px solid #e5e7eb; border-radius:6px; padding:4px 12px; pointer-events:none;">
+                                                <i class='bx bx-undo me-1'></i>Refund
+                                            </button>
+                                        </span>
+                                    @endif
                                 </td>
                             </tr>
                             @empty
                             <tr>
-                                <td colspan="10" class="text-center py-5" style="color:#6b7280;">
+                                <td colspan="11" class="text-center py-5" style="color:#6b7280;">
                                     <i class='bx bx-lock d-block mb-2' style="font-size:28px; color:#d4963e;"></i>
                                     No payment holds found
                                 </td>
@@ -203,9 +234,14 @@
 
     </div>
 </div>
+
+@include('admin.payment-holds._refund-modal')
 @endsection
 
 @push('scripts')
+<script>
+document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
+</script>
 <script>
 (function () {
     const POLL_INTERVAL = 1 * 60 * 1000; // 1 minute — testing (change back to 5 * 60 * 1000 in production)

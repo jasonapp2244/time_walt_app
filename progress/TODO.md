@@ -1,3 +1,10 @@
+- [ ] Admin refund (`feature/admin-refund`, uncommitted): user reviews → says commit → commit, merge, deploy (migration `2026_11_24_000001_create_refunds_table`).
+- [ ] Client, Stripe Dashboard (test AND live): add webhook events `charge.refunded`, `refund.created`, `refund.updated`, `refund.failed`; decide Stripe's own refund email ON/OFF; keep platform balance; never reverse transfers by hand.
+- [ ] After deploy: `php artisan migrate`, `deploy:check`, one small real deposit + refund on own card.
+- [ ] Flutter dev: show "Refunded" badge (hold status `refunded`, `refund_status`, `refunded_amount`) — see docs/FLUTTER_DEV_PROMPT.md "Refunded deposits".
+- [ ] Do NOT run `fix:hold-remaining-amount` on live before this deploy (old version ignores refunds).
+- [ ] Local temp admin `preview.admin@example.com` (id 65) password was set for the refund browser check; delete that account when done.
+
 - [ ] App Analytics: user says commit → commit `feat/admin-analytics` (Conventional Commit), merge, deploy (adds migration `clarity_snapshots`).
 - [ ] Clarity token in `.env` → ONE `php artisan analytics:sync-clarity --show` → fix field names in `ClarityReport.php` if cards show '–'.
 - [ ] GA4: link Google Analytics in Firebase (time-vault-cbd41), enable Analytics Data API, new service account + Viewer, key at storage/app/private/ga4-service-account.json (chmod 600), GA4_PROPERTY_ID.
@@ -195,3 +202,8 @@ Line-ending classification worked: all 11 `.gitignore` files were correctly iden
 Fixed by repairing ownership **before** dropping privileges: while still root, the script counts paths under the app directory not owned by the site user and, if there are any, `chown -R`s the whole directory to the site owner. A single root-owned file inside `.git` is enough to break git for the site user, and root-owned files in `vendor/` break php-fpm later.
 
 Also added a preflight write check on `.git`, so running the script directly as the site user against a root-owned checkout fails immediately with instructions instead of halfway through.
+
+- [ ] (refund) If a refund is flagged "needs attention" with no answer from Stripe: wait 15 min, then `php artisan refunds:reconcile {id}` on the server.
+- [ ] (refund) Optional later: admin-panel button for reconcile; lock per hold in `fix:hold-remaining-amount`.
+
+- [ ] When the manager approves: un-comment the App Analytics sidebar link (sidebar.blade.php, delete the 2 marker lines) and flip the test to assertSee.

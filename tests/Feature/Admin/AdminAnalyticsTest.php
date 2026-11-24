@@ -212,14 +212,26 @@ class AdminAnalyticsTest extends TestCase
         $this->actingAs($user)->get('/admin/analytics.json')->assertRedirect(route('admin.login'));
     }
 
-    public function test_the_page_uses_the_admin_layout_and_the_sidebar_links_to_it(): void
+    public function test_the_page_uses_the_admin_layout(): void
     {
         $this->actingAs($this->admin())
             ->get('/admin/analytics')
             ->assertOk()
             ->assertSee('App Analytics')
-            ->assertSee('href="'.route('admin.analytics').'"', false)
             ->assertSee(route('admin.dashboard'), false);
+    }
+
+    /**
+     * The sidebar link is commented out in layouts/partials/sidebar.blade.php
+     * until the manager approves showing it to the client. When it is turned
+     * back on, change assertDontSee to assertSee here.
+     */
+    public function test_the_sidebar_link_is_hidden_until_approved(): void
+    {
+        $this->actingAs($this->admin())
+            ->get(route('admin.dashboard'))
+            ->assertOk()
+            ->assertDontSee('href="'.route('admin.analytics').'"', false);
     }
 
     public function test_the_sync_runs_daily_at_0015_utc(): void

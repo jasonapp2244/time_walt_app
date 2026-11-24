@@ -40,3 +40,10 @@ Schedule::command('analytics:sync-clarity')
     ->timezone('UTC')
     ->withoutOverlapping()
     ->description('Store yesterday\'s Microsoft Clarity metrics for the admin App Analytics page');
+
+// Cron 6: Check that refunded deposits add up (read-only); mismatches show on the admin Refunds page
+Schedule::command('refunds:audit')
+    ->dailyAt('01:00')
+    ->timezone('UTC')
+    ->withoutOverlapping()
+    ->description('Check that refunded deposits add up; mismatches are shown on the admin Refunds page');

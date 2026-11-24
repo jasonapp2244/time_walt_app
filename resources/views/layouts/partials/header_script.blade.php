@@ -265,6 +265,8 @@
         .badge-active       { background: rgba(40,167,69,0.11);   color: #1e9c42; border: 1px solid rgba(40,167,69,0.22); }
         .badge-deleted      { background: rgba(220,53,69,0.11);   color: #c82333; border: 1px solid rgba(220,53,69,0.22); }
         .badge-inactive     { background: rgba(108,117,125,0.11); color: #495057; border: 1px solid rgba(108,117,125,0.22); }
+        .badge-refunded     { background: rgba(111,66,193,0.11);  color: #5a32a3; border: 1px solid rgba(111,66,193,0.24); }
+        .badge-canceled     { background: rgba(108,117,125,0.11); color: #495057; border: 1px solid rgba(108,117,125,0.22); }
 
         .tv-badge {
             display: inline-flex;

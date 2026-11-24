@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\StripeWebhookEvent;
+use App\Services\RefundService;
 use App\Services\WebhookService;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
@@ -19,7 +20,8 @@ class StripeController extends Controller
     private const STALE_PENDING_MINUTES = 10;
 
     public function __construct(
-        protected WebhookService $webhookService
+        protected WebhookService $webhookService,
+        protected RefundService $refundService
     ) {}
 
     /**
@@ -168,6 +170,16 @@ class StripeController extends Controller
             case 'invoice.payment_failed':
             case 'invoice.payment_action_required':
                 $this->webhookService->handleSubscriptionInvoice($event);
+                break;
+
+            case 'refund.created':
+            case 'refund.updated':
+            case 'refund.failed':
+                $this->refundService->syncFromStripe($event['data']['object']);
+                break;
+
+            case 'charge.refunded':
+                $this->refundService->syncFromCharge($event['data']['object']);
                 break;
 
             default:

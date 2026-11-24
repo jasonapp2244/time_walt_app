@@ -119,8 +119,38 @@ class PaymentSheetTest extends TestCase
         $this->assertSame((string) $this->user->id, $sent['metadata']['user_id']);
         $this->assertSame('custom', $sent['metadata']['hold_period_type']);
         $this->assertSame('Holiday fund', $sent['metadata']['title']);
-        $this->assertSame('2', $sent['metadata']['hold_hours']);
-        $this->assertSame('30', $sent['metadata']['hold_minutes']);
+        // The length in Stripe is the real one, worked out from the dates
+        // (the end date wins, exactly as for the hold row).
+        $this->assertSame('7', $sent['metadata']['hold_days']);
+        $this->assertSame('0', $sent['metadata']['hold_hours']);
+        $this->assertSame('0', $sent['metadata']['hold_minutes']);
+    }
+
+    public function test_a_short_lock_is_not_labelled_30_days_in_stripe(): void
+    {
+        $this->travelTo(now()->setTime(10, 0));
+        $this->stripeAcceptsIntent();
+
+        // The app sends only dates (hold_days is not part of the API).
+        $this->createIntent([
+            'hold_start_at' => now()->toDateString(),
+            'hold_end_at' => now()->addDays(2)->toDateString(),
+            'hold_hours' => null,
+            'hold_minutes' => null,
+        ])->assertOk();
+
+        $metadata = $this->stripe->requestsTo('POST', '/v1/payment_intents')[0]['params']['metadata'];
+        $this->assertSame('2', $metadata['hold_days']);
+        $this->assertSame('0', $metadata['hold_hours']);
+        $this->assertSame(now()->addDays(2)->toIso8601String(), $metadata['hold_until']);
+
+        // And the hold created from that PaymentIntent is 2 days too.
+        $hold = app(\App\Services\PaymentHoldService::class)->createFromPayment(
+            Payment::factory()->create(['user_id' => $this->user->id]),
+            $metadata,
+        );
+        $this->assertSame(2, $hold->hold_days);
+        $this->assertTrue($hold->hold_end_at->equalTo(now()->addDays(2)));
     }
 
     public function test_it_rounds_the_amount_to_whole_cents(): void

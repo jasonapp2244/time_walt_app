@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Payment extends Model
@@ -17,6 +18,8 @@ class Payment extends Model
         'payment_intent_id',
         'payment_intent_id_index',
         'amount',
+        'refunded_amount',
+        'refunded_at',
         'currency',
         'status',
         'paid_at',
@@ -39,6 +42,8 @@ class Payment extends Model
     {
         return [
             'amount' => 'decimal:2',
+            'refunded_amount' => 'decimal:2',
+            'refunded_at' => 'datetime',
             'status' => 'string',
             'paid_at' => 'datetime',
             'stripe_data' => 'encrypted:array',
@@ -82,5 +87,13 @@ class Payment extends Model
     public function hold(): HasOne
     {
         return $this->hasOne(PaymentHold::class);
+    }
+
+    /**
+     * Get the refunds made on this payment.
+     */
+    public function refunds(): HasMany
+    {
+        return $this->hasMany(Refund::class);
     }
 }

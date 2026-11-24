@@ -25,10 +25,48 @@ class PaymentHoldService
         // Use user's timezone for interpreting input dates, store in UTC
         $userTz = $holdPeriodData['user_timezone'] ?? $payment->user?->timezone ?? 'UTC';
         $holdPeriodType = $holdPeriodData['hold_period_type'] ?? '1_month';
+        $title = $holdPeriodData['title'] ?? null;
+
+        $period = self::resolvePeriod($holdPeriodData, $userTz);
+
+        $hold = PaymentHold::create([
+            'payment_id' => $payment->id,
+            'user_id' => $payment->user_id,
+            'title' => $title,
+            'amount' => $payment->amount,
+            'remaining_amount' => $payment->amount,
+            'hold_start_at' => $period['start'],
+            'hold_end_at' => $period['end'],
+            'hold_days' => $period['days'],
+            'hold_hours' => $period['hours'],
+            'hold_minutes' => $period['minutes'],
+            'hold_period_type' => $holdPeriodType,
+            'status' => 'holding',
+        ]);
+
+        // Every hold is created here (Payment Sheet confirm and both webhook
+        // paths), so this is the one place a lock is counted.
+        if ($payment->user) {
+            $this->freeTier->recordLock($payment->user);
+        }
+
+        return $hold;
+    }
+
+    /**
+     * The hold's real start, end and length (days / hours / minutes) from the
+     * lock request. The end date wins when it is given; otherwise the end is
+     * start + days/hours/minutes (30 days when nothing is given). Used both
+     * for the hold row and for the PaymentIntent metadata, so the Stripe
+     * Dashboard shows the same length as the app.
+     *
+     * @return array{start: Carbon, end: Carbon, days: int, hours: int, minutes: int}
+     */
+    public static function resolvePeriod(array $holdPeriodData, string $userTz): array
+    {
         $holdDays = (int) ($holdPeriodData['hold_days'] ?? 0);
         $holdHours = (int) ($holdPeriodData['hold_hours'] ?? 0);
         $holdMinutes = (int) ($holdPeriodData['hold_minutes'] ?? 0);
-        $title = $holdPeriodData['title'] ?? null;
 
         $now = now(); // UTC
 
@@ -65,31 +103,13 @@ class PaymentHoldService
 
         // Calculate actual duration between start and end
         $totalMinutes = (int) $startDate->diffInMinutes($endDate);
-        $holdDays = intdiv($totalMinutes, 1440);       // 1440 minutes in a day
-        $holdHours = intdiv($totalMinutes % 1440, 60);
-        $holdMinutes = $totalMinutes % 60;
 
-        $hold = PaymentHold::create([
-            'payment_id' => $payment->id,
-            'user_id' => $payment->user_id,
-            'title' => $title,
-            'amount' => $payment->amount,
-            'remaining_amount' => $payment->amount,
-            'hold_start_at' => $startDate,
-            'hold_end_at' => $endDate,
-            'hold_days' => $holdDays,
-            'hold_hours' => $holdHours,
-            'hold_minutes' => $holdMinutes,
-            'hold_period_type' => $holdPeriodType,
-            'status' => 'holding',
-        ]);
-
-        // Every hold is created here (Payment Sheet confirm and both webhook
-        // paths), so this is the one place a lock is counted.
-        if ($payment->user) {
-            $this->freeTier->recordLock($payment->user);
-        }
-
-        return $hold;
+        return [
+            'start' => $startDate,
+            'end' => $endDate,
+            'days' => intdiv($totalMinutes, 1440),       // 1440 minutes in a day
+            'hours' => intdiv($totalMinutes % 1440, 60),
+            'minutes' => $totalMinutes % 60,
+        ];
     }
 }

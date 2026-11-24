@@ -25,12 +25,15 @@
             </a>
         </li>
 
+        {{-- APP ANALYTICS LINK: hidden from the client until the manager approves it (2026-11-25).
+             To show it again, delete this comment line and the "END APP ANALYTICS LINK" line below.
         <li class="{{ request()->routeIs('admin.analytics*') ? 'mm-active' : '' }}">
             <a href="{{ route('admin.analytics') }}" class="{{ request()->routeIs('admin.analytics*') ? 'active' : '' }}">
                 <div class="parent-icon"><i class='bx bx-line-chart'></i></div>
                 <div class="menu-title">App Analytics</div>
             </a>
         </li>
+        END APP ANALYTICS LINK --}}
 
         <li class="{{ request()->routeIs('admin.users.*') ? 'mm-active' : '' }}">
             <a href="{{ route('admin.users.index') }}" class="{{ request()->routeIs('admin.users.*') ? 'active' : '' }}">
@@ -57,6 +60,13 @@
             <a href="{{ route('admin.transfers.index') }}" class="{{ request()->routeIs('admin.transfers.*') ? 'active' : '' }}">
                 <div class="parent-icon"><i class='bx bxs-send'></i></div>
                 <div class="menu-title">Transfers</div>
+            </a>
+        </li>
+
+        <li class="{{ request()->routeIs('admin.refunds.*') ? 'mm-active' : '' }}">
+            <a href="{{ route('admin.refunds.index') }}" class="{{ request()->routeIs('admin.refunds.*') ? 'active' : '' }}">
+                <div class="parent-icon"><i class='bx bx-undo'></i></div>
+                <div class="menu-title">Refunds</div>
             </a>
         </li>
 

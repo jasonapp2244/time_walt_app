@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\PaymentHoldController;
 use App\Http\Controllers\Admin\PrivacyPolicyController;
 use App\Http\Controllers\Admin\ProfileController;
+use App\Http\Controllers\Admin\RefundController;
 use App\Http\Controllers\Admin\SubscriptionController;
 use App\Http\Controllers\Admin\SubscriptionPaymentController;
 use App\Http\Controllers\Admin\SubscriptionPlanController;
@@ -48,6 +49,12 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('/payment-holds', [PaymentHoldController::class, 'index'])->name('payment-holds.index');
         Route::get('/payment-holds/export', [PaymentHoldController::class, 'export'])->name('payment-holds.export');
         Route::get('/payment-holds/stats', [PaymentHoldController::class, 'stats'])->name('payment-holds.stats');
+        Route::get('/payment-holds/{hold}/refund-preview', [RefundController::class, 'preview'])->name('payment-holds.refund-preview');
+        Route::post('/payment-holds/{hold}/refund', [RefundController::class, 'store'])->middleware('throttle:10,1')->name('payment-holds.refund');
+
+        // Refunds (admin only, all or part of a deposit back to the same card)
+        Route::get('/refunds', [RefundController::class, 'index'])->name('refunds.index');
+        Route::get('/refunds/export', [RefundController::class, 'export'])->name('refunds.export');
 
         // Payments
         Route::get('/payments', [PaymentController::class, 'index'])->name('payments.index');

@@ -30,6 +30,10 @@ class DeployCheck extends Command
         'invoice.paid',
         'invoice.payment_failed',
         'invoice.payment_action_required',
+        'charge.refunded',
+        'refund.created',
+        'refund.updated',
+        'refund.failed',
     ];
 
     /** Keys the app stopped reading; harmless, but they can be removed from .env. */

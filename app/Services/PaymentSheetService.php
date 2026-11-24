@@ -126,12 +126,19 @@ class PaymentSheetService
         ];
 
         if (isset($data['hold_period_type'])) {
+            // The length shown in the Stripe Dashboard is worked out from the
+            // dates exactly as the hold row will be, so a 2-day lock reads
+            // "2 days" there too (it used to fall back to 30 when the app sent
+            // only dates, which is all the API asks for).
+            $period = PaymentHoldService::resolvePeriod($data, $user->timezone ?? 'UTC');
+
             $metadata['hold_period_type'] = $data['hold_period_type'];
             $metadata['hold_start_at'] = $data['hold_start_at'] ?? now()->toIso8601String();
-            $metadata['hold_end_at'] = $data['hold_end_at'] ?? now()->addDays(30)->toIso8601String();
-            $metadata['hold_days'] = (string) ($data['hold_days'] ?? 30);
-            $metadata['hold_hours'] = (string) ($data['hold_hours'] ?? 0);
-            $metadata['hold_minutes'] = (string) ($data['hold_minutes'] ?? 0);
+            $metadata['hold_end_at'] = $data['hold_end_at'] ?? $period['end']->toIso8601String();
+            $metadata['hold_days'] = (string) $period['days'];
+            $metadata['hold_hours'] = (string) $period['hours'];
+            $metadata['hold_minutes'] = (string) $period['minutes'];
+            $metadata['hold_until'] = $period['end']->toIso8601String();
         }
 
         if (isset($data['title'])) {

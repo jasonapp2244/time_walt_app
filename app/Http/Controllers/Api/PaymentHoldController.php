@@ -96,9 +96,14 @@ class PaymentHoldController extends Controller
                 ->whereHas('payment', fn ($q) => $q->where('status', 'succeeded'))
                 ->sum(\Illuminate\Support\Facades\DB::raw('COALESCE(amount, 0)'));
 
+            // Money pulled back from Connect for a refund did not stay withdrawn.
             $transferTotal = (float) Transfer::where('user_id', $user->id)
                 ->where('status', 'completed')
-                ->sum('amount');
+                ->sum(\Illuminate\Support\Facades\DB::raw('amount - reversed_amount'));
+
+            $refundedTotal = (float) \App\Models\Payment::where('user_id', $user->id)
+                ->where('status', 'succeeded')
+                ->sum('refunded_amount');
 
             return response()->json([
                 'success' => true,
@@ -106,7 +111,8 @@ class PaymentHoldController extends Controller
                 'summary' => [
                     'total_checkout_amount' => (float) $checkoutTotal,
                     'total_transferred_amount' => (float) $transferTotal,
-                    'pending_balance' => (float) ($checkoutTotal - $transferTotal),
+                    'total_refunded_amount' => (float) $refundedTotal,
+                    'pending_balance' => (float) round($checkoutTotal - $transferTotal - $refundedTotal, 2),
                     'total_transactions' => count($transactions),
                 ],
                 'transactions' => $transactions,
@@ -363,11 +369,14 @@ class PaymentHoldController extends Controller
                 ->map(function ($hold) {
                     // Calculate and set remaining_amount if not set
                     if ($hold->remaining_amount === null) {
-                        // Calculate remaining: amount - sum of completed/pending transfers
-                        $transferredAmount = \App\Models\Transfer::where('hold_id', $hold->id)
-                            ->whereIn('status', ['completed', 'pending'])
+                        // Calculate remaining: amount - net completed/pending transfers - refunds
+                        $transferredAmount = (float) \App\Models\Transfer::where('hold_id', $hold->id)
+                            ->whereIn('status', ['completed', 'pending', 'processing'])
+                            ->sum(\Illuminate\Support\Facades\DB::raw('amount - reversed_amount'));
+                        $refundedAmount = (float) \App\Models\Refund::where('payment_hold_id', $hold->id)
+                            ->whereIn('status', \App\Models\Refund::ACTIVE_STATUSES)
                             ->sum('amount');
-                        $hold->remaining_amount = max(0, $hold->amount - $transferredAmount);
+                        $hold->remaining_amount = max(0, round($hold->amount - $transferredAmount - $refundedAmount, 2));
                         // Update the hold if remaining_amount was null
                         if ($hold->remaining_amount !== $hold->amount) {
                             $hold->update(['remaining_amount' => $hold->remaining_amount]);

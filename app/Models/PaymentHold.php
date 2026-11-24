@@ -72,6 +72,14 @@ class PaymentHold extends Model
     }
 
     /**
+     * Get the refunds of this hold's deposit.
+     */
+    public function refunds(): HasMany
+    {
+        return $this->hasMany(Refund::class, 'payment_hold_id');
+    }
+
+    /**
      * Get the latest transfer for the hold (backward-compatible).
      */
     public function transfer(): HasOne

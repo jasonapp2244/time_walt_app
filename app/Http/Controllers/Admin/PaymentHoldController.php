@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\PaymentHold;
 use App\Models\Transfer;
+use App\Services\RefundService;
 use App\Support\ListExport;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -17,13 +18,16 @@ class PaymentHoldController extends Controller
     /**
      * List all payment holds with optional status filter.
      */
-    public function index(Request $request): View
+    public function index(Request $request, RefundService $refunds): View
     {
         $holds = $this->filteredQuery($request)->latest()->paginate(10)->withQueryString();
 
         ['statusCounts' => $statusCounts, 'amountTotals' => $amountTotals] = $this->buildSummary();
 
-        return view('admin.payment-holds.index', compact('holds', 'statusCounts', 'amountTotals'));
+        // Why each row's Refund button is disabled (null = it may be refunded).
+        $refundBlocks = $holds->getCollection()->mapWithKeys(fn (PaymentHold $hold) => [$hold->id => $refunds->blockReason($hold)]);
+
+        return view('admin.payment-holds.index', compact('holds', 'statusCounts', 'amountTotals', 'refundBlocks'));
     }
 
     /**
@@ -83,7 +87,7 @@ class PaymentHoldController extends Controller
         $amountTotals = [
             'holding' => (float) PaymentHold::where('status', 'holding')->whereNull('abandoned_at')->sum(\Illuminate\Support\Facades\DB::raw('COALESCE(remaining_amount, amount)')),
             'ready' => (float) PaymentHold::whereIn('status', ['ready_for_transfer', 'partial_transferred'])->whereNull('abandoned_at')->sum(\Illuminate\Support\Facades\DB::raw('COALESCE(remaining_amount, amount)')),
-            'withdrawn' => (float) Transfer::where('status', 'completed')->sum('amount'),
+            'withdrawn' => (float) Transfer::where('status', 'completed')->sum(\Illuminate\Support\Facades\DB::raw('amount - reversed_amount')),
         ];
 
         $totalRecords = array_sum($statusCounts);

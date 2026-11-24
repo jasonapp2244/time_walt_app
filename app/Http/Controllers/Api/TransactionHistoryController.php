@@ -146,6 +146,7 @@ class TransactionHistoryController extends Controller
                 'message' => 'All transactions retrieved successfully.',
                 'summary' => [
                     'total_checkout_amount' => (float) $checkoutTotal, // Total received from all checkouts
+                    'total_refunded_amount' => (float) collect($checkouts)->sum('refunded_amount'), // Deposits refunded to the card
                     'current_balance' => (float) $currentBalance, // hold + ready (what's left in account)
                     'total_locked_amount' => (float) $holdAmountTotal, // Same as total_hold_amount
                     'available_balance' => (float) $readyTotal, // Same as total_ready_amount
@@ -219,6 +220,7 @@ class TransactionHistoryController extends Controller
                 'message' => 'Checkout transactions retrieved successfully.',
                 'summary' => [
                     'total_checkout_amount' => (float) $totalAmount,
+                    'total_refunded_amount' => (float) \App\Models\Payment::whereIn('id', $allCheckoutHolds->pluck('payment_id'))->sum('refunded_amount'),
                     'total_checkouts' => $holds->total(),
                     'average_checkout_amount' => (float) $averageAmount,
                     'largest_checkout_amount' => (float) $largestAmount,
@@ -533,6 +535,21 @@ class TransactionHistoryController extends Controller
     }
 
     /**
+     * "refunded" once the deposit went back to the card, "partially_refunded"
+     * for a part refund made in the Stripe Dashboard, otherwise null.
+     */
+    protected function refundStatus(PaymentHold $hold): ?string
+    {
+        $refunded = (float) ($hold->payment?->refunded_amount ?? 0);
+
+        if ($refunded <= 0) {
+            return null;
+        }
+
+        return $hold->status === 'refunded' || $refunded >= (float) $hold->amount ? 'refunded' : 'partially_refunded';
+    }
+
+    /**
      * Format checkout transaction.
      */
     protected function formatCheckoutTransaction(PaymentHold $hold): array
@@ -545,6 +562,8 @@ class TransactionHistoryController extends Controller
             'amount' => (float) $hold->amount,
             'currency' => $hold->payment ? strtoupper($hold->payment->currency) : 'USD',
             'status' => $hold->payment ? $hold->payment->status : 'unknown',
+            'refunded_amount' => (float) ($hold->payment?->refunded_amount ?? 0),
+            'refund_status' => $this->refundStatus($hold),
             'date' => $hold->created_at->toIso8601String(),
             'description' => 'Checkout payment received',
             'payment_details' => [

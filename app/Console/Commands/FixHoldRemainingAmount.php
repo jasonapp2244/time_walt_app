@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\PaymentHold;
+use App\Models\Refund;
 use App\Models\Transfer;
 use Illuminate\Console\Command;
 
@@ -32,18 +33,24 @@ class FixHoldRemainingAmount extends Command
         $fixedCount = 0;
         $checkedCount = 0;
 
-        // Get all holds
-        $holds = PaymentHold::with('transfer')->get();
+        // Refunded holds are settled: their money went back to the card, so
+        // recomputing them from transfers alone would put it back in the vault.
+        $holds = PaymentHold::with('transfer')->where('status', '!=', 'refunded')->get();
 
         foreach ($holds as $hold) {
             $checkedCount++;
 
-            // Calculate actual remaining amount from transfers
-            $totalTransferred = Transfer::where('hold_id', $hold->id)
-                ->whereIn('status', ['completed', 'pending'])
+            // Calculate actual remaining amount from transfers (less any part
+            // pulled back for a refund) and from refunds of this deposit
+            $totalTransferred = (float) Transfer::where('hold_id', $hold->id)
+                ->whereIn('status', ['completed', 'pending', 'processing'])
+                ->sum(\Illuminate\Support\Facades\DB::raw('amount - reversed_amount'));
+
+            $totalRefunded = (float) Refund::where('payment_hold_id', $hold->id)
+                ->whereIn('status', Refund::ACTIVE_STATUSES)
                 ->sum('amount');
 
-            $actualRemaining = max(0, $hold->amount - $totalTransferred);
+            $actualRemaining = max(0, round($hold->amount - $totalTransferred - $totalRefunded, 2));
 
             // Check if there's a data inconsistency
             $needsFix = false;

@@ -1,5 +1,12 @@
 # DEPLOYMENT STATUS — Time Vault
 
+**2026-11-25 RELEASE (refunds + tracking + Stripe hold label):** committed on `feature/admin-refund`, fast-forwarded to `development` and `main`, pushed. Rollback point: `1fe2c3a` (`./deploy.sh --rollback`). Includes the 3 analytics commits (page hidden from the sidebar). Pre-push evidence: 405 tests pass, Pint pass, 106 routes, refunds migration up/down/up clean on time_walt_test, independent review = no blocker, browser smoke of dashboard/users/payment-holds(refund popup)/refunds/payments/transfers OK.
+NOT YET DEPLOYED. Server (root, app folder): `git -c safe.directory='*' fetch origin main && git -c safe.directory='*' show origin/main:deploy.sh > /tmp/tv-deploy.sh && APP_DIR=$PWD bash /tmp/tv-deploy.sh --branch main`. deploy.sh dumps the DB and runs 2 additive migrations (clarity_snapshots, refunds). Then: `php artisan refunds:audit`; `php artisan stripe:fix-hold-metadata` then `--apply`; `php artisan schedule:list | grep refunds:audit`.
+Stripe LIVE: add webhook events charge.refunded, refund.created, refund.updated, refund.failed to the api.timevaultapp.co endpoint (deploy:check fails until done); decide Customer emails > Refunds on/off; keep platform balance. Proof after deploy: $1 / 1-day deposit (webhook 200, metadata hold_days 1) then $0.50 partial refund (emails, Refunds page, audit OK).
+
+**2026-11-24:** `feature/admin-refund` is local and uncommitted. When it ships: `deploy.sh` runs migration `2026_11_24_000001_create_refunds_table` (new `refunds` table; `payments.refunded_amount/refunded_at`; `transfers.reversed_amount`; hold ENUM + `refunded`) — mysqldump first. No new `.env` key. Scheduler: new daily `refunds:audit` 01:00 UTC (cron already present). Stripe: add the 4 refund webhook events to the LIVE endpoint or `deploy:check` fails the webhook line. Then one small real deposit + refund.
+
+
 **2026-11-05:** `feat/admin-analytics` is local and uncommitted. When it ships: `deploy.sh` runs the new migration (mysqldump first); scheduler cron already present (`schedule:list | grep analytics:sync-clarity`); `.env` keys CLARITY_API_TOKEN / GA4_PROPERTY_ID / GA4_CREDENTIALS_PATH stay empty until the owner configures them — the page then shows setup notes, nothing breaks.
 
 **2026-11-02:** webhook hardening release (code + tests only; no migration, no `.env` key, no route change). After pushing, deploy with the command below (rollback point: `75aaa20`). After deploy: `deploy:check` will now FAIL the webhook line until `checkout.session.completed` is added to the LIVE endpoint in Stripe; then send a test event from the Dashboard and expect 200.
@@ -210,3 +217,6 @@ Record the pre-deploy SHA **before** pulling — that is the only thing that mak
    php artisan verify:pending-transfers
    php artisan check:payment-holds
    ```
+- 2026-11-25: refund hardening adds command `refunds:reconcile` (manual, no schedule). No new migration beyond `2026_11_24_000001_create_refunds_table`.
+
+- After deploy (live): php artisan stripe:fix-hold-metadata (dry run, check list), then php artisan stripe:fix-hold-metadata --apply. Metadata-only, safe to re-run.

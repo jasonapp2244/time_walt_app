@@ -408,8 +408,7 @@
             total_revenue:            '$' + fmtDecimal(data.total_revenue),
             pending_transfers:        fmt(data.pending_transfers),
             total_holds_count:        fmt(data.total_holds_count),
-            total_holds_amount:       fmtDecimal(data.total_holds_amount),
-            active_subscribers:       fmt(data.active_subscribers),
+            total_holds_amount:       fmtDecimal(data.total_holds_amount),            active_subscribers:       fmt(data.active_subscribers),
             mrr_display:              data.mrr_display,
         };
 

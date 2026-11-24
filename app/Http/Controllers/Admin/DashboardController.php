@@ -62,8 +62,9 @@ class DashboardController extends Controller
                 ->where('status', '!=', 'deleted')
                 ->count(),
 
+            // Refunded deposits went back to the card, so they are not revenue.
             'total_revenue' => (float) Payment::where('status', 'succeeded')
-                ->sum('amount'),
+                ->sum(\Illuminate\Support\Facades\DB::raw('amount - refunded_amount')),
 
             'holds_holding' => PaymentHold::where('status', 'holding')
                 ->whereNull('abandoned_at')
@@ -85,8 +86,9 @@ class DashboardController extends Controller
                 ->whereNull('abandoned_at')
                 ->count(),
 
+            // Net of any part pulled back from Connect for a refund.
             'total_transferred_amount' => (float) Transfer::where('status', 'completed')
-                ->sum('amount'),
+                ->sum(\Illuminate\Support\Facades\DB::raw('amount - reversed_amount')),
 
             'pending_transfers' => Transfer::where('status', 'pending')->count(),
 

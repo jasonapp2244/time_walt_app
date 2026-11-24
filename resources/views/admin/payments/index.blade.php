@@ -113,6 +113,9 @@
                                     <span class="tv-badge badge-{{ $payment->status }}">
                                         {{ ucfirst($payment->status) }}
                                     </span>
+                                    @if((float) $payment->refunded_amount > 0)
+                                        <span class="tv-badge badge-refunded ms-1">Refunded ${{ number_format((float) $payment->refunded_amount, 2) }}</span>
+                                    @endif
                                 </td>
                                 <td style="color:#c82333; font-size:12px; font-weight:500; max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
                                     {{ $payment->failure_reason ?? '—' }}
