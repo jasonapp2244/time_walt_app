@@ -176,7 +176,7 @@ class DisputeService
     }
 
     /** won and warning_closed (an inquiry that ended) keep the money with the user. */
-    private function outcome(string $stripeStatus): string
+    public function outcome(string $stripeStatus): string
     {
         return match ($stripeStatus) {
             'won', 'warning_closed' => 'won',

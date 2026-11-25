@@ -207,3 +207,5 @@ Also added a preflight write check on `.git`, so running the script directly as 
 - [ ] (refund) Optional later: admin-panel button for reconcile; lock per hold in `fix:hold-remaining-amount`.
 
 - [ ] When the manager approves: un-comment the App Analytics sidebar link (sidebar.blade.php, delete the 2 marker lines) and flip the test to assertSee.
+- [ ] LIVE after deploy: `php artisan stripe:sync-missed --since=2026-01-01` (dry run; expect #00124 refund $250) → same with `--apply` → `php artisan refunds:audit` → open Admin → Ledger. Review any 'NOT IN APP' deposits by hand.
+- [ ] Local: temp admin preview.admin@example.com (id 65) still exists; delete when done.

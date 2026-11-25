@@ -239,14 +239,15 @@ class RefundService
     /**
      * Keep a refund row in step with Stripe (refund.created / refund.updated /
      * refund.failed). A refund that has no row was made in the Stripe
-     * Dashboard; it is recorded and taken out of the hold.
+     * Dashboard; it is recorded and taken out of the hold. $notify = false
+     * records it without emails (used when importing old refunds).
      */
-    public function syncFromStripe(array $stripeRefund): void
+    public function syncFromStripe(array $stripeRefund, bool $notify = true): void
     {
         $refund = $this->findRow($stripeRefund);
 
         if ($refund === null) {
-            $this->recordDashboardRefund($stripeRefund);
+            $this->recordDashboardRefund($stripeRefund, $notify);
 
             return;
         }
@@ -920,8 +921,12 @@ class RefundService
      * vault cannot pay the same money out again. If more was refunded than
      * the vault still held, the row is flagged for the admin.
      */
-    private function recordDashboardRefund(array $stripeRefund): void
+    private function recordDashboardRefund(array $stripeRefund, bool $notify = true): void
     {
+        // When Stripe made the refund (matters when it is imported days later).
+        $madeAt = isset($stripeRefund['created']) && is_numeric($stripeRefund['created'])
+            ? \Illuminate\Support\Carbon::createFromTimestamp((int) $stripeRefund['created'])
+            : now();
         $status = $this->mapStatus($stripeRefund['status'] ?? 'pending');
         $paymentIntent = $stripeRefund['payment_intent'] ?? null;
 
@@ -943,7 +948,7 @@ class RefundService
         $amountCents = (int) ($stripeRefund['amount'] ?? 0);
 
         try {
-            $refund = DB::transaction(function () use ($payment, $stripeRefund, $status, $amountCents) {
+            $refund = DB::transaction(function () use ($payment, $stripeRefund, $status, $amountCents, $madeAt) {
                 // Same lock order as accept()/fail(): payment, then hold.
                 $lockedPayment = Payment::whereKey($payment->id)->lockForUpdate()->firstOrFail();
                 $hold = PaymentHold::where('payment_id', $payment->id)->lockForUpdate()->first();
@@ -973,11 +978,11 @@ class RefundService
                     'arn' => $this->arn($stripeRefund),
                     'needs_attention' => $uncovered > 0,
                     'failure_reason' => $uncovered > 0 ? '$'.number_format($uncovered / 100, 2).' was refunded that the vault no longer held (already withdrawn). Check this deposit.' : null,
-                    'refunded_at' => $status === 'succeeded' ? now() : null,
+                    'refunded_at' => $status === 'succeeded' ? $madeAt : null,
                 ]);
 
                 $refundedTotal = $this->cents($lockedPayment->refunded_amount) + $amountCents;
-                $lockedPayment->update(['refunded_amount' => $refundedTotal / 100, 'refunded_at' => now()]);
+                $lockedPayment->update(['refunded_amount' => $refundedTotal / 100, 'refunded_at' => $madeAt]);
 
                 if ($hold) {
                     $remaining = $vaultBefore - $fromVault;
@@ -1003,7 +1008,9 @@ class RefundService
             Log::error('Stripe Dashboard refund exceeds the vault balance', ['refund_id' => $refund->id, 'payment_id' => $payment->id]);
         }
 
-        SendRefundIssuedNotification::dispatch($refund);
+        if ($notify) {
+            SendRefundIssuedNotification::dispatch($refund);
+        }
     }
 
     private function mapStatus(string $stripeStatus): string

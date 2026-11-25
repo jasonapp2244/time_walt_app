@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\Auth\AdminLoginController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\FeedbackController;
 use App\Http\Controllers\Admin\FreeTierSettingsController;
+use App\Http\Controllers\Admin\LedgerController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\PaymentHoldController;
 use App\Http\Controllers\Admin\PrivacyPolicyController;
@@ -55,6 +56,9 @@ Route::prefix('admin')->name('admin.')->group(function () {
         // Refunds (admin only, all or part of a deposit back to the same card)
         Route::get('/refunds', [RefundController::class, 'index'])->name('refunds.index');
         Route::get('/refunds/export', [RefundController::class, 'export'])->name('refunds.export');
+
+        // Ledger (read-only: every money movement of every user)
+        Route::get('/ledger', [LedgerController::class, 'index'])->name('ledger.index');
 
         // Payments
         Route::get('/payments', [PaymentController::class, 'index'])->name('payments.index');

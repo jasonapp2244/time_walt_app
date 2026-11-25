@@ -47,3 +47,12 @@ Schedule::command('refunds:audit')
     ->timezone('UTC')
     ->withoutOverlapping()
     ->description('Check that refunded deposits add up; mismatches are shown on the admin Refunds page');
+
+// Cron 7: Compare Stripe with the database and record anything the webhooks missed
+// (refunds, chargebacks, hand reversals), so the admin ledger always matches Stripe.
+// Runs before the refunds audit so the audit sees the corrected numbers.
+Schedule::command('stripe:sync-missed --apply --notify')
+    ->dailyAt('00:45')
+    ->timezone('UTC')
+    ->withoutOverlapping()
+    ->description('Record refunds, chargebacks and reversals Stripe has but the webhooks missed');

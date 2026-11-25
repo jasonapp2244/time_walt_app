@@ -70,6 +70,13 @@
             </a>
         </li>
 
+        <li class="{{ request()->routeIs('admin.ledger.*') ? 'mm-active' : '' }}">
+            <a href="{{ route('admin.ledger.index') }}" class="{{ request()->routeIs('admin.ledger.*') ? 'active' : '' }}">
+                <div class="parent-icon"><i class='bx bx-book-content'></i></div>
+                <div class="menu-title">Ledger</div>
+            </a>
+        </li>
+
         <li class="{{ request()->routeIs('admin.feedback.*') ? 'mm-active' : '' }}">
             <a href="{{ route('admin.feedback.index') }}" class="{{ request()->routeIs('admin.feedback.*') ? 'active' : '' }}">
                 <div class="parent-icon"><i class='bx bxs-message-rounded-detail'></i></div>

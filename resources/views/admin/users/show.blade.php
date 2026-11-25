@@ -18,6 +18,9 @@
                 <span id="user-refresh-alert" style="display:none; font-size:12px; color:#c87000; font-weight:600; cursor:pointer; background:rgba(255,152,0,0.1); border:1px solid rgba(255,152,0,0.3); border-radius:6px; padding:4px 10px;" onclick="window.location.reload()">
                     <i class='bx bx-refresh me-1'></i>New updates — click to reload
                 </span>
+                <a href="{{ route('admin.ledger.index', ['user' => $user->id]) }}" class="btn-tv-outline">
+                    <i class='bx bx-book-content me-1'></i>Ledger
+                </a>
             </div>
         </div>
 

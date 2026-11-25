@@ -159,7 +159,7 @@ class TransferReversalService
      * Total of the transfer's reversals that our refund code did not make, in
      * cents. Reads the full list from Stripe when the event shows only part.
      */
-    private function manualReversedCents(array $stripeTransfer): ?int
+    public function manualReversedCents(array $stripeTransfer): ?int
     {
         $reversals = $stripeTransfer['reversals']['data'] ?? [];
 
