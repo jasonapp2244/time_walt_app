@@ -59,13 +59,32 @@
             </div>
         @endif
 
+        {{-- Known: deposits withdrawn and then also refunded to the card (paid out twice) --}}
+        @if($paidTwice['deposits'] > 0)
+            <div class="mb-3" style="background:rgba(255,152,0,0.08); border:1px solid rgba(255,152,0,0.3); border-left:4px solid #e08900; border-radius:8px; padding:12px 16px; color:#7a4a00; font-size:13px;">
+                <div style="font-weight:700; font-size:14px;">
+                    <i class='bx bx-info-circle me-1'></i>Paid out twice: {{ $money($paidTwice['total']) }} on {{ $paidTwice['deposits'] }} deposit(s)
+                </div>
+                <div class="mt-1">
+                    These deposits were withdrawn to the user's Stripe account and later <strong>also refunded to the card</strong> in the Stripe Dashboard. The ledger is correct: the user owes this money.
+                    @foreach(array_slice($paidTwice['users'], 0, 5) as $u)
+                        <a href="{{ route('admin.ledger.index', ['user' => $u['user_id']]) }}" class="ms-1" style="color:#7a4a00; font-weight:600; white-space:nowrap;">user #{{ $u['user_id'] ?? '—' }}: {{ $money($u['owed']) }} ({{ $u['deposits'] }})</a>@if(! $loop->last),@endif
+                    @endforeach
+                </div>
+                <div class="mt-1" style="font-size:12px;">
+                    To recover it: Stripe Dashboard → Connect → the user's account → the withdrawal → <strong>Reverse</strong>. The app records the reversal and clears this automatically.
+                    <a href="{{ route('admin.refunds.index', ['attention' => 1]) }}" style="color:#7a4a00; font-weight:600;">See the refunds</a>
+                </div>
+            </div>
+        @endif
+
         {{-- Internal check: every deposit's vault equals the sum of its ledger lines --}}
         @if($mismatches)
             <div class="alert-error-tv mb-3">
                 <i class='bx bx-error-circle me-2'></i>
-                <strong>{{ count($mismatches) }} deposit(s) do not add up</strong> (vault ≠ ledger):
+                <strong>{{ count($mismatches) }} deposit(s) do not add up</strong> (vault ≠ ledger, and no flagged refund explains it):
                 @foreach(array_slice($mismatches, 0, 10) as $m)
-                    <a href="{{ route('admin.ledger.index', ['hold' => $m['hold_id']]) }}" class="ms-2" style="color:inherit;">{{ $pad($m['hold_id']) }} (vault {{ $money($m['vault']) }}, ledger {{ $money($m['ledger']) }})</a>
+                    <a href="{{ route('admin.ledger.index', ['hold' => $m['hold_id']]) }}" class="ms-2" style="color:inherit;">{{ $pad($m['hold_id']) }} (vault {{ ($m['vault'] < 0 ? '−' : '').$money($m['vault']) }}, ledger {{ ($m['ledger'] < 0 ? '−' : '').$money($m['ledger']) }})</a>
                 @endforeach
                 <div style="font-size:12px; margin-top:4px;">Nothing is changed automatically. Run <code>php artisan refunds:audit</code> for details.</div>
             </div>
@@ -129,12 +148,11 @@
                             <tr>
                                 <th>Date</th>
                                 <th>User</th>
-                                <th>Type</th>
-                                <th>Details</th>
-                                <th>Deposit</th>
-                                <th>Status</th>
+                                <th>Transaction</th>
+                                <th class="d-none d-md-table-cell">Deposit</th>
+                                <th class="d-none d-md-table-cell">Status</th>
                                 <th style="text-align:right;">Amount</th>
-                                <th style="text-align:right;">Vault effect</th>
+                                <th style="text-align:right;">Effect</th>
                                 <th style="text-align:right;" title="The user's vault balance right after this line">Vault after</th>
                             </tr>
                         </thead>
@@ -171,7 +189,12 @@
                                 @endphp
                                 <tr>
                                     <td style="color:#4b5563; font-size:12px; font-weight:500; white-space:nowrap;">
-                                        {{ $line->occurred_at?->setTimezone($tz)->format('d M Y H:i') ?? '—' }}
+                                        @if($line->occurred_at)
+                                            {{ $line->occurred_at->copy()->setTimezone($tz)->format('d M Y') }}
+                                            <div style="color:#9ca3af; font-size:11px;">{{ $line->occurred_at->copy()->setTimezone($tz)->format('H:i') }}</div>
+                                        @else
+                                            —
+                                        @endif
                                     </td>
                                     <td>
                                         @if($line->user)
@@ -182,20 +205,21 @@
                                             <span style="color:#9ca3af;">Deleted user</span>
                                         @endif
                                     </td>
-                                    <td style="white-space:nowrap; font-size:13px; font-weight:600; color:{{ $kindColor }};">
-                                        <i class='bx {{ $kindIcon }} me-1'></i>{{ $kindLabel }}
+                                    <td style="min-width:220px; white-space:normal;">
+                                        <div style="font-size:13px; font-weight:700; color:{{ $kindColor }};"><i class='bx {{ $kindIcon }} me-1'></i>{{ $kindLabel }}</div>
+                                        <div style="color:#4b5563; font-size:12px; font-weight:500; line-height:1.4; overflow-wrap:anywhere;">{{ $details }}</div>
+                                        <div class="d-md-none mt-1" style="font-size:11px;"><span class="tv-badge badge-{{ ['paid' => 'succeeded', 'won' => 'completed', 'lost' => 'failed', 'open' => 'holding', 'processing' => 'pending'][$line->status] ?? $line->status }}">{{ ucfirst(str_replace('_', ' ', (string) $line->status)) }}</span>@if($line->hold_id) <span style="color:#2563eb; font-weight:700;">{{ $pad($line->hold_id) }}</span>@endif</div>
                                     </td>
-                                    <td style="color:#374151; font-size:12px; font-weight:500; max-width:320px;">{{ $details }}</td>
-                                    <td style="font-size:12px; font-weight:700;">
+                                    <td class="d-none d-md-table-cell" style="font-size:12px; font-weight:700;">
                                         @if($line->hold_id)
                                             <a href="{{ route('admin.ledger.index', ['hold' => $line->hold_id]) }}" style="color:#2563eb; text-decoration:none;" title="Show only this deposit">{{ $pad($line->hold_id) }}</a>
                                         @else
                                             <span style="color:#9ca3af;">—</span>
                                         @endif
                                     </td>
-                                    <td><span class="tv-badge badge-{{ ['paid' => 'succeeded', 'won' => 'completed', 'lost' => 'failed', 'open' => 'holding', 'processing' => 'pending'][$line->status] ?? $line->status }}">{{ ucfirst(str_replace('_', ' ', (string) $line->status)) }}</span></td>
-                                    <td style="text-align:right; color:#111827; font-weight:600; font-size:13px;">{{ $money($line->amount) }}</td>
-                                    <td style="text-align:right; font-weight:700; font-size:13px; color:{{ $effect === null ? '#9ca3af' : ($effect > 0 ? '#1e9c42' : ($effect < 0 ? '#c82333' : '#9ca3af')) }};">
+                                    <td class="d-none d-md-table-cell"><span class="tv-badge badge-{{ ['paid' => 'succeeded', 'won' => 'completed', 'lost' => 'failed', 'open' => 'holding', 'processing' => 'pending'][$line->status] ?? $line->status }}">{{ ucfirst(str_replace('_', ' ', (string) $line->status)) }}</span></td>
+                                    <td style="text-align:right; color:#111827; font-weight:600; font-size:13px; white-space:nowrap;">{{ $money($line->amount) }}</td>
+                                    <td style="text-align:right; font-weight:700; font-size:13px; white-space:nowrap; color:{{ $effect === null ? '#9ca3af' : ($effect > 0 ? '#1e9c42' : ($effect < 0 ? '#c82333' : '#9ca3af')) }};">
                                         @if($effect === null)
                                             <span title="Subscription money is revenue, not vault money">n/a</span>
                                         @elseif($effect == 0)
@@ -204,13 +228,13 @@
                                             {{ ($effect > 0 ? '+' : '−').$money($effect) }}
                                         @endif
                                     </td>
-                                    <td style="text-align:right; color:#374151; font-weight:600; font-size:13px;">
+                                    <td style="text-align:right; color:#374151; font-weight:600; font-size:13px; white-space:nowrap;">
                                         {{ $line->balance_after === null ? '—' : (($line->balance_after < 0 ? '−' : '').$money($line->balance_after)) }}
                                     </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="9" class="text-center py-5" style="color:#6b7280;">
+                                    <td colspan="8" class="text-center py-5" style="color:#6b7280;">
                                         <i class='bx bx-book-content d-block mb-2' style="font-size:28px; color:#d4963e;"></i>
                                         No transactions found
                                     </td>

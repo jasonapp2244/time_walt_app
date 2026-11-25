@@ -29,6 +29,7 @@ class LedgerController extends Controller
             'lines' => $this->ledger->page($filters)->withQueryString(),
             'totals' => $this->ledger->totals($filters),
             'mismatches' => $this->ledger->mismatches(),
+            'paidTwice' => $this->ledger->paidTwice(),
             'stripeCheck' => Cache::get(StripeSyncMissed::CACHE_KEY),
             'filters' => $filters,
             'filterUser' => $user,

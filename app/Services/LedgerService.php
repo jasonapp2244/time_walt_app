@@ -232,8 +232,44 @@ class LedgerService
     }
 
     /**
+     * Money refunded to the card that the vault no longer held (it had
+     * already been withdrawn): paid out twice, so the user owes it. These
+     * refunds are flagged (needs_attention) when recorded; per deposit.
+     */
+    private function owedByHold(): Builder
+    {
+        return DB::table('refunds')
+            ->where('needs_attention', true)
+            ->whereIn('status', Refund::ACTIVE_STATUSES)
+            ->whereNotNull('payment_hold_id')
+            ->groupBy('payment_hold_id', 'user_id')
+            ->selectRaw('payment_hold_id, user_id, sum(amount - vault_amount - reversed_amount) as owed')
+            ->havingRaw('sum(amount - vault_amount - reversed_amount) > 0');
+    }
+
+    /**
+     * Deposits paid out twice (withdrawn, then also refunded to the card in
+     * Stripe). Known and explained: the ledger is right, the user owes it.
+     *
+     * @return array{deposits: int, total: float, users: array<int, array{user_id: int|null, deposits: int, owed: float}>}
+     */
+    public function paidTwice(): array
+    {
+        $rows = DB::query()->fromSub($this->owedByHold(), 'o')->get();
+
+        return [
+            'deposits' => $rows->count(),
+            'total' => round((float) $rows->sum('owed'), 2),
+            'users' => $rows->groupBy('user_id')
+                ->map(fn ($g, $userId) => ['user_id' => $userId ? (int) $userId : null, 'deposits' => $g->count(), 'owed' => round((float) $g->sum('owed'), 2)])
+                ->sortByDesc('owed')->values()->all(),
+        ];
+    }
+
+    /**
      * Deposits whose vault (payment_holds.remaining_amount) does not match
-     * the ledger. Empty when everything adds up.
+     * the ledger and that no flagged double payout explains. Empty when
+     * everything adds up.
      *
      * @return array<int, array{hold_id: int, user_id: int|null, vault: float, ledger: float}>
      */
@@ -246,8 +282,9 @@ class LedgerService
 
         return DB::table('payment_holds as h')
             ->leftJoinSub($byHold, 'l', 'l.hold_id', '=', 'h.id')
+            ->leftJoinSub($this->owedByHold(), 'o', 'o.payment_hold_id', '=', 'h.id')
             ->whereNotNull('h.remaining_amount')
-            ->whereRaw('round(h.remaining_amount, 2) <> round(coalesce(l.ledger, 0), 2)')
+            ->whereRaw('round(h.remaining_amount, 2) <> round(coalesce(l.ledger, 0) + coalesce(o.owed, 0), 2)')
             ->orderBy('h.id')
             ->limit($limit)
             ->get(['h.id', 'h.user_id', 'h.remaining_amount', 'l.ledger'])

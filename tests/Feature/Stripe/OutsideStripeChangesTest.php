@@ -175,7 +175,9 @@ class OutsideStripeChangesTest extends TestCase
         // Refund first (the vault covers only $30, so it is flagged) ...
         $this->postStripeWebhook($this->stripeEvent('refund.created', $refund))->assertOk();
         $this->assertTrue(\App\Models\Refund::sole()->needs_attention);
-        $this->assertSame(1, Artisan::call('refunds:audit'), 'uncovered refund shows as a mismatch');
+        $this->assertSame(0, Artisan::call('refunds:audit'), 'an uncovered refund is a known double payout, not a ledger error');
+        $this->assertStringContainsString('paid out twice', Artisan::output());
+        $this->assertSame([], \Illuminate\Support\Facades\Cache::get('refunds:audit:mismatches'));
 
         // ... then reverse $50 of the transfer: it covers part of the $70 owed, nothing reaches the vault.
         $this->transferReversed([['id' => 'trr_part', 'object' => 'transfer_reversal', 'amount' => 5000, 'metadata' => []]]);

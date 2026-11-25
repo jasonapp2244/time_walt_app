@@ -120,6 +120,33 @@ class LedgerTest extends TestCase
         $this->actingAs($this->admin)->get(route('admin.ledger.index'))->assertOk()->assertSee('1 deposit(s) do not add up');
     }
 
+    public function test_a_deposit_withdrawn_and_then_refunded_shows_as_paid_twice_not_as_an_error(): void
+    {
+        // $10 withdrawn, then also refunded to the card in the Stripe Dashboard.
+        $payment = Payment::factory()->create(['user_id' => $this->user->id, 'amount' => 10]);
+        $hold = PaymentHold::factory()->create(['payment_id' => $payment->id, 'user_id' => $this->user->id, 'amount' => 10, 'remaining_amount' => 0, 'status' => 'transferred']);
+        Transfer::factory()->create(['hold_id' => $hold->id, 'user_id' => $this->user->id, 'amount' => 10, 'status' => 'completed']);
+        Refund::factory()->create([
+            'payment_id' => $payment->id, 'payment_hold_id' => $hold->id, 'user_id' => $this->user->id,
+            'amount' => 10, 'vault_amount' => 0, 'reversed_amount' => 0, 'source' => 'stripe_dashboard', 'needs_attention' => true,
+        ]);
+
+        $this->assertSame([], app(LedgerService::class)->mismatches(), 'explained, so not a "does not add up" error');
+        $paidTwice = app(LedgerService::class)->paidTwice();
+        $this->assertSame(1, $paidTwice['deposits']);
+        $this->assertSame(10.0, $paidTwice['total']);
+        $this->assertSame($this->user->id, $paidTwice['users'][0]['user_id']);
+
+        $this->actingAs($this->admin)->get(route('admin.ledger.index'))->assertOk()
+            ->assertSee('Paid out twice: $10.00 on 1 deposit(s)')
+            ->assertDontSee('do not add up');
+
+        // A real error on top is still shown in red, with its sign.
+        $hold->update(['remaining_amount' => 5]);
+        $this->assertSame(5.0, app(LedgerService::class)->mismatches()[0]['vault']);
+        $this->actingAs($this->admin)->get(route('admin.ledger.index'))->assertSee('ledger −$10.00', false);
+    }
+
     public function test_filters_by_deposit_and_type_and_rejects_bad_input(): void
     {
         $byHold = app(LedgerService::class)->page(['hold_id' => $this->holdB->id])->getCollection();

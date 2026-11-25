@@ -35,6 +35,7 @@ class RefundsAudit extends Command
             ->get();
 
         $mismatches = [];
+        $paidTwice = [];
 
         foreach ($holds as $hold) {
             $transfers = $hold->transfers
@@ -53,6 +54,19 @@ class RefundsAudit extends Command
             $accounted = $this->cents($hold->remaining_amount ?? 0) + $transfers + $refunds + $disputes;
             $difference = $this->cents($hold->amount) - $accounted;
 
+            // Refunded to the card after the money was already withdrawn: the
+            // refund is flagged and the user owes it. Known, not a ledger error.
+            $owed = $hold->refunds
+                ->where('needs_attention', true)
+                ->whereIn('status', Refund::ACTIVE_STATUSES)
+                ->sum(fn ($r) => $this->cents($r->amount) - $this->cents($r->vault_amount) - $this->cents($r->reversed_amount));
+
+            if ($difference !== 0 && $owed > 0 && $difference + $owed === 0) {
+                $paidTwice[] = [$hold->id, $hold->user_id, $owed / 100];
+
+                continue;
+            }
+
             if ($difference !== 0) {
                 $mismatches[] = [
                     'hold_id' => $hold->id,
@@ -67,8 +81,14 @@ class RefundsAudit extends Command
 
         Cache::forever(RefundController::AUDIT_CACHE_KEY, $mismatches);
 
+        if ($paidTwice !== []) {
+            $this->warn(count($paidTwice).' deposit(s) were paid out twice (withdrawn, then also refunded to the card); the user owes $'
+                .number_format(array_sum(array_column($paidTwice, 2)), 2).'. Flagged on the Refunds page; reverse the withdrawals in Stripe to recover it.');
+            $this->table(['Hold', 'User', 'Owed'], $paidTwice);
+        }
+
         if ($mismatches === []) {
-            $this->info("All {$holds->count()} refunded deposit(s) add up.");
+            $this->info("All {$holds->count()} refunded deposit(s) add up".($paidTwice === [] ? '.' : ' (the double payouts above are explained).'));
 
             return self::SUCCESS;
         }
