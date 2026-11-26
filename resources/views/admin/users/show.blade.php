@@ -21,6 +21,10 @@
                 <a href="{{ route('admin.ledger.index', ['user' => $user->id]) }}" class="btn-tv-outline">
                     <i class='bx bx-book-content me-1'></i>Ledger
                 </a>
+                @php $userStripeFees = (float) \App\Models\StripeFee::where('user_id', $user->id)->sum('fee'); @endphp
+                <a href="{{ route('admin.ledger.fees', ['user' => $user->id]) }}" class="btn-tv-outline" title="Fees Stripe kept on this user's payments">
+                    <i class='bx bx-receipt me-1'></i>Stripe fees: {{ ($userStripeFees < 0 ? '+' : '').'$'.number_format(abs($userStripeFees), 2) }}
+                </a>
             </div>
         </div>
 

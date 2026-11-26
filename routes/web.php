@@ -59,6 +59,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
         // Ledger (read-only: every money movement of every user)
         Route::get('/ledger', [LedgerController::class, 'index'])->name('ledger.index');
+        Route::get('/ledger/fees', [LedgerController::class, 'fees'])->name('ledger.fees');
+        Route::get('/ledger/fees/export', [LedgerController::class, 'feesExport'])->name('ledger.fees.export');
 
         // Payments
         Route::get('/payments', [PaymentController::class, 'index'])->name('payments.index');

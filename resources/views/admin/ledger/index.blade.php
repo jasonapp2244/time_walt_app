@@ -7,6 +7,10 @@
     $tz = config('app.admin_timezone');
     $money = fn ($v) => '$'.number_format(abs((float) $v), 2);
     $pad = fn ($id) => $id ? '#'.str_pad((string) $id, 5, '0', STR_PAD_LEFT) : '—';
+    // The Stripe fee on a line: "−$58.30"; $0.00 on a payment that never went through (Stripe charges nothing); — when Stripe kept none.
+    $feeText = fn ($line) => $line->fee !== null && (float) $line->fee != 0
+        ? ((float) $line->fee > 0 ? '−' : '+').$money($line->fee)
+        : ($line->kind === 'payment' && $line->status !== 'succeeded' ? '$0.00' : '—');
     $kindLabels = [
         'payment' => ['Deposit', 'bx-down-arrow-circle', '#1e9c42'],
         'withdrawal' => ['Withdrawal', 'bx-send', '#0d5ed4'],
@@ -28,10 +32,12 @@
                 <h4 class="section-heading">Ledger</h4>
                 <p class="section-sub">Every money movement of every user — deposits, withdrawals, refunds, chargebacks and subscriptions — straight from the records the app keeps with Stripe</p>
             </div>
-            <div class="ms-auto">
+            <div class="ms-auto d-flex align-items-center gap-2">
                 <span style="font-size:13px; color:#92621a; font-weight:700;">{{ number_format($lines->total()) }} lines</span>
             </div>
         </div>
+
+        @include('admin.ledger.partials.tabs', ['active' => 'transactions'])
 
         {{-- Stripe check (nightly stripe:sync-missed) --}}
         @if($stripeCheck)
@@ -107,12 +113,20 @@
                 ['Chargebacks lost', $totals['chargebacks_lost'], 'red', 'bx-shield-x'],
                 [$filters['from'] || $filters['to'] || $filters['group'] ? 'Vault change (filtered)' : 'In vaults now', $totals['vault'], 'gold', 'bx-lock-alt'],
                 ['Subscriptions (net)', $totals['subscriptions'], 'cream', 'bx-crown'],
-            ] as [$label, $value, $color, $icon])
-                <div class="col-6 col-md-4 col-xl-2">
+                $filterUser
+                    ? ['This user\'s Stripe fees', -$userFees, 'red', 'bx-receipt', round($userFees, 2) != round($totals['fees'], 2) ? '−'.$money($totals['fees']).' on the lines below; the rest is on payments with no ledger line' : null]
+                    : ['Stripe fees on these lines', -$totals['fees'], 'red', 'bx-receipt', 'All fees incl. platform: Stripe fees tab'],
+                ['Deposits after fees', $totals['deposits'] - $totals['deposit_fees'], 'green', 'bx-wallet'],
+            ] as $card)
+                @php [$label, $value, $color, $icon] = $card; $note = $card[4] ?? null; @endphp
+                <div class="col-6 col-md-4 col-xl-3">
                     <div class="stat-card">
                         <div class="stat-icon {{ $color }} mb-2"><i class='bx {{ $icon }}'></i></div>
                         <div class="stat-value" style="font-size:18px;">{{ ($value < 0 ? '−' : '').$money($value) }}</div>
                         <div class="stat-label">{{ $label }}</div>
+                        @if($note)
+                            <a href="{{ route('admin.ledger.fees', array_filter(['user' => $filters['user'], 'from' => $filters['from'], 'to' => $filters['to']])) }}" style="display:block; font-size:11px; color:#6b7280; margin-top:4px; text-decoration:none;">{{ $note }}</a>
+                        @endif
                     </div>
                 </div>
             @endforeach
@@ -152,6 +166,7 @@
                                 <th class="d-none d-md-table-cell">Deposit</th>
                                 <th class="d-none d-md-table-cell">Status</th>
                                 <th style="text-align:right;">Amount</th>
+                                <th class="d-none d-md-table-cell" style="text-align:right;" title="The fee Stripe kept on this line">Stripe fee</th>
                                 <th style="text-align:right;">Effect</th>
                                 <th style="text-align:right;" title="The user's vault balance right after this line">Vault after</th>
                             </tr>
@@ -218,7 +233,11 @@
                                         @endif
                                     </td>
                                     <td class="d-none d-md-table-cell"><span class="tv-badge badge-{{ ['paid' => 'succeeded', 'won' => 'completed', 'lost' => 'failed', 'open' => 'holding', 'processing' => 'pending'][$line->status] ?? $line->status }}">{{ ucfirst(str_replace('_', ' ', (string) $line->status)) }}</span></td>
-                                    <td style="text-align:right; color:#111827; font-weight:600; font-size:13px; white-space:nowrap;">{{ $money($line->amount) }}</td>
+                                    <td style="text-align:right; color:#111827; font-weight:600; font-size:13px; white-space:nowrap;">
+                                        {{ $money($line->amount) }}
+                                        @if($feeText($line) !== '—')<div class="d-md-none" style="color:#b45309; font-size:11px; font-weight:600;">fee {{ $feeText($line) }}</div>@endif
+                                    </td>
+                                    <td class="d-none d-md-table-cell" style="text-align:right; font-size:12px; font-weight:600; white-space:nowrap; color:{{ $feeText($line) === '—' || $feeText($line) === '$0.00' ? '#9ca3af' : '#b45309' }};">{{ $feeText($line) }}</td>
                                     <td style="text-align:right; font-weight:700; font-size:13px; white-space:nowrap; color:{{ $effect === null ? '#9ca3af' : ($effect > 0 ? '#1e9c42' : ($effect < 0 ? '#c82333' : '#9ca3af')) }};">
                                         @if($effect === null)
                                             <span title="Subscription money is revenue, not vault money">n/a</span>
@@ -234,7 +253,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="8" class="text-center py-5" style="color:#6b7280;">
+                                    <td colspan="9" class="text-center py-5" style="color:#6b7280;">
                                         <i class='bx bx-book-content d-block mb-2' style="font-size:28px; color:#d4963e;"></i>
                                         No transactions found
                                     </td>
@@ -255,6 +274,8 @@
             <strong>How to read it:</strong> "Vault effect" is how the line changed the money Time Vault holds for that user
             (deposit +, withdrawal −, money pulled back +, refund −, lost chargeback −). "Vault after" is that user's balance right after the line.
             Failed payments, withdrawals and refunds are listed for the record with $0.00 effect. Stripe is checked every night and anything missed is recorded automatically.
+            "Stripe fee" is what Stripe kept on that line (card fee on a deposit or subscription, the fee on a chargeback); it is Time Vault's cost and does not change the vault.
+            A failed payment costs $0.00. Account-level fees (Connect, Radar) belong to no user and are on the <a href="{{ route('admin.ledger.fees', array_filter(['user' => $filters['user'], 'from' => $filters['from'], 'to' => $filters['to']])) }}">Fees</a> tab.
         </p>
 
     </div>

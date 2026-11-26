@@ -5,9 +5,11 @@ namespace App\Services;
 use App\Models\Dispute;
 use App\Models\Payment;
 use App\Models\Refund;
+use App\Models\StripeFee;
 use App\Models\SubscriptionInvoice;
 use App\Models\Transfer;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
@@ -30,6 +32,11 @@ use Illuminate\Support\Facades\DB;
  *
  * The sum of the effects is the same formula refunds:audit checks:
  * amount = remaining + (transfers − reversed) + refunds + lost chargebacks.
+ *
+ * Each line also carries the Stripe fee kept on it (from stripe_fees, see
+ * stripe:sync-fees): card fees on deposits and subscriptions, the chargeback
+ * fee on the chargeback line. Fees are Time Vault's cost, so they never
+ * change the vault effect or the running balance.
  */
 class LedgerService
 {
@@ -65,14 +72,15 @@ class LedgerService
              (select ph.id from payment_holds ph where ph.payment_id = payments.id order by ph.id limit 1) as hold_id,
              coalesce(paid_at, created_at) as occurred_at, amount,
              case when status = 'succeeded' then amount else 0 end as effect,
-             status, 10 as seq"
+             status, 10 as seq,
+             (select sum(f.fee) from stripe_fees f where f.payment_id = payments.id and f.dispute_id is null) as fee"
         );
 
         $withdrawals = DB::table('transfers')->selectRaw(
             "'withdrawal' as kind, id as source_id, user_id, hold_id,
              coalesce(transferred_at, created_at) as occurred_at, amount,
              case when status in ".self::TRANSFER_OUT.' then -amount else 0 end as effect,
-             status, 30 as seq'
+             status, 30 as seq, null as fee'
         );
 
         // Pulled back by our refund code: dated by the refund that needed it.
@@ -83,7 +91,7 @@ class LedgerService
                  coalesce((select min(r.created_at) from refunds r where r.payment_hold_id = transfers.hold_id and r.reversed_amount > 0), updated_at) as occurred_at,
                  reversed_amount - coalesce(manual_reversed_amount, 0) as amount,
                  reversed_amount - coalesce(manual_reversed_amount, 0) as effect,
-                 status, 35 as seq"
+                 status, 35 as seq, null as fee"
             );
 
         $manualReversals = DB::table('transfers')
@@ -91,21 +99,22 @@ class LedgerService
             ->selectRaw(
                 "'reversal_manual' as kind, id as source_id, user_id, hold_id,
                  updated_at as occurred_at, manual_reversed_amount as amount, manual_reversed_amount as effect,
-                 status, 36 as seq"
+                 status, 36 as seq, null as fee"
             );
 
         $refunds = DB::table('refunds')->selectRaw(
             "'refund' as kind, id as source_id, user_id, payment_hold_id as hold_id,
              coalesce(refunded_at, created_at) as occurred_at, amount,
              case when status in ('pending','succeeded') then -amount else 0 end as effect,
-             status, 40 as seq"
+             status, 40 as seq, null as fee"
         );
 
         $disputesOpened = DB::table('disputes')->selectRaw(
             "'chargeback_opened' as kind, id as source_id, user_id, payment_hold_id as hold_id,
              created_at as occurred_at, amount,
              case when payment_id is null then null else 0 end as effect,
-             outcome as status, 50 as seq"
+             outcome as status, 50 as seq,
+             (select sum(f.fee) from stripe_fees f where f.dispute_id = disputes.id) as fee"
         );
 
         $disputesClosed = DB::table('disputes')
@@ -114,13 +123,14 @@ class LedgerService
                 "concat('chargeback_', outcome) as kind, id as source_id, user_id, payment_hold_id as hold_id,
                  coalesce(closed_at, updated_at) as occurred_at, amount,
                  case when payment_id is null then null when outcome = 'lost' then -vault_amount else 0 end as effect,
-                 outcome as status, 51 as seq"
+                 outcome as status, 51 as seq, null as fee"
             );
 
         $subscriptions = DB::table('subscription_invoices')->selectRaw(
             "'subscription' as kind, id as source_id, user_id, null as hold_id,
              coalesce(paid_at, created_at) as occurred_at, amount, null as effect,
-             'paid' as status, 60 as seq"
+             'paid' as status, 60 as seq,
+             (select sum(f.fee) from stripe_fees f where f.subscription_invoice_id = subscription_invoices.id and f.dispute_id is null) as fee"
         );
 
         $subscriptionRefunds = DB::table('subscription_invoices')
@@ -128,7 +138,7 @@ class LedgerService
             ->selectRaw(
                 "'subscription_refund' as kind, id as source_id, user_id, null as hold_id,
                  coalesce(refunded_at, updated_at) as occurred_at, refunded_amount as amount, null as effect,
-                 'refunded' as status, 61 as seq"
+                 'refunded' as status, 61 as seq, null as fee"
             );
 
         $union = $payments
@@ -207,12 +217,12 @@ class LedgerService
     /**
      * Totals for the filtered lines.
      *
-     * @return array{deposits: float, withdrawn: float, pulled_back: float, refunded: float, chargebacks_lost: float, vault: float, subscriptions: float, lines: int}
+     * @return array{deposits: float, withdrawn: float, pulled_back: float, refunded: float, chargebacks_lost: float, vault: float, subscriptions: float, fees: float, deposit_fees: float, lines: int}
      */
     public function totals(array $filters): array
     {
         $byKind = $this->filtered($filters)
-            ->selectRaw('kind, count(*) as n, sum(effect) as effect, sum(amount) as amount')
+            ->selectRaw('kind, count(*) as n, sum(effect) as effect, sum(amount) as amount, sum(fee) as fee')
             ->groupBy('kind')
             ->get()
             ->keyBy('kind');
@@ -227,7 +237,98 @@ class LedgerService
             'chargebacks_lost' => -$effect(['chargeback_lost']),
             'vault' => round((float) $byKind->sum('effect'), 2),
             'subscriptions' => round((float) ($byKind['subscription']->amount ?? 0) - (float) ($byKind['subscription_refund']->amount ?? 0), 2),
+            // Stripe fees on these lines (Time Vault's cost; not vault money).
+            'fees' => round((float) $byKind->sum('fee'), 2),
+            'deposit_fees' => round((float) ($byKind['payment']->fee ?? 0), 2),
             'lines' => (int) $byKind->sum('n'),
+        ];
+    }
+
+    /**
+     * Every fee Stripe kept (stripe_fees, filled by stripe:sync-fees), with
+     * the filters: user_id, category, from, to. Includes platform fees that
+     * belong to no user, so with no filter it is Stripe's whole fee total.
+     */
+    public function feeQuery(array $filters): EloquentBuilder
+    {
+        $query = StripeFee::query();
+
+        if (isset($filters['user_id'])) {
+            $query->where('user_id', (int) $filters['user_id']);
+        }
+
+        if (! empty($filters['category']) && isset(StripeFee::CATEGORIES[$filters['category']])) {
+            $query->where('category', $filters['category']);
+        }
+
+        $tz = config('app.admin_timezone');
+
+        if (! empty($filters['from'])) {
+            $query->where('occurred_at', '>=', Carbon::parse($filters['from'], $tz)->startOfDay()->utc());
+        }
+
+        if (! empty($filters['to'])) {
+            $query->where('occurred_at', '<=', Carbon::parse($filters['to'], $tz)->endOfDay()->utc());
+        }
+
+        return $query;
+    }
+
+    /** One page of fee records, newest first, with their user and deposit. */
+    public function fees(array $filters, int $perPage = 25): LengthAwarePaginator
+    {
+        return $this->feeQuery($filters)
+            ->with(['user', 'payment.hold', 'dispute'])
+            ->orderByDesc('occurred_at')->orderByDesc('id')
+            ->paginate($perPage);
+    }
+
+    /**
+     * Fee totals for the filters: grand total, by category, users vs
+     * platform, and the users who cost the most in fees.
+     *
+     * @return array{total: float, gross: float, net: float, records: int, users: float, platform: float, unlinked: float, by_category: array<string, float>, top_users: array<int, array{user_id: int, user: User|null, fees: float, records: int}>}
+     */
+    public function feeTotals(array $filters): array
+    {
+        $byCategory = $this->feeQuery($filters)
+            ->toBase()
+            ->selectRaw('category, count(*) as n, sum(fee) as fee, sum(gross) as gross, sum(net) as net, sum(case when user_id is null then fee else 0 end) as no_user')
+            ->groupBy('category')
+            ->get()
+            ->keyBy('category');
+
+        $top = $this->feeQuery($filters)
+            ->toBase()
+            ->whereNotNull('user_id')
+            ->selectRaw('user_id, count(*) as n, sum(fee) as fee')
+            ->groupBy('user_id')
+            ->orderByDesc('fee')
+            ->limit(10)
+            ->get();
+        $users = User::whereIn('id', $top->pluck('user_id'))->get()->keyBy('id');
+
+        $total = round((float) $byCategory->sum('fee'), 2);
+        $noUser = round((float) $byCategory->sum('no_user'), 2);
+        $platform = round((float) ($byCategory['platform']->fee ?? 0), 2);
+
+        return [
+            'total' => $total,
+            'gross' => round((float) $byCategory->sum('gross'), 2),
+            'net' => round((float) $byCategory->sum('net'), 2),
+            'records' => (int) $byCategory->sum('n'),
+            'users' => round($total - $noUser, 2),
+            // Stripe account fees (Connect, Radar, …): nobody's payment.
+            'platform' => $platform,
+            // Fees on payments the app has no user for (for example deleted test data).
+            'unlinked' => round($noUser - $platform, 2),
+            'by_category' => $byCategory->map(fn ($r) => round((float) $r->fee, 2))->all(),
+            'top_users' => $top->map(fn ($r) => [
+                'user_id' => (int) $r->user_id,
+                'user' => $users[$r->user_id] ?? null,
+                'fees' => round((float) $r->fee, 2),
+                'records' => (int) $r->n,
+            ])->all(),
         ];
     }
 

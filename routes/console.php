@@ -56,3 +56,10 @@ Schedule::command('stripe:sync-missed --apply --notify')
     ->timezone('UTC')
     ->withoutOverlapping()
     ->description('Record refunds, chargebacks and reversals Stripe has but the webhooks missed');
+
+// Cron 8: Copy the fees Stripe kept (card, chargeback, Connect) for the admin Ledger → Fees.
+// Reads the last 3 days every hour, so a missed run leaves no gap; saving twice changes nothing.
+Schedule::command('stripe:sync-fees --apply')
+    ->hourly()
+    ->withoutOverlapping()
+    ->description('Copy the fees Stripe kept into the admin ledger');

@@ -1,3 +1,4 @@
+- [ ] Stripe fees (2026-11-27, pushed to main): user deploys (1 additive migration); then on live `php artisan stripe:sync-fees --since=2026-01-01` (dry run) → `--apply`; check `schedule:list | grep sync-fees`; compare Fees tab Oct 30–Nov 30 total with Stripe → Reports → Balance → Fees.
 - [ ] Admin refund (`feature/admin-refund`, uncommitted): user reviews → says commit → commit, merge, deploy (migration `2026_11_24_000001_create_refunds_table`).
 - [ ] Client, Stripe Dashboard (test AND live): add webhook events `charge.refunded`, `refund.created`, `refund.updated`, `refund.failed`; decide Stripe's own refund email ON/OFF; keep platform balance; never reverse transfers by hand.
 - [ ] After deploy: `php artisan migrate`, `deploy:check`, one small real deposit + refund on own card.
